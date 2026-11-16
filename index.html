@@ -1064,22 +1064,97 @@ function wireSheet() {
 }
 
 /* lettura della formazione dalla foto, fatta da Claude */
+
 async function readLineup(side, stat) {
-  if (!API.sample) { stat.textContent = 'Lettura automatica non disponibile: scrivi i nomi guardando la foto.'; return; }
-  if (!photos[side]) { toast('Prima scegli la foto'); return; }
-  stat.textContent = 'Claude sta leggendo la lista…';
+  if (!photos[side]) {
+    toast('Prima scegli la foto');
+    return;
+  }
+
+  if (!window.Tesseract) {
+    stat.textContent = 'Motore OCR non caricato. Aggiorna la pagina e riprova.';
+    return;
+  }
+
+  stat.textContent = 'Preparazione della lettura...';
+
   try {
-    try { const lim = await API.sample.limits(); if (lim && !lim.images) { stat.textContent = 'La lettura delle foto non è abilitata: scrivi i nomi a mano.'; return; } } catch (e) {}
-    const prompt = 'La foto è una lista di presentazione (distinta) di una partita di calcio dilettantistica italiana. Estrai i giocatori nell\'ordine in cui compaiono. Rispondi SOLO con JSON valido, senza altro testo, in questo formato: {"titolari":[{"n":"1","nome":"Cognome Nome"}],"panchina":[{"n":"12","nome":"Cognome Nome"}]}. "n" è il numero di maglia (stringa vuota se assente). Se la lista non distingue titolari e panchina, metti i primi 11 tra i titolari e gli altri in panchina. Se un nome è illeggibile, omettilo.';
-    const res = await API.sample(prompt, { images: [photos[side].blob], cache: false });
-    const txt = res.text || '', j = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1));
-    const line = p => `${String(p.n || '').trim()} ${String(p.nome || '').trim()}`.trim();
-    const out = (j.titolari || []).map(line); if ((j.panchina || []).length) { out.push('---'); (j.panchina || []).forEach(p => out.push(line(p))); }
-    if (!out.length) { stat.textContent = 'Nessun nome riconosciuto: scrivili a mano.'; return; }
-    $(`[data-roster="${side}"]`).value = out.join('\n'); $(`[data-roster="${side}"]`).dispatchEvent(new Event('input', { bubbles: true }));
-    stat.textContent = 'Fatto. Controlla i nomi e premi “Salva e mostra online”.';
-  } catch (err) { stat.textContent = err && err.code === 'not_granted' ? 'Autorizzazione negata: scrivi i nomi a mano.' : 'Lettura non riuscita: scrivi i nomi guardando la foto.'; }
+    const result = await Tesseract.recognize(
+      photos[side].blob,
+      'ita',
+      {
+        logger: message => {
+          if (message.status === 'recognizing text') {
+            stat.textContent =
+              'Riconoscimento testo: ' +
+              Math.round((message.progress || 0) * 100) + '%';
+          }
+        }
+      }
+    );
+
+    const text = result.data.text || '';
+
+    const lines = text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    const players = [];
+
+    for (const line of lines) {
+      const clean = line.replace(/\s+/g, ' ').trim();
+
+      if (
+        /^(titolari|formazione|panchina|riserve|a disposizione|allenatore|dirigente)/i.test(clean)
+      ) continue;
+
+      const match = clean.match(/^(\d{1,2})[\s.)\-:]+(.{3,})$/);
+
+      if (match) {
+        players.push({
+          n: match[1],
+          nome: match[2].trim()
+        });
+      }
+    }
+
+    if (!players.length) {
+      stat.textContent =
+        'Nessun giocatore riconosciuto con sicurezza. Prova una foto più nitida.';
+      return;
+    }
+
+    const titolari = players.slice(0, 11);
+    const panchina = players.slice(11);
+
+    const format = p =>
+      `${p.n} ${p.nome}`.trim();
+
+    const output = titolari.map(format);
+
+    if (panchina.length) {
+      output.push('---');
+      panchina.forEach(p => output.push(format(p)));
+    }
+
+    const field = document.querySelector(
+      `[data-roster="${side}"]`
+    );
+
+    field.value = output.join('\n');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+
+    stat.textContent =
+      `Riconosciuti ${players.length} giocatori. Controlla e correggi la lista prima di salvare.`;
+
+  } catch (error) {
+    console.error(error);
+    stat.textContent =
+      'Lettura non riuscita. Controlla la foto e riprova.';
+  }
 }
+
 
 /* ================= avvio ================= */
 (async function start() {
