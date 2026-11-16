@@ -985,7 +985,7 @@ document.addEventListener('click', async e => {
     case 'markdone': { const so = socialOf(postId); so.status = so.status === 'pubblicato' ? 'bozza' : 'pubblicato'; saveL(); $('#postDlg').close(); renderMain(); break; }
     case 'copyall': if (S.events.length) copyText(S.events.map(x => evText(x).replace(/\n\n#\S+$/, '')).join('\n\n')); break;
     case 'export': saveBlob(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `cronaca-${S.match.date || 'partita'}.json`); break;
-    case 'readlist': toast('Riconoscimento automatico non incluso nella versione indipendente: inserisci la formazione manualmente.'); break;
+    case 'readlist': await readLineup(a.dataset.s, document.querySelector('[data-ocrstat="' + a.dataset.s + '"]')); break;
     case 'savelineup': { const s = a.dataset.s; S.rosters[s] = $(`[data-roster="${s}"]`).value; commit(true); toast('Formazione salvata: compare nella pagina live'); break; }
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
