@@ -1478,50 +1478,64 @@ async function renderPhaseCard(ev) {
   const score = ev.type === 'kickoff' ? [0, 0] : scoreOf(prior);
   const goals = prior.filter(e => e.type === 'goal');
   const title = ev.type === 'kickoff' ? 'KICK OFF' : ev.type === 'halftime' ? 'HALF TIME' : 'FULL TIME';
-  const accent = ev.type === 'kickoff' ? '#c8ef78' : ev.type === 'halftime' ? '#f4c542' : '#c8ef78';
+  const accent = ev.type === 'halftime' ? '#f4c542' : '#c8ef78';
   const grad = x.createLinearGradient(0,0,W,H);
   grad.addColorStop(0,'#06130b'); grad.addColorStop(.52,'#17482a'); grad.addColorStop(1,'#030a06');
   x.fillStyle=grad; x.fillRect(0,0,W,H);
   const glow=x.createRadialGradient(540,420,40,540,420,720);
-  glow.addColorStop(0,'rgba(91,220,119,.24)'); glow.addColorStop(1,'rgba(0,0,0,0)');
+  glow.addColorStop(0,'rgba(91,220,119,.22)'); glow.addColorStop(1,'rgba(0,0,0,0)');
   x.fillStyle=glow; x.fillRect(0,0,W,H);
-  x.strokeStyle='rgba(255,255,255,.13)'; x.lineWidth=3; x.strokeRect(38,38,W-76,H-76); x.strokeRect(55,55,W-110,H-110);
-  x.fillStyle=accent; x.textAlign='center'; x.font=`900 30px ${FB}`;
-  x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER',W/2,125);
-  x.font=`900 94px ${FD}`; x.fillText(title,W/2,255);
-  x.fillStyle='rgba(255,255,255,.72)'; x.font=`600 26px ${FB}`;
+  x.strokeStyle='rgba(255,255,255,.13)'; x.lineWidth=3; x.strokeRect(38,38,W-76,H-76);
+  x.strokeStyle='rgba(200,239,120,.18)'; x.lineWidth=2; x.strokeRect(54,54,W-108,H-108);
+
+  // Intestazione: spaziatura costante e gerarchia tipografica.
+  x.textAlign='center'; x.fillStyle=accent; x.font=`800 26px ${FB}`;
+  x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER',W/2,112);
+  x.fillStyle='#fff'; x.font=`900 92px ${FD}`; x.fillText(title,W/2,230);
   const meta=[S.match.comp,S.match.venue,fmtDate(S.match.date)].filter(Boolean).join('  •  ');
-  if(meta) x.fillText(meta,W/2,310);
-  const safeLogo = src => new Promise(resolve=>{ if(!src)return resolve(null); const im=new Image(); if(/^https?:/i.test(src))im.crossOrigin='anonymous'; im.onload=()=>resolve(im); im.onerror=()=>resolve(null); im.src=src; });
+  if(meta){x.fillStyle='rgba(255,255,255,.68)';x.font=`600 23px ${FB}`;fitFont(x,meta,850,23,600,FB);x.fillText(meta,W/2,285);}
+
+  // Pannello centrale: loghi, nomi e punteggio su un'unica griglia.
+  const safeLogo = src => new Promise(resolve=>{if(!src)return resolve(null);const im=new Image();if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src;});
   const [lh,la]=await Promise.all([safeLogo(S.logos.home),safeLogo(S.logos.away)]);
-  drawLogo(x,lh,teamName('home'),220,510,176,FD); drawLogo(x,la,teamName('away'),860,510,176,FD);
-  x.fillStyle='#fff'; x.textAlign='center'; x.font=`900 150px ${FD}`;
-  x.fillText(`${score[0]}  –  ${score[1]}`,W/2,565);
-  x.fillStyle='rgba(255,255,255,.9)'; x.font=`800 31px ${FD}`;
-  fitFont(x,teamName('home').toUpperCase(),350,31,800,FD); x.fillText(teamName('home').toUpperCase(),220,650);
-  fitFont(x,teamName('away').toUpperCase(),350,31,800,FD); x.fillText(teamName('away').toUpperCase(),860,650);
-  x.fillStyle=accent; x.fillRect(100,710,880,5);
+  drawLogo(x,lh,teamName('home'),225,455,154,FD);
+  drawLogo(x,la,teamName('away'),855,455,154,FD);
+  x.fillStyle='#fff';x.textAlign='center';x.font=`900 142px ${FD}`;
+  x.fillText(`${score[0]} – ${score[1]}`,W/2,500);
+  x.fillStyle='rgba(255,255,255,.94)';x.font=`800 29px ${FD}`;
+  fitFont(x,teamName('home').toUpperCase(),350,29,800,FD);x.fillText(teamName('home').toUpperCase(),225,590);
+  fitFont(x,teamName('away').toUpperCase(),350,29,800,FD);x.fillText(teamName('away').toUpperCase(),855,590);
+
+  // Separatore e area contenuti: i marcatori non invadono mai il piè di pagina.
+  x.fillStyle=accent;x.fillRect(100,655,880,4);
   if(ev.type==='kickoff'){
-    x.fillStyle='#fff'; x.font=`800 48px ${FD}`; x.fillText('SI PARTE!',W/2,855);
-    x.fillStyle='rgba(255,255,255,.72)'; x.font=`600 27px ${FB}`; x.fillText('La partita è iniziata',W/2,915);
+    x.fillStyle='rgba(200,239,120,.12)';rrect(x,110,760,860,250,26);x.fill();
+    x.strokeStyle='rgba(200,239,120,.45)';x.lineWidth=2;rrect(x,110,760,860,250,26);x.stroke();
+    x.fillStyle=accent;x.font=`900 68px ${FD}`;x.textAlign='center';x.fillText('SI PARTE!',W/2,865);
+    x.fillStyle='rgba(255,255,255,.78)';x.font=`600 27px ${FB}`;x.fillText('La partita è iniziata',W/2,925);
   } else {
-    x.fillStyle=accent; x.font=`900 34px ${FB}`; x.fillText('MARCATORI',W/2,785);
-    if(!goals.length){x.fillStyle='rgba(255,255,255,.7)';x.font=`600 27px ${FB}`;x.fillText('Nessuna rete nel primo tempo'.replace('primo tempo',ev.type==='fulltime'?'match':'primo tempo'),W/2,865);}
-    else {
-      const rows=goals.map(g=>({name:g.player||'Autore del gol',min:g.min||'–',side:scoringSide(g),auto:g.kind==='autogol'}));
-      const split=Math.ceil(rows.length/2), cols=[rows.slice(0,split),rows.slice(split)];
-      cols.forEach((list,col)=>list.forEach((g,j)=>{
-        const xx=col===0?300:780, yy=850+j*76;
-        x.textAlign='center';x.fillStyle='#fff';x.font=`700 29px ${FB}`;
-        let label=`${g.name}${g.auto?' (aut.)':''}`;
-        fitFont(x,label,390,29,700,FB);x.fillText(label,xx,yy);
-        x.fillStyle=accent;x.font=`800 25px ${FB}`;x.fillText(`${g.min}′  •  ${teamName(g.side)}`,xx,yy+34);
-      }));
+    x.fillStyle=accent;x.font=`900 32px ${FB}`;x.textAlign='center';x.fillText('MARCATORI',W/2,725);
+    if(!goals.length){
+      x.fillStyle='rgba(255,255,255,.72)';x.font=`600 27px ${FB}`;
+      x.fillText(ev.type==='halftime'?'Nessuna rete nel primo tempo':'Nessun gol nella partita',W/2,875);
+    } else {
+      const cols=2, rows=Math.ceil(goals.length/cols), gap=18, left=92, top=770, totalW=896, cellW=(totalW-gap)/2;
+      const availableH=405, cellH=Math.min(82,Math.floor((availableH-gap*(rows-1))/rows));
+      goals.forEach((g,i)=>{
+        const col=i%2,row=Math.floor(i/2),xx=left+col*(cellW+gap),yy=top+row*(cellH+gap);
+        x.fillStyle='rgba(255,255,255,.075)';rrect(x,xx,yy,cellW,cellH,15);x.fill();
+        x.strokeStyle='rgba(255,255,255,.14)';x.lineWidth=1.5;rrect(x,xx,yy,cellW,cellH,15);x.stroke();
+        const nm=(g.player||'Autore del gol')+(g.kind==='autogol'?' (aut.)':'');
+        x.textAlign='left';x.fillStyle='#fff';x.font=`700 26px ${FB}`;fitFont(x,nm,cellW-30,26,700,FB);x.fillText(nm,xx+16,yy+33);
+        const detail=`${g.min||'–'}′  •  ${teamName(scoringSide(g))}`;
+        x.fillStyle=accent;x.font=`700 19px ${FB}`;fitFont(x,detail,cellW-30,19,700,FB);x.fillText(detail,xx+16,yy+cellH-14);
+      });
     }
   }
-  x.fillStyle='#d2f078'; x.fillRect(62,1260,956,5);
-  x.fillStyle='#fff'; x.textAlign='left'; x.font=`800 25px ${FB}`; x.fillText('ASD SANT’ALBINO TERME',78,1300);
-  x.textAlign='right'; x.fillStyle='rgba(255,255,255,.72)'; x.fillText(S.match.hashtag||'#SantAlbinoTerme',1002,1300);
+  // Footer ancorato, separato dalla zona marcatori.
+  x.fillStyle=accent;x.fillRect(62,1250,956,4);
+  x.fillStyle='#fff';x.textAlign='left';x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1290);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 21px ${FB}`;x.fillText(S.match.hashtag||'#SantAlbinoTerme',1002,1290);
   return c;
 }
 async function renderCard(ev) {
