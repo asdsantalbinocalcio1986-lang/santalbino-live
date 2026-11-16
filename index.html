@@ -1838,7 +1838,8 @@ async function renderMatchGraphic(ev) {
   }
   // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
   const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();let done=false;const finish=value=>{if(done)return;done=true;clearTimeout(timer);im.onload=null;im.onerror=null;resolve(value);};const timer=setTimeout(()=>finish(null),5000);if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>finish(im);im.onerror=()=>finish(null);im.src=src;});
-  const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
+  const PITCH_IMAGE_URL='https://images.unsplash.com/photo-1510526292299-20af3f62d453?auto=format&fit=crop&fm=jpg&ixid=NHwxMjA3fDA%3D&ixlib=rb-4.1.0&q=75&w=2400';
+  const [homeLogo,awayLogo,pitchImage]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away),loadLogo(PITCH_IMAGE_URL)]);
   // Colore prevalente del logo, escludendo trasparenze e pixel neutri.
   const logoPrimaryColor=(img,fallback)=>{
     if(!img)return fallback;
@@ -1853,6 +1854,17 @@ async function renderMatchGraphic(ev) {
   const leftGrad=x.createLinearGradient(0,0,0,H);leftGrad.addColorStop(0,shade(homeColor,.48));leftGrad.addColorStop(.52,shade(homeColor,.25));leftGrad.addColorStop(1,'#050708');
   const rightGrad=x.createLinearGradient(0,0,0,H);rightGrad.addColorStop(0,shade(awayColor,.48));rightGrad.addColorStop(.52,shade(awayColor,.25));rightGrad.addColorStop(1,'#050708');
   x.fillStyle=leftGrad;x.fillRect(0,0,W/2,H);x.fillStyle=rightGrad;x.fillRect(W/2,0,W/2,H);
+  // Fotografia reale del terreno, vista dall'alto, dietro ai loghi delle squadre.
+  // Immagine Unsplash di Willian Justen de Vasconcellos, utilizzabile con licenza Unsplash.
+  if(pitchImage){
+    const px=0,py=175,pw=W,ph=405,scale=Math.max(pw/pitchImage.width,ph/pitchImage.height);
+    const sw=pw/scale,sh=ph/scale,sx=(pitchImage.width-sw)/2,sy=(pitchImage.height-sh)/2;
+    x.save();x.beginPath();x.rect(px,py,pw,ph);x.clip();x.globalAlpha=.72;
+    x.drawImage(pitchImage,sx,sy,sw,sh,px,py,pw,ph);
+    const shade=x.createLinearGradient(0,py,0,py+ph);shade.addColorStop(0,'rgba(0,0,0,.42)');shade.addColorStop(.48,'rgba(0,0,0,.50)');shade.addColorStop(1,'rgba(0,0,0,.72)');
+    x.globalAlpha=1;x.fillStyle=shade;x.fillRect(px,py,pw,ph);
+    x.restore();
+  }
   // Filigrana dei rispettivi stemmi: ampia, discreta e dietro ai loghi principali.
   const drawTeamWatermark=(img,cx,cy,maxSize)=>{
     if(!img)return;
