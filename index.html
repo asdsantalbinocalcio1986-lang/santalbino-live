@@ -1622,7 +1622,7 @@ async function renderMatchGraphic(ev) {
     }catch(e){return fallback;}
   };
   const homeColor=logoPrimaryColor(homeLogo,'#174b2d'),awayColor=logoPrimaryColor(awayLogo,'#26384c');
-  const shade=(color,factor)=>{const m=color.match(/\\d+/g);if(!m||m.length<3)return color;return 'rgb('+m.slice(0,3).map(v=>Math.max(0,Math.min(255,Math.round(Number(v)*factor)))).join(',')+')';};
+  const shade=(color,factor)=>{const m=color.match(/[0-9]+/g);if(!m||m.length<3)return color;return 'rgb('+m.slice(0,3).map(v=>Math.max(0,Math.min(255,Math.round(Number(v)*factor)))).join(',')+')';};
   drawLogo(x,homeLogo,teamName('home'),265,430,150,FD);drawLogo(x,awayLogo,teamName('away'),815,430,150,FD);
   writeWrapped(x,teamName('home').toUpperCase(),265,545,350,26,2,'#fff',800,FD,31);
   writeWrapped(x,teamName('away').toUpperCase(),815,545,350,26,2,'#fff',800,FD,31);
