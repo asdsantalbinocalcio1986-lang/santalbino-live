@@ -21,7 +21,7 @@
   transform: none !important;
 }
 
-</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head><body><title>Santa Live</title><meta name="claude:viewport-fit-sides" content="cover"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&amp;family=Barlow:wght@400;500;600;700&amp;display=swap"><style id="app-css">
+</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head><body><title>Santa Live</title><meta name="claude:viewport-fit-sides" content="cover"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
   --bg:#eef2ec; --surface:#ffffff; --surface2:#e4eae2; --ink:#10201a; --muted:#56655c; --line:#d3dcd1;
@@ -29,7 +29,7 @@
   --c-goal:#168f4b; --c-yellow:#d9a400; --c-red:#d4372b; --c-sub:#2d7fd1; --c-injury:#d97a12; --c-save:#7156c4; --c-miss:#667770; --c-note:#667770; --c-mvp:#b58000;
   --hero1:#0a2b19; --hero2:#17663a;
   --fd:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
-  --fb:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --fb:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -1560,7 +1560,10 @@ function addPhase(type, min) { addEvent({ type, team: S.match.ourSide, min: min 
 function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; saveL(); commit(true); renderMain(); }
 
 /* ================= immagini degli eventi ================= */
-const loadImg = src => new Promise(r => { if (!src) return r(null); const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+const loadImg = src => new Promise(r => { if (!src) return r(null); const i = new Image(); if(/^https?:/i.test(src)) i.crossOrigin='anonymous'; i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+const EVENT_ART_URLS={cards:'https://upload.wikimedia.org/wikipedia/commons/5/55/Giel_a_rout_Kaart.jpg',injury:'https://upload.wikimedia.org/wikipedia/commons/6/61/Injury_icon_2.svg'};
+let eventArtPromise=null;
+const loadEventArtwork=()=>eventArtPromise||(eventArtPromise=Promise.all([loadImg(EVENT_ART_URLS.cards),loadImg(EVENT_ART_URLS.injury)]).then(([cards,injury])=>({cards,injury})));
 function fitFont(x, t, maxW, size, weight, fam) { let n = size; x.font = `${weight} ${n}px ${fam}`; while (x.measureText(t).width > maxW && n > 22) { n -= 2; x.font = `${weight} ${n}px ${fam}`; } }
 function rrect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
 function drawLogo(x, img, name, cx, cy, size, FD) {
@@ -1758,76 +1761,72 @@ function drawEventArtwork(ctx,type,cx,cy,size) {
     ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2;line([[-98,-75],[80,-75]]);
     ctx.restore();
   } else if(type==='red'||type==='yellow'){
-    const isRed=type==='red',color=isRed?'#ed1b2f':'#ffd52b',deep=isRed?'#760b18':'#9b6500';
-    // Braccio dell'arbitro in divisa scura che alza il cartellino.
-    ctx.save();ctx.translate(0,12);ctx.rotate(-.30);
-    const sleeve=ctx.createLinearGradient(-90,20,25,100);sleeve.addColorStop(0,'#27333a');sleeve.addColorStop(1,'#070c10');
-    ctx.fillStyle=sleeve;path([[-91,70],[-69,12],[-20,-2],[18,35],[-5,105],[-70,112]]);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=3;line([[-72,28],[-18,18],[5,48]]);
-    const skin=ctx.createLinearGradient(-15,-55,32,20);skin.addColorStop(0,'#f4c7a2');skin.addColorStop(1,'#a96343');
-    ctx.fillStyle=skin;ctx.beginPath();ctx.moveTo(-19,37);ctx.lineTo(-12,-14);ctx.quadraticCurveTo(-8,-34,4,-29);ctx.lineTo(12,4);ctx.lineTo(23,-38);ctx.quadraticCurveTo(30,-48,37,-36);ctx.lineTo(35,14);ctx.lineTo(22,53);ctx.closePath();ctx.fill();
-    ctx.restore();
-    // Cartellino rigido con bordo metallico, riflessi e stampa.
-    ctx.save();ctx.translate(20,-15);ctx.rotate(.16);
-    ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=24;ctx.shadowOffsetX=9;ctx.shadowOffsetY=14;
-    const card=ctx.createLinearGradient(-58,-95,62,90);card.addColorStop(0,'#ffffff');card.addColorStop(.09,color);card.addColorStop(.72,color);card.addColorStop(1,deep);
-    ctx.fillStyle=card;rrect(ctx,-57,-91,114,182,10);ctx.fill();
-    ctx.shadowColor='transparent';ctx.strokeStyle='rgba(255,255,255,.72)';ctx.lineWidth=4;rrect(ctx,-51,-85,102,170,7);ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,.18)';path([[-44,-77],[35,-77],[-5,68],[-44,68]]);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.42)';ctx.lineWidth=2;line([[-37,68],[35,68]]);
-    ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.arc(0,-67,4,0,Math.PI*2);ctx.fill();
-    ctx.restore();
-    ctx.restore();
+    const isYellow=type==='yellow',cards=assets.cards;
+    if(cards){
+      // Fotografia originale Wikimedia: ritaglio del solo cartellino, con fondo neutro rimosso.
+      const sw=cards.naturalWidth||cards.width,sh=cards.naturalHeight||cards.height;
+      const crop=isYellow?{x:.105,y:.055,w:.535,h:.79}:{x:.465,y:.055,w:.405,h:.77};
+      const temp=document.createElement('canvas');temp.width=600;temp.height=690;
+      const t=temp.getContext('2d',{willReadFrequently:true});
+      t.drawImage(cards,crop.x*sw,crop.y*sh,crop.w*sw,crop.h*sh,0,0,temp.width,temp.height);
+      try{
+        const pixels=t.getImageData(0,0,temp.width,temp.height),d=pixels.data;
+        for(let i=0;i<d.length;i+=4){const hi=Math.max(d[i],d[i+1],d[i+2]),lo=Math.min(d[i],d[i+1],d[i+2]),avg=(d[i]+d[i+1]+d[i+2])/3;if(hi-lo<32&&avg>82&&avg<225)d[i+3]=0;}
+        t.putImageData(pixels,0,0);
+      }catch(e){}
+      ctx.save();ctx.translate(5,-4);ctx.rotate(isYellow?-.10:.10);
+      ctx.shadowColor='rgba(0,0,0,.78)';ctx.shadowBlur=28;ctx.shadowOffsetX=10;ctx.shadowOffsetY=18;
+      const w=150,h=174;ctx.drawImage(temp,-w/2,-h/2,w,h);ctx.restore();
+      // Riflesso fotografico e bordo luminoso per fondere la foto con la locandina.
+      ctx.save();ctx.globalAlpha=.5;ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(-54,-82);ctx.lineTo(35,-89);ctx.stroke();ctx.restore();
+    }else{
+      const color=isYellow?'#ffe500':'#ed1c24';ctx.save();ctx.rotate(isYellow?-.10:.10);
+      ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=24;ctx.shadowOffsetY=15;
+      const g=ctx.createLinearGradient(-55,-90,55,90);g.addColorStop(0,'#fff');g.addColorStop(.12,color);g.addColorStop(1,color);
+      ctx.fillStyle=g;rrect(ctx,-58,-92,116,184,9);ctx.fill();ctx.restore();
+    }
   } else if(type==='sub'){
-    // Due calciatori in movimento, divise gialloverdi e frecce luminose.
-    const player=(px,py,scale,flip,shirt)=>{
-      ctx.save();ctx.translate(px,py);ctx.scale(scale*flip,scale);
-      ctx.fillStyle='rgba(0,0,0,.32)';ctx.beginPath();ctx.ellipse(0,84,47,10,0,0,Math.PI*2);ctx.fill();
-      const skin=ctx.createLinearGradient(-20,-90,20,-40);skin.addColorStop(0,'#f1c49e');skin.addColorStop(1,'#9b5d40');
-      ctx.fillStyle=skin;ctx.beginPath();ctx.arc(0,-73,20,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#20282d';ctx.beginPath();ctx.arc(-2,-83,20,Math.PI,Math.PI*2);ctx.fill();
-      const jersey=ctx.createLinearGradient(-40,-58,40,40);jersey.addColorStop(0,shirt);jersey.addColorStop(.55,'#173d2b');jersey.addColorStop(1,'#081b16');
-      ctx.fillStyle=jersey;path([[-24,-54],[-43,-36],[-34,8],[-24,17],[24,17],[34,8],[43,-36],[24,-54],[13,-42],[-13,-42]]);ctx.fill();
-      ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=3;line([[-20,-39],[-25,5]]);line([[20,-39],[25,5]]);
-      ctx.fillStyle='#e5e8e7';ctx.font='900 28px Arial';ctx.textAlign='center';ctx.fillText(flip<0?'7':'11',0,-5);
-      ctx.fillStyle='#11191d';path([[-22,17],[22,17],[28,76],[7,81],[0,45],[-8,81],[-28,76]]);ctx.fill();
-      ctx.strokeStyle=skin;ctx.lineWidth=11;ctx.lineCap='round';line([[-34,-30],[-48,1],[-41,24]]);line([[34,-30],[49,-2],[43,20]]);
-      ctx.fillStyle='#e8ecec';rrect(ctx,-48,18,13,13,4);ctx.fill();rrect(ctx,36,15,13,13,4);ctx.fill();
+    // Due tessere numerate: rosso per il giocatore che esce, verde per chi entra.
+    const ev=assets.ev||{},drawPlayerCard=(px,py,color,num,label,angle)=>{
+      ctx.save();ctx.translate(px,py);ctx.rotate(angle);
+      ctx.shadowColor='rgba(0,0,0,.72)';ctx.shadowBlur=22;ctx.shadowOffsetY=12;
+      const g=ctx.createLinearGradient(-65,-55,65,60);g.addColorStop(0,color==='#d92535'?'#ff7777':'#b8ff9a');g.addColorStop(.42,color);g.addColorStop(1,color==='#d92535'?'#8f101d':'#126b37');
+      ctx.fillStyle=g;rrect(ctx,-65,-58,130,116,15);ctx.fill();ctx.shadowColor='transparent';
+      ctx.strokeStyle='rgba(255,255,255,.72)';ctx.lineWidth=3;rrect(ctx,-65,-58,130,116,15);ctx.stroke();
+      ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 62px "Barlow Condensed",sans-serif';
+      const number=String(num||'—');ctx.fillText(number.length>3?number.slice(0,3):number,0,18);
+      ctx.font='800 17px "Manrope",sans-serif';ctx.fillText(label,0,43);
       ctx.restore();
     };
-    player(-55,4,.78,1,'#b7ed55');player(57,4,.78,-1,'#dce5e5');
-    ctx.save();ctx.lineWidth=9;ctx.lineCap='round';ctx.strokeStyle='#6be69b';ctx.fillStyle='#6be69b';line([[-94,-79],[-23,-79]]);path([[-23,-79],[-44,-94],[-44,-64]]);ctx.fill();
-    ctx.strokeStyle='#ff7474';ctx.fillStyle='#ff7474';line([[94,-45],[23,-45]]);path([[23,-45],[44,-60],[44,-30]]);ctx.fill();
-    ctx.restore();ctx.restore();
+    drawPlayerCard(-82,-7,'#d92535',ev.out,'ESCE',-.07);
+    drawPlayerCard(82,-7,'#168b45',ev.inn,'ENTRA',.07);
+    // Freccia rossa verso l'esterno e freccia verde verso il campo.
+    const arrow=(pts,color)=>{ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=10;ctx.lineCap='round';ctx.lineJoin='round';line(pts.slice(0,-1));const tip=pts[pts.length-1],prev=pts[pts.length-2],a=Math.atan2(tip[1]-prev[1],tip[0]-prev[0]);ctx.beginPath();ctx.moveTo(tip[0],tip[1]);ctx.lineTo(tip[0]-22*Math.cos(a-.55),tip[1]-22*Math.sin(a-.55));ctx.lineTo(tip[0]-22*Math.cos(a+.55),tip[1]-22*Math.sin(a+.55));ctx.closePath();ctx.fill();ctx.restore();};
+    arrow([[-17,-90],[-17,-124],[-55,-124]],'#ff7777');
+    arrow([[17,78],[17,111],[55,111]],'#8df0a7');
   } else if(type==='injury'){
-    // Calciatore a terra, gamba dolorante e soccorso medico.
-    ctx.save();ctx.rotate(-.12);
-    ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(-5,73,112,17,0,0,Math.PI*2);ctx.fill();
-    const skin=ctx.createLinearGradient(-10,0,25,50);skin.addColorStop(0,'#f0c19a');skin.addColorStop(1,'#9d5d43');
-    ctx.fillStyle=skin;ctx.beginPath();ctx.arc(-73,-23,18,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#172027';ctx.beginPath();ctx.arc(-78,-32,18,Math.PI,Math.PI*2);ctx.fill();
-    const shirt=ctx.createLinearGradient(-40,-20,50,50);shirt.addColorStop(0,'#c4f36e');shirt.addColorStop(.5,'#548a32');shirt.addColorStop(1,'#183b25');
-    ctx.fillStyle=shirt;path([[-58,-12],[-28,-37],[10,-25],[34,10],[14,47],[-44,39],[-67,15]]);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.38)';ctx.lineWidth=3;line([[-38,-18],[-15,31]]);
-    ctx.lineCap='round';ctx.strokeStyle='#11191d';ctx.lineWidth=22;line([[3,34],[55,54],[102,48]]);
-    ctx.strokeStyle=skin;ctx.lineWidth=14;line([[52,53],[82,61]]);
-    ctx.strokeStyle='#f1f3f1';ctx.lineWidth=19;line([[91,47],[108,47]]);
-    // Fasciatura alla caviglia.
-    ctx.strokeStyle='#fff';ctx.lineWidth=8;line([[78,53],[86,67],[98,51]]);
-    ctx.restore();
-    // Borsa medica e croce tridimensionale in primo piano.
-    ctx.save();ctx.translate(81,-63);ctx.rotate(.08);ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=15;ctx.shadowOffsetY=8;
-    const bag=ctx.createLinearGradient(-30,-25,30,40);bag.addColorStop(0,'#f8fbfb');bag.addColorStop(1,'#aebdc1');ctx.fillStyle=bag;rrect(ctx,-38,-26,76,57,9);ctx.fill();
-    ctx.shadowColor='transparent';ctx.strokeStyle='#65767c';ctx.lineWidth=3;rrect(ctx,-38,-26,76,57,9);ctx.stroke();
-    ctx.fillStyle='#d92535';rrect(ctx,-8,-18,16,42,3);ctx.fill();rrect(ctx,-21,-5,42,16,3);ctx.fill();
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-26,12,Math.PI,0);ctx.stroke();ctx.restore();
-    ctx.restore();
+    // Pittogramma originale Injury icon 2 di Wikimedia Commons.
+    const icon=assets.injury;
+    if(icon){
+      const tmp=document.createElement('canvas');tmp.width=240;tmp.height=240;
+      const t=tmp.getContext('2d');t.drawImage(icon,8,8,224,224);t.globalCompositeOperation='source-in';
+      const grad=t.createLinearGradient(0,0,0,240);grad.addColorStop(0,'#ffffff');grad.addColorStop(1,'#c8d5d2');t.fillStyle=grad;t.fillRect(0,0,240,240);
+      ctx.save();ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=26;ctx.shadowOffsetY=15;
+      ctx.drawImage(tmp,-105,-105,210,210);ctx.restore();
+      ctx.save();ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,116,-2.3,-.5);ctx.stroke();ctx.restore();
+    }else{
+      ctx.save();ctx.fillStyle='#f5f7f4';ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=20;
+      rrect(ctx,-88,-88,176,176,30);ctx.fill();ctx.shadowColor='transparent';
+      ctx.fillStyle='#d92535';rrect(ctx,-17,-62,34,124,8);ctx.fill();rrect(ctx,-62,-17,124,34,8);ctx.fill();ctx.restore();
+    }
+
   }
   ctx.restore();ctx.restore();
 }
 async function renderMatchGraphic(ev) {
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-  const x=canvas.getContext('2d'),FB='Arial,sans-serif',FD="'Arial Narrow',Arial,sans-serif";
+  const x=canvas.getContext('2d'),FB="'Manrope',sans-serif",FD="'Barlow Condensed',sans-serif";
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
@@ -1864,6 +1863,7 @@ async function renderMatchGraphic(ev) {
   // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
   const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();let done=false;const finish=value=>{if(done)return;done=true;clearTimeout(timer);im.onload=null;im.onerror=null;resolve(value);};const timer=setTimeout(()=>finish(null),5000);if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>finish(im);im.onerror=()=>finish(null);im.src=src;});
   const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
+  const eventArt=await loadEventArtwork();
   // Colore prevalente del logo, escludendo trasparenze e pixel neutri.
   const logoPrimaryColor=(img,fallback)=>{
     if(!img)return fallback;
@@ -1919,7 +1919,7 @@ async function renderMatchGraphic(ev) {
     }
   } else {
     const illustrated=['goal','red','yellow','sub','injury'].includes(ev.type);
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,900,150);
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,900,150,{...eventArt,ev});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     x.textAlign='center';x.fillStyle=accent;x.font=`900 ${illustrated?42:58}px ${FD}`;x.fillText(minute,W/2,illustrated?1015:900);
     const player=ev.type==='sub'?'':(ev.player||'');
