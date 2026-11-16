@@ -1588,7 +1588,7 @@ async function renderMatchGraphic(ev) {
   x.textAlign='center';x.fillStyle=accent;x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME  /  MATCH CENTER',W/2,105);
   const title=titleMap[ev.type]||'CRONACA LIVE';fitFont(x,title,900,84,900,FD);x.fillStyle='#fff';x.font=`900 84px ${FD}`;x.fillText(title,W/2,205);
   // Sottotitolo su due righe, con gerarchia da poster Kick Off.
-  const compParts=String(S.match.comp||'').split(/\\s*[·|]\\s*/).filter(Boolean);
+  const compParts=String(S.match.comp||'').split(/\s*[·|]\s*/).filter(Boolean);
   const compLine1=compParts.shift()||'';
   const compLine2=compParts.join('  •  ');
   if(compLine1){
