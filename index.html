@@ -1701,7 +1701,7 @@ function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#
   return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
 }
 // Illustrazioni evento in Canvas: dettagli, volumi, luci e ombre coerenti.
-function drawEventArtwork(ctx,type,cx,cy,size) {
+function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
   const s=size/200;
   ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);
   const path=(pts)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();};
