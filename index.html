@@ -1578,7 +1578,7 @@ function evTemplate(ev) {
   const one = L.evOne[ev.id]; if (one && one.img) return { src: one.img, raw: !!one.raw };
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
-async async function renderPhaseCard(ev) {
+async function renderPhaseCard(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif";
   const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
