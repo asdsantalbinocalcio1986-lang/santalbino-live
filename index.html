@@ -1573,9 +1573,6 @@ function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.s
 
 /* ================= immagini degli eventi ================= */
 const loadImg = src => new Promise(r => { if (!src) return r(null); const i = new Image(); if(/^https?:/i.test(src)) i.crossOrigin='anonymous'; i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
-const EVENT_ART_URLS={cards:'https://upload.wikimedia.org/wikipedia/commons/5/55/Giel_a_rout_Kaart.jpg',injury:'https://upload.wikimedia.org/wikipedia/commons/6/61/Injury_icon_2.svg'};
-let eventArtPromise=null;
-const loadEventArtwork=()=>eventArtPromise||(eventArtPromise=Promise.all([loadImg(EVENT_ART_URLS.cards),loadImg(EVENT_ART_URLS.injury)]).then(([cards,injury])=>({cards,injury})));
 function fitFont(x, t, maxW, size, weight, fam) { let n = size; x.font = `${weight} ${n}px ${fam}`; while (x.measureText(t).width > maxW && n > 22) { n -= 2; x.font = `${weight} ${n}px ${fam}`; } }
 function rrect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
 function drawLogo(x, img, name, cx, cy, size, FD) {
@@ -1796,7 +1793,6 @@ async function renderMatchGraphic(ev) {
   // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
   const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();let done=false;const finish=value=>{if(done)return;done=true;clearTimeout(timer);im.onload=null;im.onerror=null;resolve(value);};const timer=setTimeout(()=>finish(null),5000);if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>finish(im);im.onerror=()=>finish(null);im.src=src;});
   const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
-  const eventArt=await loadEventArtwork();
   // Colore prevalente del logo, escludendo trasparenze e pixel neutri.
   const logoPrimaryColor=(img,fallback)=>{
     if(!img)return fallback;
@@ -1852,7 +1848,7 @@ async function renderMatchGraphic(ev) {
     }
   } else {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,900,150,{...eventArt,ev});
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,900,150,{ev});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     x.textAlign='center';x.fillStyle=accent;x.font=`900 ${illustrated?42:58}px ${FD}`;x.fillText(minute,W/2,illustrated?1015:900);
     const player=ev.type==='sub'?'':(ev.player||'');
