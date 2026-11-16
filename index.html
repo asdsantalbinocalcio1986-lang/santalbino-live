@@ -1116,7 +1116,7 @@ let S = (() => {
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = 'cronaca-live-local-v2', DK = 'cronaca-live-draft-v2';
-const CARD_TYPES = ['goal', 'yellow', 'red', 'injury', 'sub', 'mvp'];
+const CARD_TYPES = ['goal', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
 const saveL = () => { try { localStorage.setItem(LK, JSON.stringify(L)); } catch (e) { toast('Memoria piena: togli qualche immagine'); } };
@@ -1471,7 +1471,61 @@ function evTemplate(ev) {
   const one = L.evOne[ev.id]; if (one && one.img) return { src: one.img, raw: !!one.raw };
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
+async function renderPhaseCard(ev) {
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif";
+  const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
+  const score = ev.type === 'kickoff' ? [0, 0] : scoreOf(prior);
+  const goals = prior.filter(e => e.type === 'goal');
+  const title = ev.type === 'kickoff' ? 'KICK OFF' : ev.type === 'halftime' ? 'HALF TIME' : 'FULL TIME';
+  const accent = ev.type === 'kickoff' ? '#c8ef78' : ev.type === 'halftime' ? '#f4c542' : '#c8ef78';
+  const grad = x.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,'#06130b'); grad.addColorStop(.52,'#17482a'); grad.addColorStop(1,'#030a06');
+  x.fillStyle=grad; x.fillRect(0,0,W,H);
+  const glow=x.createRadialGradient(540,420,40,540,420,720);
+  glow.addColorStop(0,'rgba(91,220,119,.24)'); glow.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=glow; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(255,255,255,.13)'; x.lineWidth=3; x.strokeRect(38,38,W-76,H-76); x.strokeRect(55,55,W-110,H-110);
+  x.fillStyle=accent; x.textAlign='center'; x.font=`900 30px ${FB}`;
+  x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER',W/2,125);
+  x.font=`900 94px ${FD}`; x.fillText(title,W/2,255);
+  x.fillStyle='rgba(255,255,255,.72)'; x.font=`600 26px ${FB}`;
+  const meta=[S.match.comp,S.match.venue,fmtDate(S.match.date)].filter(Boolean).join('  •  ');
+  if(meta) x.fillText(meta,W/2,310);
+  const safeLogo = src => new Promise(resolve=>{ if(!src)return resolve(null); const im=new Image(); if(/^https?:/i.test(src))im.crossOrigin='anonymous'; im.onload=()=>resolve(im); im.onerror=()=>resolve(null); im.src=src; });
+  const [lh,la]=await Promise.all([safeLogo(S.logos.home),safeLogo(S.logos.away)]);
+  drawLogo(x,lh,teamName('home'),220,510,176,FD); drawLogo(x,la,teamName('away'),860,510,176,FD);
+  x.fillStyle='#fff'; x.textAlign='center'; x.font=`900 150px ${FD}`;
+  x.fillText(`${score[0]}  –  ${score[1]}`,W/2,565);
+  x.fillStyle='rgba(255,255,255,.9)'; x.font=`800 31px ${FD}`;
+  fitFont(x,teamName('home').toUpperCase(),350,31,800,FD); x.fillText(teamName('home').toUpperCase(),220,650);
+  fitFont(x,teamName('away').toUpperCase(),350,31,800,FD); x.fillText(teamName('away').toUpperCase(),860,650);
+  x.fillStyle=accent; x.fillRect(100,710,880,5);
+  if(ev.type==='kickoff'){
+    x.fillStyle='#fff'; x.font=`800 48px ${FD}`; x.fillText('SI PARTE!',W/2,855);
+    x.fillStyle='rgba(255,255,255,.72)'; x.font=`600 27px ${FB}`; x.fillText('La partita è iniziata',W/2,915);
+  } else {
+    x.fillStyle=accent; x.font=`900 34px ${FB}`; x.fillText('MARCATORI',W/2,785);
+    if(!goals.length){x.fillStyle='rgba(255,255,255,.7)';x.font=`600 27px ${FB}`;x.fillText('Nessuna rete nel primo tempo'.replace('primo tempo',ev.type==='fulltime'?'match':'primo tempo'),W/2,865);}
+    else {
+      const rows=goals.map(g=>({name:g.player||'Autore del gol',min:g.min||'–',side:scoringSide(g),auto:g.kind==='autogol'}));
+      const split=Math.ceil(rows.length/2), cols=[rows.slice(0,split),rows.slice(split)];
+      cols.forEach((list,col)=>list.forEach((g,j)=>{
+        const xx=col===0?300:780, yy=850+j*76;
+        x.textAlign='center';x.fillStyle='#fff';x.font=`700 29px ${FB}`;
+        let label=`${g.name}${g.auto?' (aut.)':''}`;
+        fitFont(x,label,390,29,700,FB);x.fillText(label,xx,yy);
+        x.fillStyle=accent;x.font=`800 25px ${FB}`;x.fillText(`${g.min}′  •  ${teamName(g.side)}`,xx,yy+34);
+      }));
+    }
+  }
+  x.fillStyle='#d2f078'; x.fillRect(62,1260,956,5);
+  x.fillStyle='#fff'; x.textAlign='left'; x.font=`800 25px ${FB}`; x.fillText('ASD SANT’ALBINO TERME',78,1300);
+  x.textAlign='right'; x.fillStyle='rgba(255,255,255,.72)'; x.fillText(S.match.hashtag||'#SantAlbinoTerme',1002,1300);
+  return c;
+}
 async function renderCard(ev) {
+  if (['kickoff', 'halftime', 'fulltime'].includes(ev.type)) return renderPhaseCard(ev);
   const idx = S.events.findIndex(e => e.id === ev.id), sc = idx >= 0 ? scoreAt(idx) : scoreOf(S.events);
   const W = 1080, H = 1080, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FD = "'Arial Narrow',Arial,sans-serif", FB = "Arial,sans-serif";
