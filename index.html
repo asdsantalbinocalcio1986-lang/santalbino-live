@@ -1678,7 +1678,43 @@ function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#
   lines.forEach((line, i) => ctx.fillText(line, cx, y + i * lh));
   return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
 }
-async function renderMatchGraphic(ev) {
+async // Illustrazioni evento in Canvas: dettagli, volumi, luci e ombre coerenti.
+function drawEventArtwork(ctx,type,cx,cy,size) {
+  const s=size/200;
+  ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);
+  ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=24;ctx.shadowOffsetY=14;
+  if(type==='goal'){
+    const g=ctx.createRadialGradient(-35,-48,8,0,0,105);g.addColorStop(0,'#ffffff');g.addColorStop(.72,'#e7edf0');g.addColorStop(1,'#8b969d');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,88,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.save();ctx.lineJoin='round';ctx.fillStyle='#18232b';ctx.strokeStyle='#18232b';ctx.lineWidth=3;
+    const pent=(a,r)=>({x:Math.cos(a)*r,y:Math.sin(a)*r});
+    const poly=(pts)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();};
+    poly(Array.from({length:5},(_,i)=>pent(-Math.PI/2+i*2*Math.PI/5,31)));
+    for(let i=0;i<5;i++){const a=-Math.PI/2+i*2*Math.PI/5,p=pent(a,31),q=pent(a+Math.PI/5,62);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();}
+    ctx.restore();
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.62)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(-10,-12,72,Math.PI*1.05,Math.PI*1.72);ctx.stroke();ctx.restore();
+  } else if(type==='red'||type==='yellow'){
+    const color=type==='red'?'#e51d2a':'#ffd52b',dark=type==='red'?'#8f0711':'#b77a00';
+    ctx.rotate(-.13);const grad=ctx.createLinearGradient(-60,-85,65,85);grad.addColorStop(0,'#fff');grad.addColorStop(.12,color);grad.addColorStop(.72,color);grad.addColorStop(1,dark);
+    ctx.fillStyle=grad;rrect(ctx,-58,-88,116,176,13);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=5;rrect(ctx,-51,-81,102,162,9);ctx.stroke();
+    ctx.restore();ctx.save();ctx.rotate(-.13);ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(-32,-65);ctx.lineTo(30,-65);ctx.stroke();ctx.restore();
+  } else if(type==='sub'){
+    ctx.restore();
+    const arrow=(color,yy,dir)=>{ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=17;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-76,yy);ctx.lineTo(67,yy);ctx.stroke();ctx.beginPath();if(dir>0){ctx.moveTo(67,yy);ctx.lineTo(30,yy-27);ctx.lineTo(30,yy+27);}else{ctx.moveTo(-76,yy);ctx.lineTo(-39,yy-27);ctx.lineTo(-39,yy+27);}ctx.closePath();ctx.fill();ctx.restore();};
+    arrow('#55d98a',-35,1);arrow('#ff6666',35,-1);
+    ctx.fillStyle='rgba(255,255,255,.16)';ctx.beginPath();ctx.arc(0,0,94,0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=3;ctx.stroke();
+  } else if(type==='injury'){
+    ctx.restore();
+    const g=ctx.createRadialGradient(-35,-45,8,0,0,100);g.addColorStop(0,'#ffcf9a');g.addColorStop(.65,'#f28b45');g.addColorStop(1,'#9d3f20');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,88,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.shadowColor='rgba(0,0,0,.32)';ctx.shadowBlur=12;ctx.fillStyle='#fff';rrect(ctx,-25,-68,50,136,9);ctx.fill();rrect(ctx,-68,-25,136,50,9);ctx.fill();ctx.restore();
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,77,0,Math.PI*2);ctx.stroke();ctx.restore();
+  } else {ctx.restore();}
+  ctx.restore();
+}
+
+function renderMatchGraphic(ev) {
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
   const x=canvas.getContext('2d'),FB='Arial,sans-serif',FD="'Arial Narrow',Arial,sans-serif";
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
@@ -1761,10 +1797,12 @@ async function renderMatchGraphic(ev) {
       if(goals.length>6){x.textAlign='center';x.font=`600 17px ${FB}`;x.fillStyle='rgba(255,255,255,.65)';x.fillText(`+ ${goals.length-6} altri marcatori`,W/2,1150);}
     }
   } else {
+    const illustrated=['goal','red','yellow','sub','injury'].includes(ev.type);
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,900,150);
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
-    x.textAlign='center';x.fillStyle=accent;x.font=`900 58px ${FD}`;x.fillText(minute,W/2,900);
+    x.textAlign='center';x.fillStyle=accent;x.font=`900 ${illustrated?42:58}px ${FD}`;x.fillText(minute,W/2,illustrated?1015:900);
     const player=ev.type==='sub'?'':(ev.player||'');
-    if(player)writeWrapped(x,player.toUpperCase(),W/2,970,790,40,2,'#fff',800,FD,48);
+    if(player)writeWrapped(x,player.toUpperCase(),W/2,illustrated?1070:970,790,illustrated?30:40,2,'#fff',800,FD,illustrated?36:48);
     let detail=teamName(ev.team||S.match.ourSide);
     if(ev.type==='goal')detail+=({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
     else if(ev.type==='sub')detail='ENTRA  '+(ev.inn||'—')+'   •   ESCE  '+(ev.out||'—')+'   •   '+detail;
@@ -1775,7 +1813,7 @@ async function renderMatchGraphic(ev) {
     else if(ev.type==='yellow')detail+='  •  CARTELLINO GIALLO';
     else if(ev.type==='injury')detail+='  •  GIOCO FERMO';
     else if(ev.type==='save')detail+='  •  PARATA';
-    writeWrapped(x,detail,W/2,player?1060:1000,790,23,2,'rgba(255,255,255,.82)',600,FB,30);
+    writeWrapped(x,detail,W/2,illustrated?(player?1120:1090):(player?1060:1000),790,illustrated?19:23,2,'rgba(255,255,255,.82)',600,FB,illustrated?24:30);
   }
   // Footer isolato dal pannello contenuti.
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
