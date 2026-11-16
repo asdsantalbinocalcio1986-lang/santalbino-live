@@ -198,11 +198,12 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', ourSide: 'home', hashtag: '#SantAlbinoTerme' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   clock: { phase: 'pre', t0: 0 },
   mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
+  media: { evOne: {}, evImg: {}, evImgRaw: {} },
   events: []
 });
 let S = (() => {
@@ -364,6 +365,68 @@ const API = {}; let CAN_EDIT = false, LOCAL_ONLY = false;
 let db = null, dbReady = false, authUser = null, remoteChannel = null;
 const cfg = window.SANTALBINO_CONFIG || {};
 const configured = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
+
+/* ================= archivio condiviso immagini + voti MVP ================= */
+const MEDIA_BUCKET = 'santalbino-media';
+const MVP_VOTER_KEY = 'santalbino-mvp-voter-v1';
+function mvpPollKey() {
+  return S.match.pollId || [S.match.date || 'senza-data', S.match.home || '', S.match.away || ''].join('|').toLowerCase();
+}
+function voterId() {
+  let id = '';
+  try { id = localStorage.getItem(MVP_VOTER_KEY) || ''; } catch (e) {}
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : uid() + uid());
+    try { localStorage.setItem(MVP_VOTER_KEY, id); } catch (e) {}
+  }
+  return id;
+}
+let mvpVoteCounts = {}, mvpVoteBusy = false;
+async function refreshMvpVotes() {
+  if (!db) return;
+  const { data, error } = await db.from('mvp_votes').select('candidate_key').eq('match_key', mvpPollKey());
+  if (error) { console.warn('Lettura voti MVP:', error.message); return; }
+  mvpVoteCounts = {};
+  (data || []).forEach(row => { mvpVoteCounts[row.candidate_key] = (mvpVoteCounts[row.candidate_key] || 0) + 1; });
+  if ($('#main') && L.tab === 'mvp') renderMain();
+}
+async function castMvpVote(candidateKey) {
+  if (mvpVoteBusy || !db) return;
+  const vi = voteInfo();
+  if (vi.state !== 'open') { toast('La votazione non è aperta'); return; }
+  mvpVoteBusy = true;
+  try {
+    const candidate = candidates().find(c => c.key === candidateKey);
+    if (!candidate) throw new Error('Candidato non valido');
+    const { error } = await db.from('mvp_votes').insert({
+      match_key: mvpPollKey(), voter_hash: voterId(), candidate_key: candidate.key,
+      candidate_name: candidate.name, team: candidate.side, shirt_number: candidate.num
+    });
+    if (error) {
+      if (error.code === '23505') throw new Error('Hai già espresso il tuo voto per questa partita.');
+      throw new Error('Voto non registrato. Verifica la configurazione del sondaggio.');
+    }
+    try { localStorage.setItem('santalbino-mvp-vote:' + mvpPollKey(), candidateKey); } catch (e) {}
+    await refreshMvpVotes();
+    toast('Voto registrato. Grazie!');
+    renderMain();
+  } catch (err) { toast(err.message || 'Voto non registrato'); }
+  finally { mvpVoteBusy = false; }
+}
+async function uploadSharedImage(file, folder, max = 1080, type = 'image/jpeg') {
+  if (!db || !CAN_EDIT) throw new Error('Accedi alla regia per caricare immagini.');
+  const resized = await resizeImage(file, max, type);
+  const ext = resized.blob.type === 'image/png' ? 'png' : resized.blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${folder}/${Date.now()}-${uid()}.${ext}`;
+  const { error } = await db.storage.from(MEDIA_BUCKET).upload(path, resized.blob, {
+    upsert: false, contentType: resized.blob.type || type, cacheControl: '31536000'
+  });
+  if (error) throw new Error(error.message.includes('Bucket not found') ? 'Archivio immagini non configurato: crea il bucket santalbino-media in Supabase.' : 'Caricamento immagine non riuscito: ' + error.message);
+  const { data } = db.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error('Non riesco a ottenere il link pubblico dell’immagine.');
+  return data.publicUrl;
+}
+
 async function initCaps() {
   LOCAL_ONLY = !configured || !window.supabase;
   if (LOCAL_ONLY) { CAN_EDIT = false; setSync('error', 'backend non configurato'); return; }
@@ -387,11 +450,15 @@ async function initCaps() {
   else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
   dbReady = true;
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !window.__santalbinoSaving) { S = mergeState(payload.new.state); updDatalists(); renderHero(); renderMain(); }
+    if (payload.new?.state && !window.__santalbinoSaving) { S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); refreshMvpVotes(); }
+   }).subscribe();
+  db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
+    if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
+  await refreshMvpVotes();
 }
 function mergeState(raw) {
-  const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:raw.media||{}});
+  const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:Object.assign(d.media,raw.media||{})});
 }
 async function signInAdmin() {
   const email = $('#authEmail')?.value.trim(), password = $('#authPassword')?.value;
@@ -430,7 +497,7 @@ function syncHtml() {
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
 function saveDraft() { try { localStorage.setItem(DK, JSON.stringify(S)); } catch (e) {} }
 function commit(now) {
-  S.media = {evOne:L.evOne||{}, evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}};
+  S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}};
   S.rev = (S.rev || 0) + 1; saveDraft(); renderHero(); updDatalists();
   if (!CAN_EDIT || LOCAL_ONLY || !dbReady) { setSync('error', 'accesso amministratore necessario'); return; }
   setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, now ? 80 : 700);
@@ -447,14 +514,16 @@ function flushStash() { const id = stash.get('open-post'); if (id) { stash.del('
 /* ================= eventi ================= */
 function setEvOne(id, img, raw) {
   L.evOne[id] = { img, raw: !!raw }; L.evOneOrder = (L.evOneOrder || []).filter(x => x !== id); L.evOneOrder.push(id);
-  while (L.evOneOrder.length > 4) delete L.evOne[L.evOneOrder.shift()];
+  S.media = S.media || {}; S.media.evOne = S.media.evOne || {}; S.media.evOne[id] = { img, raw: !!raw };
   saveL();
 }
 function addEvent(ev, opts = {}) {
   ev.id = uid(); ev.ts = Date.now();
+  if (!S.match.pollId) S.match.pollId = uid();
   if (ev._img) setEvOne(ev.id, ev._img, ev._raw); delete ev._img; delete ev._raw;
   if (!S.match.date) S.match.date = new Date().toISOString().slice(0, 10);
   S.events.push(ev);
+  if (ev.type === 'fulltime') refreshMvpVotes();
   if (opts.post) stash.set('open-post', ev.id);
   commit(true); renderMain();
   return ev;
@@ -610,13 +679,14 @@ function candidates() {
   return out;
 }
 function mvpPublicHtml() {
-  const vi = voteInfo(), C = candidates();
-  if (vi.state === 'none') return `<div class="empty"><h3>Migliore in campo</h3>Il voto si apre al fischio finale e resta aperto 12 ore.</div>`;
-  if (vi.state === 'open') return `<div class="mvp-box"><h3>Vota il migliore in campo</h3><div class="muted">Il voto chiude tra</div><div class="count" id="mvpCount">${leftText(vi.end - Date.now())}</div>
-    ${C.length ? `<div class="cands">${C.map(c => `<div class="cand">${badge(c.side)}<b>${esc(c.num)}</b><span>${esc(c.name)}</span></div>`).join('')}</div>` : ''}
-    ${S.mvp.link ? `<a class="btn primary block" href="${esc(S.mvp.link)}" target="_blank" rel="noopener">Vota ora</a>` : '<p class="muted" style="margin:8px 0 0">Il link per votare sarà pubblicato sui canali social della squadra.</p>'}</div>`;
-  if (vi.state === 'closed') return `<div class="mvp-box"><h3>Votazione chiusa</h3>Il migliore in campo sarà annunciato a breve.</div>`;
-  const mv = vi.mv, rows = Object.entries(S.mvp.votes).map(([k, n]) => ({ k, n, name: k.split('|').slice(1).join('|'), side: k.split('|')[0] })).filter(r => r.n > 0).sort((a, b) => b.n - a.n).slice(0, 5), top = rows.length ? rows[0].n : 1;
+  const vi = voteInfo(), C = candidates(), voted = (() => { try { return localStorage.getItem('santalbino-mvp-vote:' + mvpPollKey()) || ''; } catch (e) { return ''; } })();
+  if (vi.state === 'none') return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre automaticamente al fischio finale e resta aperta 12 ore.</div>`;
+  if (vi.state === 'open') return `<div class="mvp-box"><h3>Vota il migliore in campo</h3><div class="muted">La votazione chiude tra</div><div class="count" id="mvpCount">${leftText(vi.end - Date.now())}</div>
+    ${voted ? `<p class="small" style="color:var(--c-goal);font-weight:700">Hai già votato. Grazie per aver partecipato!</p>` : `<p class="small muted">Scegli un giocatore. È possibile esprimere un solo voto per partita da questo dispositivo.</p>`}
+    ${C.length ? `<div class="cands">${C.map(c => `<div class="cand"><span style="flex:1"><b>${esc(c.num)}</b> ${esc(c.name)}<small class="muted"> · ${esc(teamName(c.side))}</small></span><b>${mvpVoteCounts[c.key] || 0}</b>${!voted ? `<button class="btn sm primary" data-vote-candidate="${esc(c.key)}">Vota</button>` : ''}</div>`).join('')}</div>` : '<p class="muted">Le formazioni non sono ancora disponibili.</p>'}
+    <p class="small muted">I voti vengono conteggiati automaticamente.</p></div>`;
+  if (vi.state === 'closed') return `<div class="mvp-box"><h3>Votazione chiusa</h3>Il risultato sarà annunciato dalla società.</div>`;
+  const mv = vi.mv, rows = Object.entries(mvpVoteCounts).map(([k, n]) => ({ k, n, name: k.split('|').slice(1).join('|') })).filter(r => r.n > 0).sort((a, b) => b.n - a.n).slice(0, 5), top = rows.length ? rows[0].n : 1;
   return `<div class="mvp-box"><h3>Migliore in campo</h3><div class="muted">${esc(mv.player)} · ${esc(teamName(mv.team))}</div><img class="mvp-img" id="mvpImg" alt="Migliore in campo: ${esc(mv.player)}">
     ${rows.length ? `<div class="rank">${rows.map(r => `<span>${esc(r.name)}</span><b>${r.n}</b><div class="bar l"><i style="width:${r.n / top * 100}%"></i></div>`).join('')}</div>` : ''}</div>`;
 }
@@ -624,34 +694,67 @@ async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el &
 let armedMvp = false;
 function mvpRegiaHtml() {
   const vi = voteInfo(), C = candidates();
-  const st = { none: 'La votazione parte al fischio finale e dura 12 ore.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Inserisci i voti e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
-  const tally = k => (S.mvp.votes[k] || 0);
+  const st = { none: 'La votazione parte automaticamente al fischio finale e dura 12 ore.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
+  const tally = k => (mvpVoteCounts[k] || S.mvp.votes[k] || 0);
   const sorted = [...C].sort((a, b) => tally(b.key) - tally(a.key));
   return `<div class="card"><h2>Votazione MVP</h2><p style="margin-top:0">${st}</p>
-    <label class="f"><span>Link del sondaggio (Google Moduli, Facebook, Instagram…)</span><input type="text" id="m-link" value="${esc(S.mvp.link)}" placeholder="https://forms.gle/…" autocomplete="off"></label>
     <label class="check"><input type="checkbox" id="m-our" ${S.mvp.ourOnly ? 'checked' : ''}> Candidati: solo i giocatori della nostra squadra</label>
-    <button class="btn primary block" data-a="savemvp">Salva e mostra online</button>
-    <p class="small muted">I voti si raccolgono nel sondaggio: la pagina non può ricevere voti dai tifosi. Dopo la chiusura inserisci qui i risultati.</p></div>
-  <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><input type="number" min="0" inputmode="numeric" data-vote="${esc(c.key)}" value="${tally(c.key) || ''}" placeholder="0" aria-label="Voti ${esc(c.name)}"></div>`).join('')}<button class="btn block" data-a="savevotes">Salva voti</button>` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
+    <button class="btn primary block" data-a="savemvp">Salva impostazioni</button>
+    <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
+    <p class="small muted">Il pubblico vota direttamente dalla scheda MVP della pagina live. Un voto per dispositivo e partita.</p></div>
+  <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow\"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
     ${S.mvp.tpl ? `<img class="thumb" style="max-height:120px" src="${S.mvp.tpl}" alt="Sfondo MVP">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${S.mvp.tpl ? 'Cambia immagine' : 'Carica immagine'}<input type="file" accept="image/*" data-mvptpl hidden></label>${S.mvp.tpl ? '<button class="btn sm danger" data-a="rmmvptpl">Togli</button>' : ''}</div>
     ${S.mvp.tpl ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-mvpraw ${S.mvp.raw ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>
-  <div class="card"><h2>Proclama</h2>${C.length ? `<label class="f"><span>Migliore in campo</span><select id="m-win">${sorted.map(c => `<option value="${esc(c.key)}">${esc(c.num)} ${esc(c.name)} (${esc(teamName(c.side))})${tally(c.key) ? ' · ' + tally(c.key) + ' voti' : ''}</option>`).join('')}</select></label>
-    <button class="btn primary block" data-a="proclaim" ${vi.state === 'none' ? 'disabled' : ''}>${armedMvp ? 'Tocca ancora: chiudi il voto e proclama' : vi.state === 'done' ? 'Cambia MVP e rifai l’immagine' : 'Proclama MVP e crea l’immagine'}</button>` : '<p class="muted" style="margin:0">Servono le formazioni.</p>'}</div>`;
+  <div class="card"><h2>Proclama</h2>${C.length ? `<label class="f"><span>Migliore in campo</span><select id="m-win">${sorted.map(c => `<option value="${esc(c.key)}">${esc(c.num)} ${esc(c.name)} (${esc(teamName(c.side))}) · ${tally(c.key)} voti</option>`).join('')}</select></label>
+    <button class="btn primary block" data-a="proclaim" ${vi.state === 'none' || vi.state === 'open' ? 'disabled' : ''}>${vi.state === 'done' ? 'Cambia MVP e rifai l’immagine' : 'Proclama MVP e crea l’immagine'}</button>` : '<p class="muted" style="margin:0">Servono le formazioni.</p>'}</div>`;
 }
 function proclaim() {
-  const key = $('#m-win').value, side = key.split('|')[0], name = key.split('|').slice(1).join('|'), n = S.mvp.votes[key] || 0;
+  const key = $('#m-win').value, side = key.split('|')[0], name = key.split('|').slice(1).join('|'), n = mvpVoteCounts[key] || S.mvp.votes[key] || 0;
   S.events = S.events.filter(e => e.type !== 'mvp');
   addEvent({ type: 'mvp', team: side, min: '', player: name, votes: n }, { post: true });
 }
 
+/* ================= resoconto automatico di fine partita ================= */
+function buildMatchReport() {
+  const [h, a] = scoreOf(S.events), date = fmtDate(S.match.date), title = `${teamName('home')} ${h}-${a} ${teamName('away')}`;
+  const meta = [S.match.comp, date, S.match.venue].filter(Boolean).join(' · ');
+  const goals = S.events.filter(e => e.type === 'goal').map(e => {
+    const side = scoringSide(e), name = e.player || 'un giocatore';
+    const method = e.kind === 'autogol' ? ' (autogol)' : e.kind === 'rigore' ? ' (su rigore)' : e.kind === 'punizione' ? ' (su punizione)' : e.kind === 'testa' ? ' (di testa)' : '';
+    return `${e.min ? e.min + '′ ' : ''}${name} (${teamName(side)})${method}`;
+  });
+  const opening = `Si chiude sul risultato di ${h}-${a} la partita tra ${teamName('home')} e ${teamName('away')}${meta ? ', valida per ' + meta : ''}.`;
+  const paragraphs = [opening];
+  if (goals.length) paragraphs.push(`Le reti: ${goals.join('; ')}.`);
+  else paragraphs.push('La gara si conclude senza reti.');
+  const details = S.events
+    .filter(e => !['goal','kickoff','halftime','secondhalf','fulltime','mvp'].includes(e.type))
+    .map(e => buildText(e, scoreAt(S.events.indexOf(e))).replace(/\n/g, ' '));
+  if (details.length) paragraphs.push(`Nel corso dell'incontro: ${details.join(' ')}`);
+  const mvp = S.events.find(e => e.type === 'mvp');
+  if (mvp) paragraphs.push(`Il pubblico ha scelto ${mvp.player} (${teamName(mvp.team)}) come migliore in campo${mvp.votes ? ', con ' + mvp.votes + ' voti' : ''}.`);
+  return `RESOCONTO FINALE\n${title}\n${meta}\n\n${paragraphs.join('\n\n')}\n\n${S.match.hashtag || ''}`.trim();
+}
+function reportHtml() {
+  return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="14" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
+}
+
 /* ================= vista pubblica ================= */
+function standingsHtml() {
+  const url = validExternalUrl(S.match.standingsUrl);
+  return url ? `<div class="card"><h2>Classifica del campionato</h2><p class="small muted">Consulta la classifica aggiornata direttamente sul sito esterno selezionato dalla società.</p><a class="btn primary block" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Apri la classifica in tempo reale ↗</a></div>` : '<div class="empty">Link alla classifica non ancora configurato.</div>' ;
+}
+function validExternalUrl(value) {
+  try { const u = new URL(String(value || '').trim()); return ['https:', 'http:'].includes(u.protocol) ? u.href : ''; } catch (e) { return ''; }
+}
+
 function publicHtml() {
-  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche']]; if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']);
+  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -685,7 +788,7 @@ function regiaHtml() {
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('');
-  else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div><div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
+  else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else body = settingsHtml();
   return (LOCAL_ONLY || API.artifact ? syncHtml() : '') + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-rtab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` + body;
@@ -696,11 +799,12 @@ function settingsHtml() {
   return `<div class="card"><h2>Partita</h2>${I('s-home', 'Squadra di casa', m.home)}${I('s-away', 'Squadra ospite', m.away, 'Nome della squadra avversaria')}
     <label class="f"><span>La nostra squadra</span><select id="s-our"><option value="home" ${m.ourSide === 'home' ? 'selected' : ''}>Gioca in casa</option><option value="away" ${m.ourSide === 'away' ? 'selected' : ''}>Gioca in trasferta</option></select></label>
     ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
+    ${I('s-standings', 'Link esterno alla classifica in tempo reale', m.standingsUrl || '', 'https://...') }<p class="small muted" style="margin-top:-5px">Il collegamento viene salvato online e resta disponibile nella pagina pubblica anche dopo l’azzeramento della partita. Puoi modificarlo o cancellarlo in qualsiasi momento.</p>
     <button class="btn primary block" data-a="savematch">Salva e aggiorna la pagina live</button></div>
   <div class="card"><h2>Loghi</h2><p class="small muted" style="margin-top:0">Compaiono nella pagina live e nelle immagini degli eventi. Meglio un logo quadrato o con sfondo trasparente.</p>
     ${['home', 'away'].map(s => `<div class="f"><span>Logo ${esc(teamName(s))}</span>${S.logos[s] ? `<img class="thumb" style="max-height:90px;background:#fff;padding:4px" src="${S.logos[s]}" alt="Logo">` : ''}
       <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${S.logos[s] ? 'Cambia logo' : 'Carica logo'}<input type="file" accept="image/*" data-logo="${s}" hidden></label>${S.logos[s] ? `<button class="btn sm danger" data-a="rmlogo" data-s="${s}">Togli logo</button>` : ''}</div></div>`).join('')}</div>
-  <div class="card"><h2>Immagini degli eventi</h2><p class="small muted" style="margin-top:0">Una tua immagine per ogni tipo di evento: diventa lo sfondo della grafica, con logo della squadra e minuto sopra. “Solo immagine” la usa così com’è. Restano su questo dispositivo.</p>
+  <div class="card"><h2>Immagini degli eventi</h2><p class="small muted" style="margin-top:0">Una tua immagine per ogni tipo di evento: diventa lo sfondo della grafica, con logo della squadra e minuto sopra. “Solo immagine” la usa così com’è. Sono archiviate online e condivise con tutti i dispositivi.</p>
     ${[['goal', 'Gol'], ['yellow', 'Cartellino giallo'], ['red', 'Cartellino rosso'], ['injury', 'Infortunio'], ['sub', 'Cambio']].map(([k, l]) => `<div class="f"><span>${l}</span>${L.evImg[k] ? `<img class="thumb" style="max-height:100px" src="${L.evImg[k]}" alt="Immagine ${l}">` : ''}
       <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${L.evImg[k] ? 'Cambia immagine' : 'Carica immagine'}<input type="file" accept="image/*" data-evimg="${k}" hidden></label>${L.evImg[k] ? `<button class="btn sm danger" data-a="rmevimg" data-k="${k}">Togli</button>` : ''}</div>
       ${L.evImg[k] ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-evraw="${k}" ${L.evImgRaw[k] ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>`).join('')}</div>
@@ -787,6 +891,7 @@ function tickClock() {
 /* ================= eventi dell'interfaccia ================= */
 document.addEventListener('click', async e => {
   const t = e.target;
+  const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
   const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
@@ -821,8 +926,10 @@ document.addEventListener('click', async e => {
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
-    case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); renderMain(); break;
-    case 'savemvp': S.mvp.link = $('#m-link').value.trim(); S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Salvato: aggiorno la pagina live'); break;
+    case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
+    case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
+    case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
+    case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
     case 'rmmvptpl': S.mvp.tpl = ''; S.mvp.raw = false; commit(true); renderMain(); break;
     case 'proclaim': { const vi = voteInfo();
@@ -832,7 +939,7 @@ document.addEventListener('click', async e => {
     case 'newmatch': if (armedNew) { armedNew = false; resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
 });
-function resetMatch() { S.events = []; S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.match.date = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.match.date = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
   S.match.home = g('#s-home') || defaults().match.home; S.match.away = g('#s-away'); S.match.ourSide = $('#s-our').value; S.match.comp = g('#s-comp'); S.match.venue = g('#s-venue'); S.match.date = $('#s-date').value; S.match.hashtag = g('#s-tag');
@@ -851,12 +958,12 @@ document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
   try {
     if (ds.photo && t.files[0]) { photos[ds.photo] = await resizeImage(t.files[0], 1600); renderMain(); }
-    else if (ds.logo && t.files[0]) { S.logos[ds.logo] = (await resizeImage(t.files[0], 256, 'image/png')).url; commit(true); renderMain(); }
-    else if (ds.evimg && t.files[0]) { L.evImg[ds.evimg] = (await resizeImage(t.files[0], 1080)).url; saveL(); renderMain(); }
-    else if (t.matches && t.matches('[data-mvptpl]') && t.files[0]) { S.mvp.tpl = (await resizeImage(t.files[0], 1080)).url; commit(true); renderMain(); }
+    else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); S.logos[ds.logo] = await uploadSharedImage(t.files[0], 'loghi', 256, 'image/png'); commit(true); renderMain(); toast('Logo salvato e condiviso'); }
+    else if (ds.evimg && t.files[0]) { toast('Caricamento immagine evento…'); L.evImg[ds.evimg] = await uploadSharedImage(t.files[0], 'eventi', 1080); commit(true); renderMain(); toast('Immagine salvata e condivisa'); }
+    else if (t.matches && t.matches('[data-mvptpl]') && t.files[0]) { toast('Caricamento sfondo MVP…'); S.mvp.tpl = await uploadSharedImage(t.files[0], 'mvp', 1080); commit(true); renderMain(); toast('Sfondo MVP salvato e condiviso'); }
     else if (t.matches && t.matches('[data-mvpraw]')) { S.mvp.raw = t.checked; commit(true); }
     else if (ds.evraw) { L.evImgRaw[ds.evraw] = t.checked; saveL(); }
-    else if (t.matches && t.matches('[data-evimg-one]') && t.files[0]) { draft.img = (await resizeImage(t.files[0], 1080)).url; renderSheet(); }
+    else if (t.matches && t.matches('[data-evimg-one]') && t.files[0]) { toast('Caricamento immagine evento…'); draft.img = await uploadSharedImage(t.files[0], 'eventi-singoli', 1080); renderSheet(); toast('Immagine caricata'); }
     else if (t.matches && t.matches('[data-d-raw]')) draft.raw = t.checked;
     else if (t.id === 'impJson' && t.files[0]) { const d = JSON.parse(await t.files[0].text()); const b = defaults(); S = Object.assign(b, d, { match: Object.assign(b.match, d.match), logos: Object.assign(b.logos, d.logos), rosters: Object.assign(b.rosters, d.rosters), clock: Object.assign(b.clock, d.clock), mvp: Object.assign(b.mvp, d.mvp), events: d.events || [] }); commit(true); renderAll(); toast('Dati caricati'); }
   } catch (err) { toast(err.message || 'Operazione non riuscita'); }
