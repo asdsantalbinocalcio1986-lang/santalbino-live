@@ -1261,9 +1261,9 @@ async function castMvpVote(candidateKey) {
   } catch (err) { toast(err.message || 'Voto non registrato'); }
   finally { mvpVoteBusy = false; }
 }
-async function uploadSharedImage(file, folder, max = 1080, type = 'image/jpeg') {
+async function uploadSharedImage(file, folder, max = 1080, type = 'image/jpeg', processor = null) {
   if (!db || !CAN_EDIT) throw new Error('Accedi alla regia per caricare immagini.');
-  const resized = await resizeImage(file, max, type);
+  const resized = processor ? await processor(file) : await resizeImage(file, max, type);
   const ext = resized.blob.type === 'image/png' ? 'png' : resized.blob.type === 'image/webp' ? 'webp' : 'jpg';
   const path = `${folder}/${Date.now()}-${uid()}.${ext}`;
   const { error } = await db.storage.from(MEDIA_BUCKET).upload(path, resized.blob, {
@@ -1384,9 +1384,23 @@ const loadImg = src => new Promise(r => { if (!src) return r(null); const i = ne
 function fitFont(x, t, maxW, size, weight, fam) { let n = size; x.font = `${weight} ${n}px ${fam}`; while (x.measureText(t).width > maxW && n > 22) { n -= 2; x.font = `${weight} ${n}px ${fam}`; } }
 function rrect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
 function drawLogo(x, img, name, cx, cy, size, FD) {
-  x.save(); x.fillStyle = '#ffffff'; x.beginPath(); x.arc(cx, cy, size / 2 + 8, 0, Math.PI * 2); x.fill();
-  if (img) { const k = Math.min(size / img.width, size / img.height), w = img.width * k, h = img.height * k; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.clip(); x.drawImage(img, cx - w / 2, cy - h / 2, w, h); }
-  else { x.fillStyle = '#17663a'; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.fill(); const ini = name.replace(/^ASD\s+/i, '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase(); x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = `800 ${size * .42}px ${FD}`; x.fillText(ini, cx, cy + size * .15); }
+  // Tessera squadrata: il marchio è sempre contenuto, mai ritagliato in un cerchio.
+  const left = cx - size / 2, top = cy - size / 2, radius = Math.max(14, size * .13);
+  x.save();
+  x.shadowColor = 'rgba(0,0,0,.38)'; x.shadowBlur = 24; x.shadowOffsetY = 8;
+  x.fillStyle = '#f7f9f4'; rrect(x, left - 7, top - 7, size + 14, size + 14, radius + 5); x.fill();
+  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+  x.strokeStyle = '#c5ed72'; x.lineWidth = 5; rrect(x, left - 5, top - 5, size + 10, size + 10, radius + 4); x.stroke();
+  if (img) {
+    const pad = size * .13, area = size - pad * 2;
+    const k = Math.min(area / img.width, area / img.height);
+    const w = img.width * k, h = img.height * k;
+    x.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+  } else {
+    x.fillStyle = '#17663a'; rrect(x, left, top, size, size, radius); x.fill();
+    const ini = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = `800 ${size * .42}px ${FD}`; x.fillText(ini, cx, cy + size * .15);
+  }
   x.restore();
 }
 function drawIcon(x, type, kind, cx, cy) {
@@ -1404,82 +1418,107 @@ function evTemplate(ev) {
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
 async function renderCard(ev) {
-  // Grafica autonoma: nessuno sfondo o modello esterno viene caricato.
-  // Per sicurezza nel canvas accettiamo soltanto loghi già incorporati come data URI.
   const idx = S.events.findIndex(e => e.id === ev.id), sc = idx >= 0 ? scoreAt(idx) : scoreOf(S.events);
   const W = 1080, H = 1080, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FD = "'Arial Narrow',Arial,sans-serif", FB = "Arial,sans-serif";
-  const g = x.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#06130b'); g.addColorStop(.52, '#123d22'); g.addColorStop(1, '#07170e');
-  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const ACC = { goal:'#59df91', yellow:'#f4c542', red:'#ff6256', injury:'#ffad4d', sub:'#62b7ff', mvp:'#f8d45c' }[ev.type] || '#c5ed72';
 
-  // Elementi decorativi vettoriali: non richiedono immagini né connessione.
+  // Fondo premium con degradados, luces, textura y motivos de campo vectoriales.
+  const g = x.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#06130b'); g.addColorStop(.48, '#123d22'); g.addColorStop(1, '#050e09');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const glow = x.createRadialGradient(540, 390, 60, 540, 390, 650);
+  glow.addColorStop(0, 'rgba(91,220,119,.23)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = glow; x.fillRect(0, 0, W, H);
   x.save();
-  x.strokeStyle = 'rgba(190,235,110,.13)'; x.lineWidth = 3;
-  x.beginPath(); x.arc(540, 520, 390, 0, Math.PI * 2); x.stroke();
-  x.beginPath(); x.arc(540, 520, 300, 0, Math.PI * 2); x.stroke();
-  x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 2;
-  x.strokeRect(34, 34, W - 68, H - 68);
-  x.beginPath(); x.moveTo(540, 120); x.lineTo(540, 960); x.stroke();
+  x.strokeStyle = 'rgba(190,235,110,.10)'; x.lineWidth = 2;
+  for (let k=0;k<7;k++) { x.beginPath(); x.arc(540, 500, 250+k*55, 0, Math.PI*2); x.stroke(); }
+  x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 3;
+  x.strokeRect(42, 42, 996, 996);
+  x.strokeRect(62, 62, 956, 956);
+  x.beginPath(); x.moveTo(540, 90); x.lineTo(540, 990); x.stroke();
+  x.beginPath(); x.arc(540, 540, 118, 0, Math.PI*2); x.stroke();
+  x.strokeRect(62, 360, 175, 360); x.strokeRect(843, 360, 175, 360);
   x.restore();
 
-  const safeLogo = src => typeof src === 'string' && src.startsWith('data:image/')
-    ? loadImg(src) : Promise.resolve(null);
+  // Loghi caricati dall'amministratore: CORS anonimo per consentire l'esportazione canvas.
+  const safeLogo = src => {
+    if (typeof src !== 'string' || !src) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const im = new Image();
+      if (/^https?:/i.test(src)) im.crossOrigin = 'anonymous';
+      im.onload = () => resolve(im); im.onerror = () => resolve(null); im.src = src;
+    });
+  };
   const [lh, la] = await Promise.all([safeLogo(S.logos.home), safeLogo(S.logos.away)]);
 
-  x.textAlign = 'center';
-  x.fillStyle = '#d8f49b'; x.font = `700 30px ${FB}`;
-  x.fillText((S.match.comp || 'SANT\'ALBINO TERME').toUpperCase(), W / 2, 92);
-  const sub = [S.match.venue, fmtDate(S.match.date)].filter(Boolean).join(' · ');
-  if (sub) { x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `500 25px ${FB}`; x.fillText(sub, W / 2, 132); }
+  // Fascia superiore e marchio societario sempre visibile.
+  x.fillStyle = '#c8ef78'; x.textAlign = 'center'; x.font = `800 25px ${FB}`;
+  x.fillText('SANT’ALBINO TERME  •  MATCH CENTER', W/2, 105);
+  x.fillStyle = 'rgba(255,255,255,.92)'; x.font = `700 31px ${FB}`;
+  fitFont(x, (S.match.comp || 'CRONACA UFFICIALE').toUpperCase(), 850, 31, 700, FB);
+  x.fillText((S.match.comp || 'CRONACA UFFICIALE').toUpperCase(), W/2, 155);
+  const sub = [S.match.venue, fmtDate(S.match.date)].filter(Boolean).join('  •  ');
+  if (sub) { x.fillStyle = 'rgba(255,255,255,.62)'; x.font = `500 22px ${FB}`; x.fillText(sub, W/2, 194); }
 
-  // Le due squadre usano esclusivamente loghi incorporati; il logo societario
-  // resta quindi sempre presente anche quando il Sant'Albino gioca in trasferta.
-  drawLogo(x, lh, teamName('home'), 205, 260, 150, FD);
-  drawLogo(x, la, teamName('away'), 875, 260, 150, FD);
-  x.fillStyle = '#fff'; x.font = `800 150px ${FD}`;
-  x.fillText(`${sc[0]} - ${sc[1]}`, W / 2, 310);
-  x.fillStyle = '#fff'; x.font = `700 34px ${FD}`;
-  fitFont(x, teamName('home').toUpperCase(), 350, 34, 700, FD); x.fillText(teamName('home').toUpperCase(), 205, 390);
-  fitFont(x, teamName('away').toUpperCase(), 350, 34, 700, FD); x.fillText(teamName('away').toUpperCase(), 875, 390);
+  drawLogo(x, lh, teamName('home'), 205, 310, 132, FD);
+  drawLogo(x, la, teamName('away'), 875, 310, 132, FD);
+  x.fillStyle = '#fff'; x.font = `800 142px ${FD}`; x.textAlign = 'center';
+  x.shadowColor = 'rgba(0,0,0,.4)'; x.shadowBlur = 22;
+  x.fillText(`${sc[0]}  –  ${sc[1]}`, W/2, 345); x.shadowBlur = 0;
+  x.fillStyle = '#fff'; x.font = `800 31px ${FD}`;
+  fitFont(x, teamName('home').toUpperCase(), 350, 31, 800, FD); x.fillText(teamName('home').toUpperCase(), 205, 425);
+  fitFont(x, teamName('away').toUpperCase(), 350, 31, 800, FD); x.fillText(teamName('away').toUpperCase(), 875, 425);
 
-  const ACC = { goal: '#53df8c', yellow: '#f2c230', red: '#f0574a', injury: '#f2a038', sub: '#5aa7ee', mvp: '#f6c945' }[ev.type] || '#c5ed72';
-  x.fillStyle = 'rgba(0,0,0,.42)'; rrect(x, 58, 455, 964, 500, 30); x.fill();
-  x.fillStyle = ACC; rrect(x, 58, 455, 964, 14, 7); x.fill();
+  // Pannello evento con accento cromatico, micro-etichetta e icona dedicata.
+  x.save();
+  x.shadowColor = 'rgba(0,0,0,.42)'; x.shadowBlur = 32; x.shadowOffsetY = 14;
+  const panel = x.createLinearGradient(0, 475, 0, 965);
+  panel.addColorStop(0, 'rgba(18,38,25,.97)'); panel.addColorStop(1, 'rgba(4,14,8,.97)');
+  x.fillStyle = panel; rrect(x, 58, 475, 964, 490, 30); x.fill();
+  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+  x.strokeStyle = 'rgba(255,255,255,.13)'; x.lineWidth = 2; rrect(x, 58, 475, 964, 490, 30); x.stroke();
+  x.fillStyle = ACC; rrect(x, 58, 475, 964, 13, 7); x.fill();
+  x.restore();
 
-  const lg = ev.team === 'home' ? lh : la;
-  drawLogo(x, lg, teamName(ev.team || S.match.ourSide), 190, 625, 142, FD);
-  const mn = ev.type === 'mvp' ? 'MVP' : (ev.min ? ev.min + "'" : '');
-  if (mn) { x.textAlign = 'left'; x.fillStyle = ACC; fitFont(x, mn, 390, 150, 800, FD); x.fillText(mn, 310, 680); x.textAlign = 'center'; }
-  drawIcon(x, ev.type, ev.kind, 890, 625);
+  const mn = ev.type === 'mvp' ? 'MVP' : (ev.min ? ev.min + "'" : 'LIVE');
+  x.fillStyle = ACC; x.textAlign = 'left'; x.font = `800 30px ${FB}`;
+  x.fillText('EVENTO DELLA PARTITA', 105, 545);
+  x.textAlign = 'center'; x.font = `900 96px ${FD}`;
+  x.fillText(mn, 540, 660);
+  drawIcon(x, ev.type, ev.kind, 885, 650);
 
-  const title = ev.type === 'goal' ? (ev.kind === 'autogol' ? 'AUTOGOL' : 'GOL!') : {
-    yellow: 'CARTELLINO GIALLO',
-    red: ev.kind === 'doppio' ? 'DOPPIO GIALLO · ESPULSO' : 'CARTELLINO ROSSO',
-    injury: 'INFORTUNIO',
-    sub: 'SOSTITUZIONE',
-    mvp: 'MIGLIORE IN CAMPO'
+  const title = ev.type === 'goal' ? (ev.kind === 'autogol' ? 'AUTOGOL' : 'GOOOL!') : {
+    yellow:'AMMONIZIONE', red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',
+    injury:'INFORTUNIO', sub:'SOSTITUZIONE', mvp:'PLAYER OF THE MATCH'
   }[ev.type] || 'AGGIORNAMENTO';
-  x.fillStyle = ACC; x.textAlign = 'center'; fitFont(x, title, 880, 82, 800, FD); x.fillText(title, W / 2, 805);
+  x.fillStyle = ACC; x.textAlign = 'center'; fitFont(x, title, 820, 72, 900, FD); x.fillText(title, 540, 790);
 
   const team = teamName(ev.team || S.match.ourSide);
   let detail = team;
   if (ev.type === 'goal') {
-    x.fillStyle = '#fff'; const nm = (ev.player || 'Gol').toUpperCase();
-    fitFont(x, nm, 880, 70, 700, FD); x.fillText(nm, W / 2, 875);
-    detail = team + ({ rigore: ' · rigore', punizione: ' · punizione', testa: ' · di testa' }[ev.kind] || '') + (ev.assist ? ` · assist ${ev.assist}` : '');
+    x.fillStyle = '#fff'; const nm = (ev.player || 'Marcatore').toUpperCase();
+    fitFont(x, nm, 820, 62, 800, FD); x.fillText(nm, 540, 865);
+    detail = team + ({rigore:'  •  RIGORE', punizione:'  •  PUNIZIONE', testa:'  •  COLPO DI TESTA'}[ev.kind] || '') + (ev.assist ? `  •  ASSIST ${ev.assist}` : '');
   } else if (ev.type === 'sub') {
-    x.fillStyle = '#6fe0a2'; const a = 'ENTRA  ' + (ev.inn || '…').toUpperCase();
-    fitFont(x, a, 880, 52, 700, FD); x.fillText(a, W / 2, 860);
-    x.fillStyle = '#ff8f84'; const b = 'ESCE  ' + (ev.out || '…').toUpperCase();
-    fitFont(x, b, 880, 52, 700, FD); x.fillText(b, W / 2, 915);
+    x.fillStyle = '#72e7a5'; const a = '▲  ENTRA  ' + (ev.inn || '…').toUpperCase();
+    fitFont(x, a, 820, 45, 800, FD); x.fillText(a, 540, 850);
+    x.fillStyle = '#ff9187'; const b = '▼  ESCE  ' + (ev.out || '…').toUpperCase();
+    fitFont(x, b, 820, 45, 800, FD); x.fillText(b, 540, 905);
   } else {
     x.fillStyle = '#fff'; const nm = (ev.player || team).toUpperCase();
-    fitFont(x, nm, 880, 70, 700, FD); x.fillText(nm, W / 2, 875);
+    fitFont(x, nm, 820, 62, 800, FD); x.fillText(nm, 540, 865);
   }
-  if (ev.type === 'mvp' && ev.votes) detail += ` · ${ev.votes} voti`;
-  x.fillStyle = 'rgba(255,255,255,.82)'; fitFont(x, detail, 880, 30, 600, FB); x.fillText(detail, W / 2, 930);
-  if (S.match.hashtag) { x.fillStyle = 'rgba(255,255,255,.65)'; x.font = `600 28px ${FB}`; x.fillText(S.match.hashtag, W / 2, 1010); }
+  if (ev.type === 'mvp' && ev.votes) detail += `  •  ${ev.votes} VOTI`;
+  x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `600 23px ${FB}`;
+  fitFont(x, detail, 830, 23, 600, FB); x.fillText(detail, 540, 930);
+
+  // Piè di pagina con banda gialloverde e identità del club.
+  x.fillStyle = '#d2f078'; x.fillRect(62, 995, 956, 5);
+  x.fillStyle = '#fff'; x.font = `800 24px ${FB}`; x.textAlign = 'left';
+  x.fillText('ASD SANT’ALBINO TERME', 78, 1030);
+  x.textAlign = 'right'; x.fillStyle = 'rgba(255,255,255,.7)';
+  x.fillText(S.match.hashtag || '#SantAlbinoTerme', 1002, 1030);
   return c;
 }
 const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .92)); };
@@ -1489,7 +1528,30 @@ function resizeImage(file, max, type = 'image/jpeg', q = .82) {
   return new Promise((res, rej) => {
     const img = new Image(), u = URL.createObjectURL(file);
     img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => res({ blob: b, url: c.toDataURL(type, q) }), type, q); };
-    img.onerror = () => rej(new Error('Immagine non leggibile')); img.src = u;
+    img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Immagine non leggibile')); }; img.src = u;
+  });
+}
+
+// Normalizza ogni logo in un riquadro PNG trasparente 512×512.
+// Il marchio viene sempre contenuto per intero, con margine di sicurezza.
+function resizeLogo(file) {
+  return new Promise((res, rej) => {
+    const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => {
+      const size = 512, inner = 424;
+      const scale = Math.min(inner / img.width, inner / img.height);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const c = document.createElement('canvas'); c.width = size; c.height = size;
+      const x = c.getContext('2d');
+      x.clearRect(0, 0, size, size);
+      x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+      x.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      URL.revokeObjectURL(u);
+      c.toBlob(blob => blob ? res({ blob, url: c.toDataURL('image/png') }) : rej(new Error('Ridimensionamento logo non riuscito')), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Logo non leggibile: usa PNG, JPG o WebP.')); };
+    img.src = u;
   });
 }
 
@@ -1927,7 +1989,7 @@ document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
   try {
     if (ds.photo && t.files[0]) { photos[ds.photo] = await resizeImage(t.files[0], 1600); renderMain(); }
-    else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); S.logos[ds.logo] = await uploadSharedImage(t.files[0], 'loghi', 256, 'image/png'); commit(true); renderMain(); toast('Logo salvato e condiviso'); }
+    else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); S.logos[ds.logo] = await uploadSharedImage(t.files[0], 'loghi', 512, 'image/png', resizeLogo); commit(true); renderMain(); toast('Logo salvato e condiviso'); }
     else if (ds.evimg && t.files[0]) { toast('Caricamento immagine evento…'); L.evImg[ds.evimg] = await uploadSharedImage(t.files[0], 'eventi', 1080); commit(true); renderMain(); toast('Immagine salvata e condivisa'); }
     else if (t.matches && t.matches('[data-mvptpl]') && t.files[0]) { toast('Caricamento sfondo MVP…'); S.mvp.tpl = await uploadSharedImage(t.files[0], 'mvp', 1080); commit(true); renderMain(); toast('Sfondo MVP salvato e condiviso'); }
     else if (t.matches && t.matches('[data-mvpraw]')) { S.mvp.raw = t.checked; commit(true); }
