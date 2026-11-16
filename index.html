@@ -1697,7 +1697,7 @@ function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#
   lines.forEach((line, i) => ctx.fillText(line, cx, y + i * lh));
   return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
 }
-async // Illustrazioni evento in Canvas: dettagli, volumi, luci e ombre coerenti.
+// Illustrazioni evento in Canvas: dettagli, volumi, luci e ombre coerenti.
 function drawEventArtwork(ctx,type,cx,cy,size) {
   const s=size/200;
   ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);
