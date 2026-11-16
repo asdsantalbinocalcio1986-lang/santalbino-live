@@ -942,8 +942,24 @@ document.addEventListener('click', async e => {
 function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.match.date = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
-  S.match.home = g('#s-home') || defaults().match.home; S.match.away = g('#s-away'); S.match.ourSide = $('#s-our').value; S.match.comp = g('#s-comp'); S.match.venue = g('#s-venue'); S.match.date = $('#s-date').value; S.match.hashtag = g('#s-tag');
-  commit(true); toast('Salvato: aggiorno la pagina live');
+
+  const standings = g('#s-standings');
+  if (standings && !validExternalUrl(standings)) {
+    toast('Inserisci un link valido che inizi con https://');
+    return;
+  }
+
+  S.match.home = g('#s-home') || defaults().match.home;
+  S.match.away = g('#s-away');
+  S.match.ourSide = $('#s-our').value;
+  S.match.comp = g('#s-comp');
+  S.match.venue = g('#s-venue');
+  S.match.date = $('#s-date').value;
+  S.match.hashtag = g('#s-tag');
+  S.match.standingsUrl = validExternalUrl(standings);
+
+  commit(true);
+  toast('Salvato: aggiorno la pagina live');
 }
 /* campi e file */
 document.addEventListener('input', e => {
