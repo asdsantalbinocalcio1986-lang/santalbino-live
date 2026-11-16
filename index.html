@@ -1116,7 +1116,7 @@ let S = (() => {
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = 'cronaca-live-local-v2', DK = 'cronaca-live-draft-v2';
-const CARD_TYPES = ['goal', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'fulltime'];
+const CARD_TYPES = ['goal', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
 const saveL = () => { try { localStorage.setItem(LK, JSON.stringify(L)); } catch (e) { toast('Memoria piena: togli qualche immagine'); } };
@@ -1538,111 +1538,141 @@ async function renderPhaseCard(ev) {
   x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 21px ${FB}`;x.fillText(S.match.hashtag||'#SantAlbinoTerme',1002,1290);
   return c;
 }
-async function renderCard(ev) {
-  if (['kickoff', 'halftime', 'fulltime'].includes(ev.type)) return renderPhaseCard(ev);
-  const idx = S.events.findIndex(e => e.id === ev.id), sc = idx >= 0 ? scoreAt(idx) : scoreOf(S.events);
-  const W = 1080, H = 1080, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const x = c.getContext('2d'), FD = "'Arial Narrow',Arial,sans-serif", FB = "Arial,sans-serif";
-  const ACC = { goal:'#59df91', yellow:'#f4c542', red:'#ff6256', injury:'#ffad4d', sub:'#62b7ff', mvp:'#f8d45c' }[ev.type] || '#c5ed72';
-
-  // Fondo premium con degradados, luces, textura y motivos de campo vectoriales.
-  const g = x.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#06130b'); g.addColorStop(.48, '#123d22'); g.addColorStop(1, '#050e09');
-  x.fillStyle = g; x.fillRect(0, 0, W, H);
-  const glow = x.createRadialGradient(540, 390, 60, 540, 390, 650);
-  glow.addColorStop(0, 'rgba(91,220,119,.23)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
-  x.fillStyle = glow; x.fillRect(0, 0, W, H);
-  x.save();
-  x.strokeStyle = 'rgba(190,235,110,.10)'; x.lineWidth = 2;
-  for (let k=0;k<7;k++) { x.beginPath(); x.arc(540, 500, 250+k*55, 0, Math.PI*2); x.stroke(); }
-  x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 3;
-  x.strokeRect(42, 42, 996, 996);
-  x.strokeRect(62, 62, 956, 956);
-  x.beginPath(); x.moveTo(540, 90); x.lineTo(540, 990); x.stroke();
-  x.beginPath(); x.arc(540, 540, 118, 0, Math.PI*2); x.stroke();
-  x.strokeRect(62, 360, 175, 360); x.strokeRect(843, 360, 175, 360);
-  x.restore();
-
-  // Loghi caricati dall'amministratore: CORS anonimo per consentire l'esportazione canvas.
-  const safeLogo = src => {
-    if (typeof src !== 'string' || !src) return Promise.resolve(null);
-    return new Promise(resolve => {
-      const im = new Image();
-      if (/^https?:/i.test(src)) im.crossOrigin = 'anonymous';
-      im.onload = () => resolve(im); im.onerror = () => resolve(null); im.src = src;
-    });
-  };
-  const [lh, la] = await Promise.all([safeLogo(S.logos.home), safeLogo(S.logos.away)]);
-
-  // Fascia superiore e marchio societario sempre visibile.
-  x.fillStyle = '#c8ef78'; x.textAlign = 'center'; x.font = `800 25px ${FB}`;
-  x.fillText('SANT’ALBINO TERME  •  MATCH CENTER', W/2, 105);
-  x.fillStyle = 'rgba(255,255,255,.92)'; x.font = `700 31px ${FB}`;
-  fitFont(x, (S.match.comp || 'CRONACA UFFICIALE').toUpperCase(), 850, 31, 700, FB);
-  x.fillText((S.match.comp || 'CRONACA UFFICIALE').toUpperCase(), W/2, 155);
-  const sub = [S.match.venue, fmtDate(S.match.date)].filter(Boolean).join('  •  ');
-  if (sub) { x.fillStyle = 'rgba(255,255,255,.62)'; x.font = `500 22px ${FB}`; x.fillText(sub, W/2, 194); }
-
-  drawLogo(x, lh, teamName('home'), 205, 310, 132, FD);
-  drawLogo(x, la, teamName('away'), 875, 310, 132, FD);
-  x.fillStyle = '#fff'; x.font = `800 142px ${FD}`; x.textAlign = 'center';
-  x.shadowColor = 'rgba(0,0,0,.4)'; x.shadowBlur = 22;
-  x.fillText(`${sc[0]}  –  ${sc[1]}`, W/2, 345); x.shadowBlur = 0;
-  x.fillStyle = '#fff'; x.font = `800 31px ${FD}`;
-  fitFont(x, teamName('home').toUpperCase(), 350, 31, 800, FD); x.fillText(teamName('home').toUpperCase(), 205, 425);
-  fitFont(x, teamName('away').toUpperCase(), 350, 31, 800, FD); x.fillText(teamName('away').toUpperCase(), 875, 425);
-
-  // Pannello evento con accento cromatico, micro-etichetta e icona dedicata.
-  x.save();
-  x.shadowColor = 'rgba(0,0,0,.42)'; x.shadowBlur = 32; x.shadowOffsetY = 14;
-  const panel = x.createLinearGradient(0, 475, 0, 965);
-  panel.addColorStop(0, 'rgba(18,38,25,.97)'); panel.addColorStop(1, 'rgba(4,14,8,.97)');
-  x.fillStyle = panel; rrect(x, 58, 475, 964, 490, 30); x.fill();
-  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
-  x.strokeStyle = 'rgba(255,255,255,.13)'; x.lineWidth = 2; rrect(x, 58, 475, 964, 490, 30); x.stroke();
-  x.fillStyle = ACC; rrect(x, 58, 475, 964, 13, 7); x.fill();
-  x.restore();
-
-  const mn = ev.type === 'mvp' ? 'MVP' : (ev.min ? ev.min + "'" : 'LIVE');
-  x.fillStyle = ACC; x.textAlign = 'left'; x.font = `800 30px ${FB}`;
-  x.fillText('EVENTO DELLA PARTITA', 105, 545);
-  x.textAlign = 'center'; x.font = `900 96px ${FD}`;
-  x.fillText(mn, 540, 660);
-  drawIcon(x, ev.type, ev.kind, 885, 650);
-
-  const title = ev.type === 'goal' ? (ev.kind === 'autogol' ? 'AUTOGOL' : 'GOOOL!') : {
-    yellow:'AMMONIZIONE', red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',
-    injury:'INFORTUNIO', sub:'SOSTITUZIONE', mvp:'PLAYER OF THE MATCH'
-  }[ev.type] || 'AGGIORNAMENTO';
-  x.fillStyle = ACC; x.textAlign = 'center'; fitFont(x, title, 820, 72, 900, FD); x.fillText(title, 540, 790);
-
-  const team = teamName(ev.team || S.match.ourSide);
-  let detail = team;
-  if (ev.type === 'goal') {
-    x.fillStyle = '#fff'; const nm = (ev.player || 'Marcatore').toUpperCase();
-    fitFont(x, nm, 820, 62, 800, FD); x.fillText(nm, 540, 865);
-    detail = team + ({rigore:'  •  RIGORE', punizione:'  •  PUNIZIONE', testa:'  •  COLPO DI TESTA'}[ev.kind] || '') + (ev.assist ? `  •  ASSIST ${ev.assist}` : '');
-  } else if (ev.type === 'sub') {
-    x.fillStyle = '#72e7a5'; const a = '▲  ENTRA  ' + (ev.inn || '…').toUpperCase();
-    fitFont(x, a, 820, 45, 800, FD); x.fillText(a, 540, 850);
-    x.fillStyle = '#ff9187'; const b = '▼  ESCE  ' + (ev.out || '…').toUpperCase();
-    fitFont(x, b, 820, 45, 800, FD); x.fillText(b, 540, 905);
-  } else {
-    x.fillStyle = '#fff'; const nm = (ev.player || team).toUpperCase();
-    fitFont(x, nm, 820, 62, 800, FD); x.fillText(nm, 540, 865);
+async 
+// Unico template grafico per ogni contenuto condiviso: griglia fissa, aree separate e testi contenuti.
+function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
+  const words = String(text || '').split(/\\s+/).filter(Boolean);
+  const lines = []; let line = '';
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width <= maxWidth || !line) line = test;
+    else { lines.push(line); line = word; }
   }
-  if (ev.type === 'mvp' && ev.votes) detail += `  •  ${ev.votes} VOTI`;
-  x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `600 23px ${FB}`;
-  fitFont(x, detail, 830, 23, 600, FB); x.fillText(detail, 540, 930);
+  if (line) lines.push(line);
+  if (lines.length > maxLines) {
+    const clipped = lines.slice(0, maxLines);
+    let last = clipped[maxLines - 1];
+    while (last && ctx.measureText(last + '…').width > maxWidth) last = last.slice(0, -1);
+    clipped[maxLines - 1] = last.replace(/[\\s.,;:]+$/, '') + '…';
+    return clipped;
+  }
+  return lines;
+}
+function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#fff', weight = 600, family = 'Arial,sans-serif', lineHeight = null) {
+  let size = fontSize, lines;
+  do {
+    ctx.font = `${weight} ${size}px ${family}`;
+    lines = wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight || size * 1.28);
+    if (lines.length <= maxLines && lines.every(line => ctx.measureText(line).width <= maxWidth)) break;
+    size -= 2;
+  } while (size > 18);
+  ctx.fillStyle = color; ctx.textAlign = 'center';
+  const lh = lineHeight || size * 1.28;
+  lines.forEach((line, i) => ctx.fillText(line, cx, y + i * lh));
+  return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
+}
+async function renderMatchGraphic(ev) {
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif";
+  const idx = S.events.findIndex(e => e.id === ev.id);
+  const prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
+  const score = ev.type === 'kickoff' ? [0, 0] : (idx >= 0 ? scoreAt(idx) : scoreOf(S.events));
+  const goals = prior.filter(e => e.type === 'goal');
+  const phase = ['kickoff','halftime','secondhalf','fulltime'].includes(ev.type);
+  const titleMap = {
+    kickoff:'KICK OFF', halftime:'HALF TIME', secondhalf:'SECOND HALF', fulltime:'FULL TIME',
+    goal:ev.kind === 'autogol' ? 'AUTOGOL' : 'GOOOL!',
+    yellow:'AMMONIZIONE', red:ev.kind === 'doppio' ? 'DOPPIA AMMONIZIONE' : 'ESPULSIONE',
+    injury:'INFORTUNIO', sub:'SOSTITUZIONE', mvp:'PLAYER OF THE MATCH',
+    save:'GRANDE PARATA', miss:'OCCASIONE', note:'AGGIORNAMENTO'
+  };
+  const accent = ({goal:'#59df91',yellow:'#f4c542',red:'#ff6256',injury:'#ffad4d',sub:'#62b7ff',mvp:'#f8d45c',halftime:'#f4c542'})[ev.type] || '#c8ef78';
+  const grad = x.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,'#06130b'); grad.addColorStop(.52,'#17482a'); grad.addColorStop(1,'#030a06');
+  x.fillStyle=grad; x.fillRect(0,0,W,H);
+  const glow=x.createRadialGradient(540,430,40,540,430,760);
+  glow.addColorStop(0,'rgba(91,220,119,.22)'); glow.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=glow; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(255,255,255,.13)'; x.lineWidth=3; x.strokeRect(38,38,W-76,H-76);
+  x.strokeStyle='rgba(200,239,120,.18)'; x.lineWidth=2; x.strokeRect(54,54,W-108,H-108);
 
-  // Piè di pagina con banda gialloverde e identità del club.
-  x.fillStyle = '#d2f078'; x.fillRect(62, 995, 956, 5);
-  x.fillStyle = '#fff'; x.font = `800 24px ${FB}`; x.textAlign = 'left';
-  x.fillText('ASD SANT’ALBINO TERME', 78, 1030);
-  x.textAlign = 'right'; x.fillStyle = 'rgba(255,255,255,.7)';
-  x.fillText(S.match.hashtag || '#SantAlbinoTerme', 1002, 1030);
+  // Header e metadati su righe distinte: mai una stringa lunga fuori dai margini.
+  x.textAlign='center'; x.fillStyle=accent; x.font=`800 25px ${FB}`;
+  x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER',W/2,105);
+  x.fillStyle='#fff'; x.font=`900 78px ${FD}`;
+  fitFont(x,titleMap[ev.type] || 'CRONACA LIVE',860,78,900,FD);
+  x.fillText(titleMap[ev.type] || 'CRONACA LIVE',W/2,195);
+  const meta=[S.match.comp,S.match.venue,fmtDate(S.match.date)].filter(Boolean).join('  •  ');
+  if(meta) writeWrapped(x,meta,W/2,245,850,22,2,'rgba(255,255,255,.72)',600,FB,29);
+
+  // Loghi laterali e risultato centrale, senza intersezioni geometriche.
+  const safeLogo = src => new Promise(resolve=>{
+    if(typeof src!=='string'||!src)return resolve(null);
+    const im=new Image(); if(/^https?:/i.test(src))im.crossOrigin='anonymous';
+    im.onload=()=>resolve(im); im.onerror=()=>resolve(null); im.src=src;
+  });
+  const [lh,la]=await Promise.all([safeLogo(S.logos.home),safeLogo(S.logos.away)]);
+  drawLogo(x,lh,teamName('home'),235,420,148,FD);
+  drawLogo(x,la,teamName('away'),845,420,148,FD);
+  x.fillStyle='#fff'; x.textAlign='center'; x.font=`900 112px ${FD}`;
+  x.fillText(`${score[0]} – ${score[1]}`,W/2,455);
+  x.fillStyle='rgba(255,255,255,.94)'; x.font=`800 27px ${FD}`;
+  writeWrapped(x,teamName('home').toUpperCase(),235,535,330,27,2,'rgba(255,255,255,.94)',800,FD,32);
+  writeWrapped(x,teamName('away').toUpperCase(),845,535,330,27,2,'rgba(255,255,255,.94)',800,FD,32);
+
+  // Pannello unico per i dettagli, con altezza e margini identici per ogni evento.
+  x.fillStyle=accent; x.fillRect(100,610,880,4);
+  x.fillStyle='rgba(4,15,9,.72)'; rrect(x,76,650,928,545,28); x.fill();
+  x.strokeStyle='rgba(255,255,255,.14)'; x.lineWidth=2; rrect(x,76,650,928,545,28); x.stroke();
+  x.fillStyle=accent; rrect(x,76,650,928,12,6); x.fill();
+  if(ev.type==='kickoff'){
+    x.fillStyle=accent; x.font=`900 78px ${FD}`; x.textAlign='center'; x.fillText('SI PARTE!',W/2,865);
+    writeWrapped(x,'La partita è iniziata',W/2,930,790,30,2,'rgba(255,255,255,.82)',600,FB,39);
+  } else if(ev.type==='halftime'||ev.type==='fulltime'){
+    x.fillStyle=accent; x.font=`900 31px ${FB}`; x.textAlign='center'; x.fillText('MARCATORI',W/2,720);
+    if(!goals.length){
+      writeWrapped(x,ev.type==='halftime'?'Nessuna rete nel primo tempo':'Nessun gol nella partita',W/2,865,790,29,2,'rgba(255,255,255,.78)',600,FB,38);
+    } else {
+      const shown=goals.slice(-8), cols=2, gap=16, left=112, top=760, cellW=420, cellH=78;
+      shown.forEach((g,i)=>{
+        const col=i%2,row=Math.floor(i/2),xx=left+col*(cellW+16),yy=top+row*(cellH+15);
+        x.fillStyle='rgba(255,255,255,.075)';rrect(x,xx,yy,cellW,cellH,13);x.fill();
+        x.strokeStyle='rgba(255,255,255,.13)';x.lineWidth=1.5;rrect(x,xx,yy,cellW,cellH,13);x.stroke();
+        const nm=(g.player||'Autore del gol')+(g.kind==='autogol'?' (aut.)':'');
+        x.textAlign='left';x.font=`700 24px ${FB}`;fitFont(x,nm,cellW-28,24,700,FB);x.fillStyle='#fff';x.fillText(nm,xx+15,yy+31);
+        const detail=`${g.min||'–'}′  •  ${teamName(scoringSide(g))}`;
+        x.font=`700 18px ${FB}`;fitFont(x,detail,cellW-28,18,700,FB);x.fillStyle=accent;x.fillText(detail,xx+15,yy+60);
+      });
+      if(goals.length>8) writeWrapped(x,`+ altri ${goals.length-8} marcatori`,W/2,1160,700,18,1,'rgba(255,255,255,.65)',600,FB,22);
+    }
+  } else {
+    const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
+    x.fillStyle=accent;x.textAlign='center';x.font=`900 64px ${FD}`;x.fillText(minute,W/2,755);
+    const player=(ev.type==='sub'?'':(ev.player||''));
+    if(player) writeWrapped(x,player.toUpperCase(),W/2,835,790,46,2,'#fff',800,FD,54);
+    let detail=teamName(ev.team||S.match.ourSide);
+    if(ev.type==='goal') detail += ({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
+    else if(ev.type==='sub') detail='ENTRA  '+(ev.inn||'—')+'     •     ESCE  '+(ev.out||'—')+'     •     '+detail;
+    else if(ev.type==='mvp'&&ev.votes) detail+='  •  '+ev.votes+' VOTI';
+    else if(ev.type==='note') detail=ev.note||detail;
+    else if(ev.type==='miss') detail=(ev.kind||'Occasione')+'  •  '+detail;
+    else if(ev.type==='red') detail+=(ev.kind==='doppio'?'  •  DOPPIO GIALLO':'  •  ROSSO DIRETTO');
+    else if(ev.type==='yellow') detail+='  •  CARTELLINO GIALLO';
+    else if(ev.type==='injury') detail+='  •  GIOCO FERMO';
+    else if(ev.type==='save') detail+='  •  PARATA';
+    if(player) writeWrapped(x,detail,W/2,Math.min(950,900),790,24,3,'rgba(255,255,255,.76)',600,FB,32);
+    else writeWrapped(x,detail,W/2,875,790,29,4,'rgba(255,255,255,.82)',600,FB,38);
+    if(ev.type==='kickoff') writeWrapped(x,'La partita è iniziata',W/2,970,790,26,2,'rgba(255,255,255,.8)',600,FB,34);
+  }
+  // Footer in una fascia autonoma e sempre visibile.
+  x.fillStyle=accent;x.fillRect(62,1240,956,4);
+  x.fillStyle='#fff';x.textAlign='left';x.font=`800 22px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1280);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 20px ${FB}`;
+  const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,20,600,FB);x.fillText(tag,1002,1280);
   return c;
 }
+async function renderCard(ev) { return renderMatchGraphic(ev); }
+async function renderPhaseCard(ev) { return renderMatchGraphic(ev); }
 const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .92)); };
 const cardUrl = async ev => (await renderCard(ev)).toDataURL('image/jpeg', .88);
 
