@@ -2269,7 +2269,7 @@ let armedNew = false;
 
 /* ================= finestra evento ================= */
 let draft = null, textManual = false;
-const MISS_KINDS = ['Occasione', 'Palo', 'Traversa', 'Rigore sbagliato', 'Gran tiro'];
+const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function openSheet(type) {
   draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : '', player: '', assist: '', out: '', inn: '', note: '', min: '' };
   textManual = false; renderSheet(); $('#sheet').showModal();
