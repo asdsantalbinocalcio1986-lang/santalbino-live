@@ -368,6 +368,17 @@ async function initCaps() {
   LOCAL_ONLY = !configured || !window.supabase;
   if (LOCAL_ONLY) { CAN_EDIT = false; setSync('error', 'backend non configurato'); return; }
   db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  db.auth.onAuthStateChange((event, session) => {
+    authUser = session?.user || null; CAN_EDIT = !!authUser;
+    if (event === 'PASSWORD_RECOVERY') {
+      const dlg = $('#recoveryDlg');
+      if (dlg && !dlg.open) dlg.showModal();
+    }
+    if (event !== 'PASSWORD_RECOVERY') {
+      if (!CAN_EDIT) L.mode = 'public'; else L.mode = 'regia';
+      if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
+    }
+  });
   const { data: { session } } = await db.auth.getSession();
   authUser = session?.user || null;
   CAN_EDIT = !!authUser;
@@ -378,11 +389,6 @@ async function initCaps() {
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
     if (payload.new?.state && !window.__santalbinoSaving) { S = mergeState(payload.new.state); updDatalists(); renderHero(); renderMain(); }
   }).subscribe();
-  db.auth.onAuthStateChange((_event, session) => {
-    authUser = session?.user || null; CAN_EDIT = !!authUser;
-    if (!CAN_EDIT) L.mode = 'public'; else L.mode = 'regia';
-    saveL(); $('#top').innerHTML = topHtml(); renderMain();
-  });
 }
 function mergeState(raw) {
   const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:raw.media||{}});
@@ -393,6 +399,24 @@ async function signInAdmin() {
   const {error} = await db.auth.signInWithPassword({email,password});
   if (error) { $('#authError').textContent = 'Accesso non riuscito: verifica le credenziali.'; return; }
   $('#authDlg').close(); $('#authPassword').value = '';
+}
+async function requestPasswordReset() {
+  const email = $('#authEmail')?.value.trim();
+  if (!email) { $('#authError').textContent = 'Inserisci prima la tua email.'; return; }
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo });
+  $('#authError').textContent = error ? 'Invio non riuscito: ' + error.message : 'Email inviata. Apri il link ricevuto per impostare una nuova password.';
+}
+async function saveNewPassword() {
+  const password = $('#newPassword')?.value || '';
+  const confirm = $('#confirmNewPassword')?.value || '';
+  const msg = $('#recoveryError');
+  if (password.length < 8) { msg.textContent = 'La password deve contenere almeno 8 caratteri.'; return; }
+  if (password !== confirm) { msg.textContent = 'Le due password non coincidono.'; return; }
+  const { error } = await db.auth.updateUser({ password });
+  if (error) { msg.textContent = 'Non è stato possibile aggiornare la password: ' + error.message; return; }
+  msg.textContent = 'Password aggiornata. Accesso alla regia in corso…';
+  setTimeout(() => { $('#recoveryDlg').close(); $('#authDlg').close(); L.mode = 'regia'; saveL(); $('#top').innerHTML = topHtml(); renderMain(); }, 700);
 }
 async function signOutAdmin() { if (db) await db.auth.signOut(); }
 
@@ -875,8 +899,12 @@ async function readLineup(side, stat) {
   ROOT = $('#root');
   const mk = (tag, id) => { const d = document.createElement(tag); d.id = id; document.body.appendChild(d); return d; };
   mk('dialog', 'sheet').setAttribute('aria-label', 'Nuovo evento'); mk('dialog', 'postDlg').setAttribute('aria-label', 'Pubblica su Facebook');
-  const auth = mk('dialog','authDlg'); auth.innerHTML = `<form id="authForm"><div class="sheethead"><h2>Accesso amministratore</h2><button type="button" class="btn sm" id="authClose">Chiudi</button></div><label class="f"><span>Email</span><input id="authEmail" type="email" autocomplete="username" required></label><label class="f"><span>Password</span><input id="authPassword" type="password" autocomplete="current-password" required></label><p id="authError" class="small muted"></p><button class="btn primary block" type="submit">Accedi</button></form>`;
+  const auth = mk('dialog','authDlg'); auth.innerHTML = `<form id="authForm"><div class="sheethead"><h2>Accesso amministratore</h2><button type="button" class="btn sm" id="authClose">Chiudi</button></div><label class="f"><span>Email</span><input id="authEmail" type="email" autocomplete="username" required></label><label class="f"><span>Password</span><input id="authPassword" type="password" autocomplete="current-password" required></label><p id="authError" class="small muted"></p><button class="btn primary block" type="submit">Accedi</button><button class="btn block" type="button" id="forgotPassword">Recupera password</button></form>`;
+  const recovery = mk('dialog','recoveryDlg'); recovery.innerHTML = `<form id="recoveryForm"><div class="sheethead"><h2>Imposta una nuova password</h2><button type="button" class="btn sm" id="recoveryClose">Chiudi</button></div><label class="f"><span>Nuova password (almeno 8 caratteri)</span><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></label><label class="f"><span>Ripeti la nuova password</span><input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="8" required></label><p id="recoveryError" class="small muted"></p><button class="btn primary block" type="submit">Salva nuova password</button></form>`;
   $('#authForm').addEventListener('submit', e => {e.preventDefault(); signInAdmin();}); $('#authClose').addEventListener('click',()=>auth.close());
+  $('#forgotPassword').addEventListener('click', requestPasswordReset);
+  $('#recoveryForm').addEventListener('submit', e => {e.preventDefault(); saveNewPassword();});
+  $('#recoveryClose').addEventListener('click',()=>recovery.close());
   ['home', 'away'].forEach(s => mk('datalist', 'dl-' + s));
   wireSheet();
   renderAll();
