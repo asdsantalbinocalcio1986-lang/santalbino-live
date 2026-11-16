@@ -1579,10 +1579,16 @@ async function renderMatchGraphic(ev) {
   const goals=prior.filter(e=>e.type==='goal');
   const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
-  const grad=x.createLinearGradient(0,0,W,H);grad.addColorStop(0,'#06140c');grad.addColorStop(.48,'#123e25');grad.addColorStop(1,'#020906');x.fillStyle=grad;x.fillRect(0,0,W,H);
-  const glow=x.createRadialGradient(540,570,30,540,570,700);glow.addColorStop(0,'rgba(119,232,104,.20)');glow.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=glow;x.fillRect(0,0,W,H);
-  // Trama campo e cornice: richiamo grafico al poster Kick Off.
-  x.save();x.strokeStyle='rgba(210,255,213,.055)';x.lineWidth=3;x.strokeRect(110,300,860,850);x.beginPath();x.moveTo(540,300);x.lineTo(540,1150);x.stroke();x.beginPath();x.ellipse(540,725,125,125,0,0,Math.PI*2);x.stroke();x.strokeRect(110,520,145,410);x.strokeRect(825,520,145,410);x.restore();
+  // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
+  const leftGrad=x.createLinearGradient(0,0,0,H);leftGrad.addColorStop(0,shade(homeColor,.48));leftGrad.addColorStop(.52,shade(homeColor,.25));leftGrad.addColorStop(1,'#050708');
+  const rightGrad=x.createLinearGradient(0,0,0,H);rightGrad.addColorStop(0,shade(awayColor,.48));rightGrad.addColorStop(.52,shade(awayColor,.25));rightGrad.addColorStop(1,'#050708');
+  x.fillStyle=leftGrad;x.fillRect(0,0,W/2,H);x.fillStyle=rightGrad;x.fillRect(W/2,0,W/2,H);
+  // Trama fibra di carbonio su tutta la superficie.
+  const weave=document.createElement('canvas');weave.width=weave.height=64;const wx=weave.getContext('2d');wx.fillStyle='rgba(0,0,0,.24)';wx.fillRect(0,0,64,64);
+  for(let j=-64;j<128;j+=16){wx.strokeStyle='rgba(255,255,255,.11)';wx.lineWidth=5;wx.beginPath();wx.moveTo(j,0);wx.lineTo(j+64,64);wx.stroke();wx.strokeStyle='rgba(0,0,0,.34)';wx.lineWidth=5;wx.beginPath();wx.moveTo(j+7,0);wx.lineTo(j+71,64);wx.stroke();}
+  x.save();x.globalAlpha=.72;x.fillStyle=x.createPattern(weave,'repeat');x.fillRect(0,0,W,H);x.restore();
+  const leftGlow=x.createRadialGradient(270,520,20,270,520,610);leftGlow.addColorStop(0,'rgba(255,255,255,.12)');leftGlow.addColorStop(1,'rgba(0,0,0,0)');const rightGlow=x.createRadialGradient(810,520,20,810,520,610);rightGlow.addColorStop(0,'rgba(255,255,255,.12)');rightGlow.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=leftGlow;x.fillRect(0,0,W/2,H);x.fillStyle=rightGlow;x.fillRect(W/2,0,W/2,H);x.strokeStyle='rgba(255,255,255,.24)';x.lineWidth=2;x.beginPath();x.moveTo(W/2,65);x.lineTo(W/2,H-65);x.stroke();
   x.strokeStyle='rgba(255,255,255,.18)';x.lineWidth=3;x.strokeRect(36,36,W-72,H-72);x.strokeStyle='rgba(183,243,107,.52)';x.lineWidth=2;x.strokeRect(53,53,W-106,H-106);
   // Testata compatta con gerarchia chiara.
   x.textAlign='center';x.fillStyle=accent;x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME  /  MATCH CENTER',W/2,105);
@@ -1607,6 +1613,16 @@ async function renderMatchGraphic(ev) {
   // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
   const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src;});
   const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
+  // Colore prevalente del logo, escludendo trasparenze e pixel neutri.
+  const logoPrimaryColor=(img,fallback)=>{
+    if(!img)return fallback;
+    try{const sample=document.createElement('canvas');sample.width=64;sample.height=64;const ctx=sample.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,64,64);const data=ctx.getImageData(0,0,64,64).data,bins=new Map();
+      for(let i=0;i<data.length;i+=4){const r=data[i],g=data[i+1],b=data[i+2],alpha=data[i+3];if(alpha<110)continue;const max=Math.max(r,g,b),min=Math.min(r,g,b),sat=max?((max-min)/max):0;if(max<35||min>238||sat<.20)continue;const key=[r>>5,g>>5,b>>5].join(',');const v=bins.get(key)||{n:0,r:0,g:0,b:0};v.n++;v.r+=r;v.g+=g;v.b+=b;bins.set(key,v);}
+      let best=null;for(const v of bins.values())if(!best||v.n>best.n)best=v;return best?'rgb('+Math.round(best.r/best.n)+','+Math.round(best.g/best.n)+','+Math.round(best.b/best.n)+')':fallback;
+    }catch(e){return fallback;}
+  };
+  const homeColor=logoPrimaryColor(homeLogo,'#174b2d'),awayColor=logoPrimaryColor(awayLogo,'#26384c');
+  const shade=(color,factor)=>{const m=color.match(/\\d+/g);if(!m||m.length<3)return color;return 'rgb('+m.slice(0,3).map(v=>Math.max(0,Math.min(255,Math.round(Number(v)*factor)))).join(',')+')';};
   drawLogo(x,homeLogo,teamName('home'),265,430,150,FD);drawLogo(x,awayLogo,teamName('away'),815,430,150,FD);
   writeWrapped(x,teamName('home').toUpperCase(),265,545,350,26,2,'#fff',800,FD,31);
   writeWrapped(x,teamName('away').toUpperCase(),815,545,350,26,2,'#fff',800,FD,31);
