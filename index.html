@@ -1825,6 +1825,7 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
   ctx.restore();ctx.restore();
 }
 async function renderMatchGraphic(ev) {
+  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
   const x=canvas.getContext('2d'),FB="'Manrope',sans-serif",FD="'Barlow Condensed',sans-serif";
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
