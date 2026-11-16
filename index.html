@@ -1611,7 +1611,7 @@ async function renderMatchGraphic(ev) {
     fitFont(x,details,900,17,600,FB);x.fillText(details,W/2,322);
   }
   // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
-  const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src;});
+  const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();let done=false;const finish=value=>{if(done)return;done=true;clearTimeout(timer);im.onload=null;im.onerror=null;resolve(value);};const timer=setTimeout(()=>finish(null),5000);if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>finish(im);im.onerror=()=>finish(null);im.src=src;});
   const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
   // Colore prevalente del logo, escludendo trasparenze e pixel neutri.
   const logoPrimaryColor=(img,fallback)=>{
