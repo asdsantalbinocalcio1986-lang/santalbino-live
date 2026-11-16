@@ -679,6 +679,7 @@ function candidates() {
   return out;
 }
 
+
 function mvpPublicHtml() {
   const vi = voteInfo();
   const C = candidates();
@@ -718,6 +719,7 @@ function mvpPublicHtml() {
     <p class="muted">I risultati sono riservati alla società. Grazie a tutti per aver partecipato!</p>
   </div>`;
 }
+
 
 async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) el.src = await cardUrl(vi.mv); }
 let armedMvp = false;
