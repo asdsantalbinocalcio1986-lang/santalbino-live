@@ -1587,8 +1587,23 @@ async function renderMatchGraphic(ev) {
   // Testata compatta con gerarchia chiara.
   x.textAlign='center';x.fillStyle=accent;x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME  /  MATCH CENTER',W/2,105);
   const title=titleMap[ev.type]||'CRONACA LIVE';fitFont(x,title,900,84,900,FD);x.fillStyle='#fff';x.font=`900 84px ${FD}`;x.fillText(title,W/2,205);
-  const meta=[S.match.comp,S.match.venue,fmtDate(S.match.date)].filter(Boolean);
-  if(meta.length){x.font=`600 21px ${FB}`;x.fillStyle='rgba(255,255,255,.75)';const line=meta.join('   •   ');fitFont(x,line,900,21,600,FB);x.fillText(line,W/2,255);}
+  // Sottotitolo su due righe, con gerarchia da poster Kick Off.
+  const compParts=String(S.match.comp||'').split(/\\s*[·|]\\s*/).filter(Boolean);
+  const compLine1=compParts.shift()||'';
+  const compLine2=compParts.join('  •  ');
+  if(compLine1){
+    x.textAlign='center';x.fillStyle='#c9f58a';x.font=`800 23px ${FB}`;
+    fitFont(x,compLine1.toUpperCase(),900,23,800,FB);x.fillText(compLine1.toUpperCase(),W/2,258);
+  }
+  if(compLine2){
+    x.fillStyle='rgba(255,255,255,.88)';x.font=`700 19px ${FB}`;
+    fitFont(x,compLine2.toUpperCase(),900,19,700,FB);x.fillText(compLine2.toUpperCase(),W/2,290);
+  }
+  const details=[S.match.venue,fmtDate(S.match.date)].filter(Boolean).join('  •  ');
+  if(details){
+    x.fillStyle='rgba(255,255,255,.62)';x.font=`600 17px ${FB}`;
+    fitFont(x,details,900,17,600,FB);x.fillText(details,W/2,322);
+  }
   // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
   const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src;});
   const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
