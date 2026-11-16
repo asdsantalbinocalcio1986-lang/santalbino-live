@@ -1725,8 +1725,29 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
   const bg=ctx.createLinearGradient(-130,-130,130,130);bg.addColorStop(0,'rgba(66,137,83,.32)');bg.addColorStop(1,'rgba(4,16,10,.08)');rr(-137,-137,274,274,24,bg);
   ctx.save();ctx.strokeStyle='rgba(215,244,220,.20)';ctx.lineWidth=2;rr(-112,-105,224,210,8,null,'rgba(215,244,220,.18)');line([[0,-104],[0,104]]);circle(0,0,29,null,'rgba(215,244,220,.18)');ctx.restore();
   if(type==='goal'){
-    goal(-78,-55,156,105);ball(14,8,19);arrow([[-95,52],[-48,28],[-5,9]],lime,5);
-    ctx.save();ctx.strokeStyle='rgba(183,243,107,.75)';ctx.lineWidth=2;for(let i=0;i<5;i++)line([[-50+i*22,-50],[-40+i*18,48]]);ctx.restore();
+    // Un solo pallone da calcio tridimensionale, con pannelli, luce e ombra.
+    const x=0,y=0,r=83;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.72)';ctx.shadowBlur=30;ctx.shadowOffsetX=12;ctx.shadowOffsetY=20;
+    circle(x,y,r,'#101713','#050907');
+    ctx.shadowColor='transparent';
+    const sphere=ctx.createRadialGradient(-29,-36,5,8,12,104);
+    sphere.addColorStop(0,'#ffffff');sphere.addColorStop(.28,'#edf1ed');sphere.addColorStop(.68,'#b9c2bd');sphere.addColorStop(1,'#58635d');
+    circle(x,y,r,sphere,'#202a24');
+    // Pannello centrale e cuciture nere, prospettiva leggermente curva.
+    poly([[-13,-29],[12,-34],[31,-17],[24,8],[0,20],[-23,5],[-31,-17]],'#18211c','#303a33');
+    const panels=[
+      [[-13,-29],[-31,-17],[-50,-35],[-43,-59],[-17,-73],[2,-57],[12,-34]],
+      [[12,-34],[31,-17],[55,-27],[67,-50],[48,-70],[20,-78],[2,-57]],
+      [[24,8],[31,-17],[55,-27],[73,-5],[65,23],[40,39],[18,31]],
+      [[0,20],[24,8],[18,31],[1,58],[-25,62],[-39,38],[-23,5]],
+      [[-23,5],[-31,-17],[-50,-35],[-72,-15],[-69,15],[-47,37],[-39,38]]
+    ];
+    panels.forEach((p,i)=>poly(p,i%2?'#f4f6f3':'#e4e9e5','#202923'));
+    ctx.save();ctx.globalAlpha=.45;ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(-22,-26,48,Math.PI*1.08,Math.PI*1.78);ctx.stroke();ctx.restore();
+    const shine=ctx.createRadialGradient(-38,-48,1,-32,-42,38);shine.addColorStop(0,'rgba(255,255,255,.8)');shine.addColorStop(1,'rgba(255,255,255,0)');
+    circle(-32,-40,38,shine,null);
+    ctx.restore();
   }else if(type==='shot'||type==='miss'||type==='crossbar'){
     goal(-78,-65,156,110);
     if(type==='crossbar'){ball(4,-77,16);arrow([[-65,45],[-22,4],[0,-59]],yellow,5);for(let i=0;i<8;i++){const a=i*Math.PI/4;line([[4+20*Math.cos(a),-77+20*Math.sin(a)],[4+30*Math.cos(a),-77+30*Math.sin(a)]]);}}
