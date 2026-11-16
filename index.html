@@ -1806,7 +1806,7 @@ async function renderMatchGraphic(ev) {
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
-  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const titleMap={kickoff:'KICK OFF',halftime:'half time',secondhalf:'SECOND HALF',fulltime:'Full time',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
   // Trama fibra di carbonio su tutta la superficie.
@@ -1857,11 +1857,11 @@ async function renderMatchGraphic(ev) {
   // Fotografia reale del terreno, vista dall'alto, dietro ai loghi delle squadre.
   // Immagine Unsplash di Willian Justen de Vasconcellos, utilizzabile con licenza Unsplash.
   if(pitchImage){
-    const px=0,py=175,pw=W,ph=405,scale=Math.max(pw/pitchImage.width,ph/pitchImage.height);
+    const px=0,py=315,pw=W,ph=285,scale=Math.max(pw/pitchImage.width,ph/pitchImage.height);
     const sw=pw/scale,sh=ph/scale,sx=(pitchImage.width-sw)/2,sy=(pitchImage.height-sh)/2;
-    x.save();x.beginPath();x.rect(px,py,pw,ph);x.clip();x.globalAlpha=.72;
+    x.save();x.beginPath();x.rect(px,py,pw,ph);x.clip();x.globalAlpha=.84;
     x.drawImage(pitchImage,sx,sy,sw,sh,px,py,pw,ph);
-    const shade=x.createLinearGradient(0,py,0,py+ph);shade.addColorStop(0,'rgba(0,0,0,.42)');shade.addColorStop(.48,'rgba(0,0,0,.50)');shade.addColorStop(1,'rgba(0,0,0,.72)');
+    const shade=x.createLinearGradient(0,py,0,py+ph);shade.addColorStop(0,'rgba(0,0,0,.34)');shade.addColorStop(.48,'rgba(0,0,0,.42)');shade.addColorStop(1,'rgba(0,0,0,.58)');
     x.globalAlpha=1;x.fillStyle=shade;x.fillRect(px,py,pw,ph);
     x.restore();
   }
