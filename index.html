@@ -1404,45 +1404,82 @@ function evTemplate(ev) {
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
 async function renderCard(ev) {
-  try { await Promise.all([document.fonts.load("800 100px 'Barlow Condensed'"), document.fonts.load("600 40px Barlow")]); } catch (e) {}
+  // Grafica autonoma: nessuno sfondo o modello esterno viene caricato.
+  // Per sicurezza nel canvas accettiamo soltanto loghi già incorporati come data URI.
   const idx = S.events.findIndex(e => e.id === ev.id), sc = idx >= 0 ? scoreAt(idx) : scoreOf(S.events);
   const W = 1080, H = 1080, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const x = c.getContext('2d'), FD = "'Barlow Condensed','Arial Narrow',sans-serif", FB = "Barlow,Arial,sans-serif";
-  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0a2214'); g.addColorStop(1, '#17663a'); x.fillStyle = g; x.fillRect(0, 0, W, H);
-  const tpl = evTemplate(ev), bg = await loadImg(tpl.src);
-  if (bg) {
-    const k = Math.max(W / bg.width, H / bg.height), w = bg.width * k, h = bg.height * k; x.drawImage(bg, (W - w) / 2, (H - h) / 2, w, h);
-    if (tpl.raw) return c;
-    x.fillStyle = 'rgba(6,20,12,.58)'; x.fillRect(0, 0, W, H);
-  } else { x.fillStyle = 'rgba(255,255,255,.035)'; for (let i = 0; i < 8; i += 2) x.fillRect(0, i * H / 8, W, H / 8); }
-  x.textAlign = 'center';
-  x.fillStyle = 'rgba(255,255,255,.85)'; x.font = `600 30px ${FB}`; x.fillText((S.match.comp || '').toUpperCase(), W / 2, 62);
-  const sub = [S.match.venue, fmtDate(S.match.date)].filter(Boolean).join(' · '); x.fillStyle = 'rgba(255,255,255,.55)'; x.font = `500 26px ${FB}`; x.fillText(sub, W / 2, 100);
-  const [lh, la] = await Promise.all([loadImg(S.logos.home), loadImg(S.logos.away)]);
-  drawLogo(x, lh, teamName('home'), 195, 232, 150, FD); drawLogo(x, la, teamName('away'), 885, 232, 150, FD);
-  x.fillStyle = '#fff'; x.font = `800 160px ${FD}`; x.fillText(`${sc[0]} - ${sc[1]}`, W / 2, 275);
-  x.fillStyle = 'rgba(255,255,255,.92)';
-  fitFont(x, teamName('home').toUpperCase(), 330, 40, 700, FD); x.fillText(teamName('home').toUpperCase(), 195, 372);
-  fitFont(x, teamName('away').toUpperCase(), 330, 40, 700, FD); x.fillText(teamName('away').toUpperCase(), 885, 372);
+  const x = c.getContext('2d'), FD = "'Arial Narrow',Arial,sans-serif", FB = "Arial,sans-serif";
+  const g = x.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#06130b'); g.addColorStop(.52, '#123d22'); g.addColorStop(1, '#07170e');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
 
-  const ACC = { goal: '#3fd17f', yellow: '#f2c230', red: '#f0574a', injury: '#f2a038', sub: '#5aa7ee', mvp: '#f6c945' }[ev.type];
-  x.fillStyle = bg ? 'rgba(0,0,0,.5)' : 'rgba(0,0,0,.34)'; rrect(x, 60, 410, 960, 580, 28); x.fill();
-  x.fillStyle = ACC; rrect(x, 60, 410, 960, 14, 7); x.fill();
-  // riga: logo della squadra dell'evento, minuto, icona
+  // Elementi decorativi vettoriali: non richiedono immagini né connessione.
+  x.save();
+  x.strokeStyle = 'rgba(190,235,110,.13)'; x.lineWidth = 3;
+  x.beginPath(); x.arc(540, 520, 390, 0, Math.PI * 2); x.stroke();
+  x.beginPath(); x.arc(540, 520, 300, 0, Math.PI * 2); x.stroke();
+  x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 2;
+  x.strokeRect(34, 34, W - 68, H - 68);
+  x.beginPath(); x.moveTo(540, 120); x.lineTo(540, 960); x.stroke();
+  x.restore();
+
+  const safeLogo = src => typeof src === 'string' && src.startsWith('data:image/')
+    ? loadImg(src) : Promise.resolve(null);
+  const [lh, la] = await Promise.all([safeLogo(S.logos.home), safeLogo(S.logos.away)]);
+
+  x.textAlign = 'center';
+  x.fillStyle = '#d8f49b'; x.font = `700 30px ${FB}`;
+  x.fillText((S.match.comp || 'SANT\'ALBINO TERME').toUpperCase(), W / 2, 92);
+  const sub = [S.match.venue, fmtDate(S.match.date)].filter(Boolean).join(' · ');
+  if (sub) { x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `500 25px ${FB}`; x.fillText(sub, W / 2, 132); }
+
+  // Le due squadre usano esclusivamente loghi incorporati; il logo societario
+  // resta quindi sempre presente anche quando il Sant'Albino gioca in trasferta.
+  drawLogo(x, lh, teamName('home'), 205, 260, 150, FD);
+  drawLogo(x, la, teamName('away'), 875, 260, 150, FD);
+  x.fillStyle = '#fff'; x.font = `800 150px ${FD}`;
+  x.fillText(`${sc[0]} - ${sc[1]}`, W / 2, 310);
+  x.fillStyle = '#fff'; x.font = `700 34px ${FD}`;
+  fitFont(x, teamName('home').toUpperCase(), 350, 34, 700, FD); x.fillText(teamName('home').toUpperCase(), 205, 390);
+  fitFont(x, teamName('away').toUpperCase(), 350, 34, 700, FD); x.fillText(teamName('away').toUpperCase(), 875, 390);
+
+  const ACC = { goal: '#53df8c', yellow: '#f2c230', red: '#f0574a', injury: '#f2a038', sub: '#5aa7ee', mvp: '#f6c945' }[ev.type] || '#c5ed72';
+  x.fillStyle = 'rgba(0,0,0,.42)'; rrect(x, 58, 455, 964, 500, 30); x.fill();
+  x.fillStyle = ACC; rrect(x, 58, 455, 964, 14, 7); x.fill();
+
   const lg = ev.team === 'home' ? lh : la;
-  drawLogo(x, lg, teamName(ev.team), 185, 560, 170, FD);
+  drawLogo(x, lg, teamName(ev.team || S.match.ourSide), 190, 625, 142, FD);
   const mn = ev.type === 'mvp' ? 'MVP' : (ev.min ? ev.min + "'" : '');
-  if (mn) { x.textAlign = 'left'; x.fillStyle = ACC; fitFont(x, mn, 400, 180, 800, FD); x.fillText(mn, 320, 620); x.textAlign = 'center'; }
-  drawIcon(x, ev.type, ev.kind, 905, 560);
-  const title = ev.type === 'goal' ? (ev.kind === 'autogol' ? 'AUTOGOL' : 'GOL!') : { yellow: 'CARTELLINO GIALLO', red: ev.kind === 'doppio' ? 'DOPPIO GIALLO · ESPULSO' : 'CARTELLINO ROSSO', injury: 'INFORTUNIO', sub: 'SOSTITUZIONE', mvp: 'MIGLIORE IN CAMPO' }[ev.type];
-  x.fillStyle = ACC; fitFont(x, title, 880, 92, 800, FD); x.fillText(title, W / 2, 790);
-  const team = teamName(ev.team); let detail = team;
-  if (ev.type === 'goal') { x.fillStyle = '#fff'; const nm = (ev.player || 'Gol').toUpperCase(); fitFont(x, nm, 880, 80, 700, FD); x.fillText(nm, W / 2, 878); detail = team + ({ rigore: ' · rigore', punizione: ' · punizione', testa: ' · di testa' }[ev.kind] || '') + (ev.assist ? ` · assist ${ev.assist}` : ''); }
-  else if (ev.type === 'sub') { x.fillStyle = '#6fe0a2'; const a = 'ENTRA  ' + (ev.inn || '…').toUpperCase(); fitFont(x, a, 880, 58, 700, FD); x.fillText(a, W / 2, 858); x.fillStyle = '#ff8f84'; const b = 'ESCE  ' + (ev.out || '…').toUpperCase(); fitFont(x, b, 880, 58, 700, FD); x.fillText(b, W / 2, 920); }
-  else { x.fillStyle = '#fff'; const nm = (ev.player || team).toUpperCase(); fitFont(x, nm, 880, 80, 700, FD); x.fillText(nm, W / 2, 878); }
+  if (mn) { x.textAlign = 'left'; x.fillStyle = ACC; fitFont(x, mn, 390, 150, 800, FD); x.fillText(mn, 310, 680); x.textAlign = 'center'; }
+  drawIcon(x, ev.type, ev.kind, 890, 625);
+
+  const title = ev.type === 'goal' ? (ev.kind === 'autogol' ? 'AUTOGOL' : 'GOL!') : {
+    yellow: 'CARTELLINO GIALLO',
+    red: ev.kind === 'doppio' ? 'DOPPIO GIALLO · ESPULSO' : 'CARTELLINO ROSSO',
+    injury: 'INFORTUNIO',
+    sub: 'SOSTITUZIONE',
+    mvp: 'MIGLIORE IN CAMPO'
+  }[ev.type] || 'AGGIORNAMENTO';
+  x.fillStyle = ACC; x.textAlign = 'center'; fitFont(x, title, 880, 82, 800, FD); x.fillText(title, W / 2, 805);
+
+  const team = teamName(ev.team || S.match.ourSide);
+  let detail = team;
+  if (ev.type === 'goal') {
+    x.fillStyle = '#fff'; const nm = (ev.player || 'Gol').toUpperCase();
+    fitFont(x, nm, 880, 70, 700, FD); x.fillText(nm, W / 2, 875);
+    detail = team + ({ rigore: ' · rigore', punizione: ' · punizione', testa: ' · di testa' }[ev.kind] || '') + (ev.assist ? ` · assist ${ev.assist}` : '');
+  } else if (ev.type === 'sub') {
+    x.fillStyle = '#6fe0a2'; const a = 'ENTRA  ' + (ev.inn || '…').toUpperCase();
+    fitFont(x, a, 880, 52, 700, FD); x.fillText(a, W / 2, 860);
+    x.fillStyle = '#ff8f84'; const b = 'ESCE  ' + (ev.out || '…').toUpperCase();
+    fitFont(x, b, 880, 52, 700, FD); x.fillText(b, W / 2, 915);
+  } else {
+    x.fillStyle = '#fff'; const nm = (ev.player || team).toUpperCase();
+    fitFont(x, nm, 880, 70, 700, FD); x.fillText(nm, W / 2, 875);
+  }
   if (ev.type === 'mvp' && ev.votes) detail += ` · ${ev.votes} voti`;
-  x.fillStyle = 'rgba(255,255,255,.82)'; fitFont(x, detail, 880, 34, 600, FB); x.fillText(detail, W / 2, 968);
-  if (S.match.hashtag) { x.fillStyle = 'rgba(255,255,255,.6)'; x.font = `600 30px ${FB}`; x.fillText(S.match.hashtag, W / 2, 1040); }
+  x.fillStyle = 'rgba(255,255,255,.82)'; fitFont(x, detail, 880, 30, 600, FB); x.fillText(detail, W / 2, 930);
+  if (S.match.hashtag) { x.fillStyle = 'rgba(255,255,255,.65)'; x.font = `600 28px ${FB}`; x.fillText(S.match.hashtag, W / 2, 1010); }
   return c;
 }
 const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .92)); };
