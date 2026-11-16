@@ -1572,104 +1572,76 @@ function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#
   return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
 }
 async function renderMatchGraphic(ev) {
-  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif";
-  const idx = S.events.findIndex(e => e.id === ev.id);
-  const prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
-  const score = ev.type === 'kickoff' ? [0, 0] : (idx >= 0 ? scoreAt(idx) : scoreOf(S.events));
-  const goals = prior.filter(e => e.type === 'goal');
-  const phase = ['kickoff','halftime','secondhalf','fulltime'].includes(ev.type);
-  const titleMap = {
-    kickoff:'KICK OFF', halftime:'HALF TIME', secondhalf:'SECOND HALF', fulltime:'FULL TIME',
-    goal:ev.kind === 'autogol' ? 'AUTOGOL' : 'GOOOL!',
-    yellow:'AMMONIZIONE', red:ev.kind === 'doppio' ? 'DOPPIA AMMONIZIONE' : 'ESPULSIONE',
-    injury:'INFORTUNIO', sub:'SOSTITUZIONE', mvp:'PLAYER OF THE MATCH',
-    save:'GRANDE PARATA', miss:'OCCASIONE', note:'AGGIORNAMENTO'
-  };
-  const accent = ({goal:'#59df91',yellow:'#f4c542',red:'#ff6256',injury:'#ffad4d',sub:'#62b7ff',mvp:'#f8d45c',halftime:'#f4c542'})[ev.type] || '#c8ef78';
-  const grad = x.createLinearGradient(0,0,W,H);
-  grad.addColorStop(0,'#06130b'); grad.addColorStop(.52,'#17482a'); grad.addColorStop(1,'#030a06');
-  x.fillStyle=grad; x.fillRect(0,0,W,H);
-  const glow=x.createRadialGradient(540,430,40,540,430,760);
-  glow.addColorStop(0,'rgba(91,220,119,.22)'); glow.addColorStop(1,'rgba(0,0,0,0)');
-  x.fillStyle=glow; x.fillRect(0,0,W,H);
-  x.strokeStyle='rgba(255,255,255,.13)'; x.lineWidth=3; x.strokeRect(38,38,W-76,H-76);
-  x.strokeStyle='rgba(200,239,120,.18)'; x.lineWidth=2; x.strokeRect(54,54,W-108,H-108);
-
-  // Header e metadati su righe distinte: mai una stringa lunga fuori dai margini.
-  x.textAlign='center'; x.fillStyle=accent; x.font=`800 25px ${FB}`;
-  x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER',W/2,105);
-  x.fillStyle='#fff'; x.font=`900 78px ${FD}`;
-  fitFont(x,titleMap[ev.type] || 'CRONACA LIVE',860,78,900,FD);
-  x.fillText(titleMap[ev.type] || 'CRONACA LIVE',W/2,195);
-  const meta=[S.match.comp,S.match.venue,fmtDate(S.match.date)].filter(Boolean).join('  •  ');
-  if(meta) writeWrapped(x,meta,W/2,245,850,22,2,'rgba(255,255,255,.72)',600,FB,29);
-
-  // Loghi laterali e risultato centrale, senza intersezioni geometriche.
-  const safeLogo = src => new Promise(resolve=>{
-    if(typeof src!=='string'||!src)return resolve(null);
-    const im=new Image(); if(/^https?:/i.test(src))im.crossOrigin='anonymous';
-    im.onload=()=>resolve(im); im.onerror=()=>resolve(null); im.src=src;
-  });
-  const [lh,la]=await Promise.all([safeLogo(S.logos.home),safeLogo(S.logos.away)]);
-  drawLogo(x,lh,teamName('home'),235,420,148,FD);
-  drawLogo(x,la,teamName('away'),845,420,148,FD);
-  x.fillStyle='#fff'; x.textAlign='center'; x.font=`900 112px ${FD}`;
-  x.fillText(`${score[0]} – ${score[1]}`,W/2,455);
-  x.fillStyle='rgba(255,255,255,.94)'; x.font=`800 27px ${FD}`;
-  writeWrapped(x,teamName('home').toUpperCase(),235,535,330,27,2,'rgba(255,255,255,.94)',800,FD,32);
-  writeWrapped(x,teamName('away').toUpperCase(),845,535,330,27,2,'rgba(255,255,255,.94)',800,FD,32);
-
-  // Pannello unico per i dettagli, con altezza e margini identici per ogni evento.
-  x.fillStyle=accent; x.fillRect(100,610,880,4);
-  x.fillStyle='rgba(4,15,9,.72)'; rrect(x,76,650,928,545,28); x.fill();
-  x.strokeStyle='rgba(255,255,255,.14)'; x.lineWidth=2; rrect(x,76,650,928,545,28); x.stroke();
-  x.fillStyle=accent; rrect(x,76,650,928,12,6); x.fill();
-  if(ev.type==='kickoff'){
-    x.fillStyle=accent; x.font=`900 78px ${FD}`; x.textAlign='center'; x.fillText('SI PARTE!',W/2,865);
-    writeWrapped(x,'La partita è iniziata',W/2,930,790,30,2,'rgba(255,255,255,.82)',600,FB,39);
+  const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+  const x=canvas.getContext('2d'),FB='Arial,sans-serif',FD="'Arial Narrow',Arial,sans-serif";
+  const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
+  const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
+  const goals=prior.filter(e=>e.type==='goal');
+  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
+  const grad=x.createLinearGradient(0,0,W,H);grad.addColorStop(0,'#06140c');grad.addColorStop(.48,'#123e25');grad.addColorStop(1,'#020906');x.fillStyle=grad;x.fillRect(0,0,W,H);
+  const glow=x.createRadialGradient(540,570,30,540,570,700);glow.addColorStop(0,'rgba(119,232,104,.20)');glow.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=glow;x.fillRect(0,0,W,H);
+  // Trama campo e cornice: richiamo grafico al poster Kick Off.
+  x.save();x.strokeStyle='rgba(210,255,213,.055)';x.lineWidth=3;x.strokeRect(110,300,860,850);x.beginPath();x.moveTo(540,300);x.lineTo(540,1150);x.stroke();x.beginPath();x.ellipse(540,725,125,125,0,0,Math.PI*2);x.stroke();x.strokeRect(110,520,145,410);x.strokeRect(825,520,145,410);x.restore();
+  x.strokeStyle='rgba(255,255,255,.18)';x.lineWidth=3;x.strokeRect(36,36,W-72,H-72);x.strokeStyle='rgba(183,243,107,.52)';x.lineWidth=2;x.strokeRect(53,53,W-106,H-106);
+  // Testata compatta con gerarchia chiara.
+  x.textAlign='center';x.fillStyle=accent;x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME  /  MATCH CENTER',W/2,105);
+  const title=titleMap[ev.type]||'CRONACA LIVE';fitFont(x,title,900,84,900,FD);x.fillStyle='#fff';x.font=`900 84px ${FD}`;x.fillText(title,W/2,205);
+  const meta=[S.match.comp,S.match.venue,fmtDate(S.match.date)].filter(Boolean);
+  if(meta.length){x.font=`600 21px ${FB}`;x.fillStyle='rgba(255,255,255,.75)';const line=meta.join('   •   ');fitFont(x,line,900,21,600,FB);x.fillText(line,W/2,255);}
+  // Area squadre: loghi, nomi e risultato su tre livelli verticali distinti.
+  const loadLogo=src=>new Promise(resolve=>{if(typeof src!=='string'||!src)return resolve(null);const im=new Image();if(/^https?:/i.test(src))im.crossOrigin='anonymous';im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=src;});
+  const [homeLogo,awayLogo]=await Promise.all([loadLogo(S.logos.home),loadLogo(S.logos.away)]);
+  drawLogo(x,homeLogo,teamName('home'),265,430,150,FD);drawLogo(x,awayLogo,teamName('away'),815,430,150,FD);
+  writeWrapped(x,teamName('home').toUpperCase(),265,545,350,26,2,'#fff',800,FD,31);
+  writeWrapped(x,teamName('away').toUpperCase(),815,545,350,26,2,'#fff',800,FD,31);
+  // Piastra risultato autonoma, larga e separata dai marchi.
+  x.save();x.shadowColor='rgba(0,0,0,.42)';x.shadowBlur=28;x.shadowOffsetY=10;x.fillStyle='rgba(2,13,7,.88)';rrect(x,270,590,540,128,28);x.fill();x.restore();
+  x.strokeStyle=accent;x.lineWidth=3;rrect(x,270,590,540,128,28);x.stroke();
+  x.textAlign='center';x.fillStyle='#fff';x.font=`900 100px ${FD}`;x.fillText(`${score[0]}  –  ${score[1]}`,W/2,685);
+  // Barra di separazione e pannello evento, con respiro tra le sezioni.
+  x.fillStyle=accent;x.fillRect(100,750,880,4);
+  x.fillStyle='rgba(3,15,8,.88)';rrect(x,76,785,928,390,26);x.fill();
+  x.strokeStyle='rgba(255,255,255,.16)';x.lineWidth=2;rrect(x,76,785,928,390,26);x.stroke();
+  x.fillStyle=accent;rrect(x,76,785,928,10,5);x.fill();
+  if(ev.type==='kickoff'||ev.type==='secondhalf'){
+    x.textAlign='center';x.fillStyle=accent;x.font=`900 74px ${FD}`;x.fillText(ev.type==='kickoff'?'SI PARTE!':'SI RIPARTE!',W/2,960);
+    writeWrapped(x,ev.type==='kickoff'?'La partita è iniziata':'Inizia il secondo tempo',W/2,1025,790,29,2,'rgba(255,255,255,.86)',600,FB,38);
   } else if(ev.type==='halftime'||ev.type==='fulltime'){
-    x.fillStyle=accent; x.font=`900 31px ${FB}`; x.textAlign='center'; x.fillText('MARCATORI',W/2,720);
+    x.textAlign='center';x.fillStyle=accent;x.font=`900 29px ${FB}`;x.fillText('MARCATORI',W/2,845);
     if(!goals.length){
-      writeWrapped(x,ev.type==='halftime'?'Nessuna rete nel primo tempo':'Nessun gol nella partita',W/2,865,790,29,2,'rgba(255,255,255,.78)',600,FB,38);
+      writeWrapped(x,ev.type==='halftime'?'Nessuna rete nel primo tempo':'Nessun gol nella partita',W/2,975,790,28,2,'rgba(255,255,255,.82)',600,FB,36);
     } else {
-      const shown=goals.slice(-8), cols=2, gap=16, left=112, top=760, cellW=420, cellH=78;
-      shown.forEach((g,i)=>{
-        const col=i%2,row=Math.floor(i/2),xx=left+col*(cellW+16),yy=top+row*(cellH+15);
-        x.fillStyle='rgba(255,255,255,.075)';rrect(x,xx,yy,cellW,cellH,13);x.fill();
-        x.strokeStyle='rgba(255,255,255,.13)';x.lineWidth=1.5;rrect(x,xx,yy,cellW,cellH,13);x.stroke();
+      const shown=goals.slice(-6),cellW=420,cellH=78,left=112,top=875;
+      shown.forEach((g,i)=>{const col=i%2,row=Math.floor(i/2),xx=left+col*436,yy=top+row*91;
+        x.fillStyle='rgba(255,255,255,.075)';rrect(x,xx,yy,cellW,cellH,13);x.fill();x.strokeStyle='rgba(255,255,255,.16)';x.lineWidth=1.5;rrect(x,xx,yy,cellW,cellH,13);x.stroke();
         const nm=(g.player||'Autore del gol')+(g.kind==='autogol'?' (aut.)':'');
-        x.textAlign='left';x.font=`700 24px ${FB}`;fitFont(x,nm,cellW-28,24,700,FB);x.fillStyle='#fff';x.fillText(nm,xx+15,yy+31);
-        const detail=`${g.min||'–'}′  •  ${teamName(scoringSide(g))}`;
-        x.font=`700 18px ${FB}`;fitFont(x,detail,cellW-28,18,700,FB);x.fillStyle=accent;x.fillText(detail,xx+15,yy+60);
+        x.textAlign='left';x.font=`700 23px ${FB}`;fitFont(x,nm,cellW-30,23,700,FB);x.fillStyle='#fff';x.fillText(nm,xx+15,yy+31);
+        const detail=`${g.min||'–'}′   •   ${teamName(scoringSide(g))}`;x.font=`700 17px ${FB}`;fitFont(x,detail,cellW-30,17,700,FB);x.fillStyle=accent;x.fillText(detail,xx+15,yy+59);
       });
-      if(goals.length>8) writeWrapped(x,`+ altri ${goals.length-8} marcatori`,W/2,1160,700,18,1,'rgba(255,255,255,.65)',600,FB,22);
+      if(goals.length>6){x.textAlign='center';x.font=`600 17px ${FB}`;x.fillStyle='rgba(255,255,255,.65)';x.fillText(`+ ${goals.length-6} altri marcatori`,W/2,1150);}
     }
   } else {
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
-    x.fillStyle=accent;x.textAlign='center';x.font=`900 64px ${FD}`;x.fillText(minute,W/2,755);
-    const player=(ev.type==='sub'?'':(ev.player||''));
-    if(player) writeWrapped(x,player.toUpperCase(),W/2,835,790,46,2,'#fff',800,FD,54);
+    x.textAlign='center';x.fillStyle=accent;x.font=`900 58px ${FD}`;x.fillText(minute,W/2,900);
+    const player=ev.type==='sub'?'':(ev.player||'');
+    if(player)writeWrapped(x,player.toUpperCase(),W/2,970,790,40,2,'#fff',800,FD,48);
     let detail=teamName(ev.team||S.match.ourSide);
-    if(ev.type==='goal') detail += ({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
-    else if(ev.type==='sub') detail='ENTRA  '+(ev.inn||'—')+'     •     ESCE  '+(ev.out||'—')+'     •     '+detail;
-    else if(ev.type==='mvp'&&ev.votes) detail+='  •  '+ev.votes+' VOTI';
-    else if(ev.type==='note') detail=ev.note||detail;
-    else if(ev.type==='miss') detail=(ev.kind||'Occasione')+'  •  '+detail;
-    else if(ev.type==='red') detail+=(ev.kind==='doppio'?'  •  DOPPIO GIALLO':'  •  ROSSO DIRETTO');
-    else if(ev.type==='yellow') detail+='  •  CARTELLINO GIALLO';
-    else if(ev.type==='injury') detail+='  •  GIOCO FERMO';
-    else if(ev.type==='save') detail+='  •  PARATA';
-    if(player) writeWrapped(x,detail,W/2,Math.min(950,900),790,24,3,'rgba(255,255,255,.76)',600,FB,32);
-    else writeWrapped(x,detail,W/2,875,790,29,4,'rgba(255,255,255,.82)',600,FB,38);
-    if(ev.type==='kickoff') writeWrapped(x,'La partita è iniziata',W/2,970,790,26,2,'rgba(255,255,255,.8)',600,FB,34);
+    if(ev.type==='goal')detail+=({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
+    else if(ev.type==='sub')detail='ENTRA  '+(ev.inn||'—')+'   •   ESCE  '+(ev.out||'—')+'   •   '+detail;
+    else if(ev.type==='mvp'&&ev.votes)detail+='  •  '+ev.votes+' VOTI';
+    else if(ev.type==='note')detail=ev.note||detail;
+    else if(ev.type==='miss')detail=(ev.kind||'Occasione')+'  •  '+detail;
+    else if(ev.type==='red')detail+=(ev.kind==='doppio'?'  •  DOPPIO GIALLO':'  •  ROSSO DIRETTO');
+    else if(ev.type==='yellow')detail+='  •  CARTELLINO GIALLO';
+    else if(ev.type==='injury')detail+='  •  GIOCO FERMO';
+    else if(ev.type==='save')detail+='  •  PARATA';
+    writeWrapped(x,detail,W/2,player?1060:1000,790,23,2,'rgba(255,255,255,.82)',600,FB,30);
   }
-  // Footer in una fascia autonoma e sempre visibile.
-  x.fillStyle=accent;x.fillRect(62,1240,956,4);
-  x.fillStyle='#fff';x.textAlign='left';x.font=`800 22px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1280);
-  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 20px ${FB}`;
-  const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,20,600,FB);x.fillText(tag,1002,1280);
-  return c;
+  // Footer isolato dal pannello contenuti.
+  x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
+  return canvas;
 }
 async function renderCard(ev) { return renderMatchGraphic(ev); }
 async function renderPhaseCard(ev) { return renderMatchGraphic(ev); }
