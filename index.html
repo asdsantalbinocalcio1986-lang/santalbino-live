@@ -1580,9 +1580,6 @@ async function renderMatchGraphic(ev) {
   const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
-  const leftGrad=x.createLinearGradient(0,0,0,H);leftGrad.addColorStop(0,shade(homeColor,.48));leftGrad.addColorStop(.52,shade(homeColor,.25));leftGrad.addColorStop(1,'#050708');
-  const rightGrad=x.createLinearGradient(0,0,0,H);rightGrad.addColorStop(0,shade(awayColor,.48));rightGrad.addColorStop(.52,shade(awayColor,.25));rightGrad.addColorStop(1,'#050708');
-  x.fillStyle=leftGrad;x.fillRect(0,0,W/2,H);x.fillStyle=rightGrad;x.fillRect(W/2,0,W/2,H);
   // Trama fibra di carbonio su tutta la superficie.
   const weave=document.createElement('canvas');weave.width=weave.height=64;const wx=weave.getContext('2d');wx.fillStyle='rgba(0,0,0,.24)';wx.fillRect(0,0,64,64);
   for(let j=-64;j<128;j+=16){wx.strokeStyle='rgba(255,255,255,.11)';wx.lineWidth=5;wx.beginPath();wx.moveTo(j,0);wx.lineTo(j+64,64);wx.stroke();wx.strokeStyle='rgba(0,0,0,.34)';wx.lineWidth=5;wx.beginPath();wx.moveTo(j+7,0);wx.lineTo(j+71,64);wx.stroke();}
@@ -1623,6 +1620,10 @@ async function renderMatchGraphic(ev) {
   };
   const homeColor=logoPrimaryColor(homeLogo,'#174b2d'),awayColor=logoPrimaryColor(awayLogo,'#26384c');
   const shade=(color,factor)=>{const m=color.match(/[0-9]+/g);if(!m||m.length<3)return color;return 'rgb('+m.slice(0,3).map(v=>Math.max(0,Math.min(255,Math.round(Number(v)*factor)))).join(',')+')';};
+  // I colori sono disponibili solo dopo il caricamento e l'analisi dei loghi.
+  const leftGrad=x.createLinearGradient(0,0,0,H);leftGrad.addColorStop(0,shade(homeColor,.48));leftGrad.addColorStop(.52,shade(homeColor,.25));leftGrad.addColorStop(1,'#050708');
+  const rightGrad=x.createLinearGradient(0,0,0,H);rightGrad.addColorStop(0,shade(awayColor,.48));rightGrad.addColorStop(.52,shade(awayColor,.25));rightGrad.addColorStop(1,'#050708');
+  x.fillStyle=leftGrad;x.fillRect(0,0,W/2,H);x.fillStyle=rightGrad;x.fillRect(W/2,0,W/2,H);
   drawLogo(x,homeLogo,teamName('home'),265,430,150,FD);drawLogo(x,awayLogo,teamName('away'),815,430,150,FD);
   writeWrapped(x,teamName('home').toUpperCase(),265,545,350,26,2,'#fff',800,FD,31);
   writeWrapped(x,teamName('away').toUpperCase(),815,545,350,26,2,'#fff',800,FD,31);
@@ -2028,15 +2029,20 @@ async function openPost(id) {
   const ev = S.events.find(e => e.id === id); if (!ev) return;
   postId = id; const d = $('#postDlg'), isCard = CARD_TYPES.includes(ev.type);
   d.innerHTML = '<p class="muted">Preparo il post…</p>'; if (!d.open) d.showModal();
-  postUrl = isCard ? await cardUrl(ev) : '';
-  const so = socialOf(id);
-  d.innerHTML = `<div class="sheethead"><h2>Pubblica su Facebook</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div>
-    ${isCard ? `<img class="thumb" style="max-height:44dvh;margin:0 auto 10px" src="${postUrl}" alt="Immagine dell'evento"><p class="small muted" style="margin-top:0;text-align:center">Su telefono puoi anche tenere premuto sull’immagine per salvarla.</p>` : ''}
-    <label class="f"><span>Testo del post</span><textarea id="postText" rows="5">${esc(evText(ev))}</textarea></label>
-    <div class="row2 stack">${isCard ? '<button class="btn" data-a="saveimg">1. Salva immagine</button>' : ''}<button class="btn" data-a="copypost">${isCard ? '2. ' : '1. '}Copia testo</button></div>
-    <a class="btn primary block" style="margin-top:10px" href="${esc(fbLink())}" target="_blank" rel="noopener">${isCard ? '3. ' : '2. '}Apri Facebook</a>
-    <p class="small muted">Nel nuovo post della pagina allega l’immagine e incolla il testo.</p>
-    <button class="btn block" data-a="markdone">${so.status === 'pubblicato' ? 'Segna come da pubblicare' : 'Fatto: segna come pubblicato'}</button>`;
+  try {
+    postUrl = isCard ? await cardUrl(ev) : '';
+    const so = socialOf(id);
+    d.innerHTML = `<div class="sheethead"><h2>Pubblica su Facebook</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div>
+      ${isCard ? `<img class="thumb" style="max-height:44dvh;margin:0 auto 10px" src="${postUrl}" alt="Immagine dell'evento"><p class="small muted" style="margin-top:0;text-align:center">Su telefono puoi anche tenere premuto sull’immagine per salvarla.</p>` : ''}
+      <label class="f"><span>Testo del post</span><textarea id="postText" rows="5">${esc(evText(ev))}</textarea></label>
+      <div class="row2 stack">${isCard ? '<button class="btn" data-a="saveimg">1. Salva immagine</button>' : ''}<button class="btn" data-a="copypost">${isCard ? '2. ' : '1. '}Copia testo</button></div>
+      <a class="btn primary block" style="margin-top:10px" href="${esc(fbLink())}" target="_blank" rel="noopener">${isCard ? '3. ' : '2. '}Apri Facebook</a>
+      <p class="small muted">Nel nuovo post della pagina allega l’immagine e incolla il testo.</p>
+      <button class="btn block" data-a="markdone">${so.status === 'pubblicato' ? 'Segna come da pubblicare' : 'Fatto: segna come pubblicato'}</button>`;
+  } catch (err) {
+    console.error('Errore preparazione post:', err);
+    d.innerHTML = `<div class="sheethead"><h2>Errore nella preparazione</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div><p class="small" style="color:#ff625e">Non è stato possibile generare la grafica: ${esc(err?.message || 'errore non identificato')}.</p><p class="small muted">Controlla i loghi delle squadre e riprova. Il testo dell’evento resta disponibile nella cronaca.</p>`;
+  }
 }
 
 /* ================= disegno pagina ================= */
