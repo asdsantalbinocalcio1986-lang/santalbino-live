@@ -1710,14 +1710,22 @@ function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#
   return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
 }
 // Illustrazioni evento in Canvas: dettagli, volumi, luci e ombre coerenti.
-const GOAL_BALL_IMAGE_URL='https://capsamex.sfo3.cdn.digitaloceanspaces.com/additionals/MO9007_33_NEW.jpg';
+const GOAL_BALL_IMAGE_URL='https://images.weserv.nl/?url=www.gadget.it%2Fdata%2Fthumb_cache%2F_data_prod_img_soccer-pallone-da-calcio-21-5cm_jpg_r_950_950.jpg&output=png&w=700&h=700&fit=contain';
 let goalBallImagePromise=null;
 function loadGoalBallImage(){
   if(!goalBallImagePromise)goalBallImagePromise=new Promise(resolve=>{
-    const img=new Image();let done=false;
-    const finish=value=>{if(done)return;done=true;clearTimeout(timer);img.onload=null;img.onerror=null;resolve(value);};
-    const timer=setTimeout(()=>finish(null),7000);
-    img.crossOrigin='anonymous';img.onload=()=>finish(img);img.onerror=()=>finish(null);img.src=GOAL_BALL_IMAGE_URL;
+    const sources=[
+      GOAL_BALL_IMAGE_URL,
+      'https://www.gadget.it/data/thumb_cache/_data_prod_img_soccer-pallone-da-calcio-21-5cm-7fmo9007_jpg_r_40_40.webp'
+    ];
+    const trySource=index=>{
+      if(index>=sources.length){resolve(null);return;}
+      const img=new Image();let done=false;
+      const finish=value=>{if(done)return;done=true;clearTimeout(timer);img.onload=null;img.onerror=null;if(value)resolve(value);else trySource(index+1);};
+      const timer=setTimeout(()=>finish(null),9000);
+      img.crossOrigin='anonymous';img.onload=()=>finish(img);img.onerror=()=>finish(null);img.src=sources[index];
+    };
+    trySource(0);
   });
   return goalBallImagePromise;
 }
@@ -1740,20 +1748,21 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
     ctx.save();ctx.strokeStyle='rgba(215,244,220,.20)';ctx.lineWidth=2;rr(-112,-105,224,210,8,null,'rgba(215,244,220,.18)');line([[0,-104],[0,104]]);circle(0,0,29,null,'rgba(215,244,220,.18)');ctx.restore();
   }
   if(type==='goal'){
-    // Fotografia originale del pallone Soccer MO9007-33, con rilievo e ombra.
+    // Fotografia del prodotto originale Soccer MO9007-33: nessun pallone sostitutivo disegnato.
     const img=assets.goalBall,x=0,y=0,d=194;
-    ctx.save();ctx.shadowColor='rgba(0,0,0,.72)';ctx.shadowBlur=28;ctx.shadowOffsetX=10;ctx.shadowOffsetY=18;
     if(img){
-      ctx.beginPath();ctx.arc(x,y,96,0,Math.PI*2);ctx.clip();
-      ctx.drawImage(img,x-d/2,y-d/2,d,d);
+      ctx.save();ctx.shadowColor='rgba(0,0,0,.70)';ctx.shadowBlur=24;ctx.shadowOffsetX=8;ctx.shadowOffsetY=14;
+      ctx.beginPath();ctx.arc(x,y,94,0,Math.PI*2);ctx.clip();
+      // Ritaglio centrale: elimina il margine bianco della foto e porta il pallone a piena dimensione.
+      const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+      const crop=Math.min(iw,ih)*.64,sx=(iw-crop)/2,sy=(ih-crop)/2;
+      ctx.drawImage(img,sx,sy,crop,crop,x-d/2,y-d/2,d,d);
+      ctx.restore();
     }else{
-      const r=83,sphere=ctx.createRadialGradient(-29,-36,5,8,12,104);
-      sphere.addColorStop(0,'#ffffff');sphere.addColorStop(.28,'#edf1ed');sphere.addColorStop(.68,'#b9c2bd');sphere.addColorStop(1,'#58635d');
-      circle(x,y,r,sphere,'#202a24');
-      poly([[-13,-29],[12,-34],[31,-17],[24,8],[0,20],[-23,5],[-31,-17]],'#18211c','#303a33');
-      [[[-13,-29],[-31,-17],[-50,-35],[-43,-59],[-17,-73],[2,-57],[12,-34]],[[12,-34],[31,-17],[55,-27],[67,-50],[48,-70],[20,-78],[2,-57]],[[24,8],[31,-17],[55,-27],[73,-5],[65,23],[40,39],[18,31]],[[0,20],[24,8],[18,31],[1,58],[-25,62],[-39,38],[-23,5]],[[-23,5],[-31,-17],[-50,-35],[-72,-15],[-69,15],[-47,37],[-39,38]]].forEach((p,i)=>poly(p,i%2?'#f4f6f3':'#e4e9e5','#202923'));
+      ctx.save();ctx.fillStyle='#ffffff';ctx.strokeStyle='#d9e3dc';ctx.lineWidth=3;
+      circle(0,0,78,ctx.createRadialGradient(-24,-30,4,5,8,88),'#d9e3dc');
+      ctx.restore();
     }
-    ctx.restore();
   }else if(type==='shot'||type==='miss'||type==='crossbar'){
     goal(-78,-65,156,110);
     if(type==='crossbar'){ball(4,-77,16);arrow([[-65,45],[-22,4],[0,-59]],yellow,5);for(let i=0;i<8;i++){const a=i*Math.PI/4;line([[4+20*Math.cos(a),-77+20*Math.sin(a)],[4+30*Math.cos(a),-77+30*Math.sin(a)]]);}}
@@ -1886,11 +1895,11 @@ async function renderMatchGraphic(ev) {
   } else {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const goalBall=ev.type==='goal'?await loadGoalBallImage():null;
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,900,150,{ev,goalBall});
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,890,125,{ev,goalBall});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
-    x.textAlign='center';x.fillStyle=accent;x.font=`900 ${illustrated?42:58}px ${FD}`;x.fillText(minute,W/2,illustrated?1015:900);
+    x.textAlign='center';x.fillStyle=accent;x.font=`900 ${illustrated?40:58}px ${FD}`;x.fillText(minute,W/2,illustrated?1005:900);
     const player=ev.type==='sub'?'':(ev.player||'');
-    if(player)writeWrapped(x,player.toUpperCase(),W/2,illustrated?1070:970,790,illustrated?30:40,2,'#fff',800,FD,illustrated?36:48);
+    if(player)writeWrapped(x,player.toUpperCase(),W/2,illustrated?1055:970,790,illustrated?30:40,2,'#fff',800,FD,illustrated?36:48);
     let detail=teamName(ev.team||S.match.ourSide);
     if(ev.type==='goal')detail+=({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
     else if(ev.type==='sub')detail='ENTRA  '+(ev.inn||'—')+'   •   ESCE  '+(ev.out||'—')+'   •   '+detail;
@@ -1901,7 +1910,7 @@ async function renderMatchGraphic(ev) {
     else if(ev.type==='yellow')detail+='  •  CARTELLINO GIALLO';
     else if(ev.type==='injury')detail+='  •  GIOCO FERMO';
     else if(ev.type==='save')detail+='  •  PARATA';
-    writeWrapped(x,detail,W/2,illustrated?(player?1120:1090):(player?1060:1000),790,illustrated?19:23,2,'rgba(255,255,255,.82)',600,FB,illustrated?24:30);
+    writeWrapped(x,detail,W/2,illustrated?(player?1105:1080):(player?1060:1000),790,illustrated?19:23,2,'rgba(255,255,255,.82)',600,FB,illustrated?24:30);
   }
   // Footer isolato dal pannello contenuti.
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
