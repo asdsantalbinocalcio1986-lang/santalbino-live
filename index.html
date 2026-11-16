@@ -1398,7 +1398,7 @@ function drawLogo(x, img, name, cx, cy, size, FD) {
     x.drawImage(img, cx - w / 2, cy - h / 2, w, h);
   } else {
     x.fillStyle = '#17663a'; rrect(x, left, top, size, size, radius); x.fill();
-    const ini = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+    const ini = name.replace(/^ASD\s+/i, '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
     x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = `800 ${size * .42}px ${FD}`; x.fillText(ini, cx, cy + size * .15);
   }
   x.restore();
