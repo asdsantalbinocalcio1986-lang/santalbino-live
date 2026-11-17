@@ -56,6 +56,22 @@ begin
 end $$;
 
 alter table public.live_state enable row level security;
+-- Elimina anche eventuali policy permissive create in precedenza dal pannello.
+do $
+declare p record;
+begin
+  for p in
+    select policyname from pg_policies
+    where schemaname = 'public' and tablename in ('live_state','mvp_votes')
+  loop
+    execute format('drop policy if exists %I on public.%I',
+      p.policyname,
+      case when exists (
+        select 1 from pg_tables where schemaname='public' and tablename='live_state'
+      ) and p.policyname in (select policyname from pg_policies where schemaname='public' and tablename='live_state')
+      then 'live_state' else 'mvp_votes' end);
+  end loop;
+end $;
 drop policy if exists "Public can read live state" on public.live_state;
 create policy "Public can read live state"
   on public.live_state for select to anon, authenticated using (true);
