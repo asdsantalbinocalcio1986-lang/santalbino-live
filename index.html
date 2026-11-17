@@ -2040,7 +2040,7 @@ async function renderMatchGraphic(ev) {
   x.fillStyle=leftGlow;x.fillRect(0,0,W/2,H);x.fillStyle=rightGlow;x.fillRect(W/2,0,W/2,H);x.strokeStyle='rgba(255,255,255,.24)';x.lineWidth=2;x.beginPath();x.moveTo(W/2,65);x.lineTo(W/2,H-65);x.stroke();
   x.strokeStyle='rgba(255,255,255,.18)';x.lineWidth=3;x.strokeRect(36,36,W-72,H-72);x.strokeStyle='rgba(183,243,107,.52)';x.lineWidth=2;x.strokeRect(53,53,W-106,H-106);
   // Nelle sostituzioni si abbassa tutto il contenuto, compreso il campetto, senza spostare la cornice.
-  if(ev.type==='sub'){x.save();x.translate(0,100);}
+  
   // Testata compatta con gerarchia chiara.
   x.textAlign='center';x.fillStyle=accent;x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME  /  MATCH CENTER',W/2,105);
   const title=titleMap[ev.type]||'CRONACA LIVE';fitFont(x,title,900,84,900,FD);x.fillStyle='#fff';x.font=`900 84px ${FD}`;x.fillText(title,W/2,205);
@@ -2142,7 +2142,7 @@ async function renderMatchGraphic(ev) {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const hydra=ev.type==='goal'?await loadHydraImage():null;
     const injuryArtworkCenterY=(785+1006)/2; // centro esatto tra il bordo superiore del pannello evento e l'inizio della fascia informativa
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra,editor:true});
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:(ev.type==='sub'?925:880)),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:(ev.type==='sub'?92:125)),{ev,hydra,editor:true});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
@@ -2173,16 +2173,24 @@ async function renderMatchGraphic(ev) {
       x.strokeStyle='rgba(183,243,107,.68)';x.lineWidth=2;rrect(x,112,1084,856,80,16);x.stroke();x.restore();
       if(player){x.textAlign='center';fitFont(x,player.toUpperCase(),790,29,900,FD);x.fillStyle='#fff';x.font=`900 29px ${FD}`;x.fillText(player.toUpperCase(),W/2,1116);}
       x.textAlign='center';fitFont(x,detail,790,17,700,FB);x.fillStyle='rgba(255,255,255,.92)';x.font=`700 17px ${FB}`;x.fillText(detail,W/2,1148);
+    }else if(ev.type==='sub'){
+      x.save();x.textAlign='center';x.fillStyle='#fff';x.font=`900 76px ${FD}`;
+      x.shadowColor='rgba(0,0,0,.72)';x.shadowBlur=16;x.fillText('SOSTITUZIONE',W/2,858);x.shadowBlur=0;x.restore();
+      x.save();x.fillStyle='rgba(2,13,7,.96)';rrect(x,430,974,220,48,14);x.fill();
+      x.strokeStyle=accent;x.lineWidth=2.5;rrect(x,430,974,220,48,14);x.stroke();x.restore();
+      x.textAlign='center';x.textBaseline='middle';x.fillStyle=accent;x.font=`900 34px ${FD}`;x.fillText(minute,W/2,998);
+      const side=ev.team||S.match.ourSide||'home',roster=parseRoster(S.rosters[side]||'');
+      const getSubPlayer=raw=>{const value=String(raw||'').trim();const found=/^\d{1,2}$/.test(value)?roster.find(p=>p.num===value):roster.find(p=>p.name.toLowerCase()===value.toLowerCase());return {name:found?.name||value||'—',num:found?.num||(/^\d{1,2}$/.test(value)?value:'—')};};
+      const entrants=[{label:'ENTRA',player:getSubPlayer(ev.inn)},{label:'ESCE',player:getSubPlayer(ev.out)}];
+      entrants.forEach((item,i)=>{const bx=92+i*458,by=1040,bw=438,bh=112;x.save();x.fillStyle='rgba(2,13,7,.94)';rrect(x,bx,by,bw,bh,17);x.fill();x.strokeStyle=i===0?'#b7f36b':'#72c5ff';x.lineWidth=2.5;rrect(x,bx,by,bw,bh,17);x.stroke();x.textAlign='left';x.textBaseline='alphabetic';x.fillStyle=i===0?'#b7f36b':'#72c5ff';x.font=`900 19px ${FB}`;x.fillText(item.label,bx+22,by+27);x.fillStyle='rgba(255,255,255,.10)';rrect(x,bx+18,by+38,70,62,10);x.fill();x.strokeStyle='rgba(255,255,255,.42)';x.lineWidth=1.5;rrect(x,bx+18,by+38,70,62,10);x.stroke();x.textAlign='center';x.textBaseline='middle';x.fillStyle='#fff';x.font=`900 38px ${FD}`;x.fillText(item.player.num,bx+53,by+69);x.textAlign='left';x.fillStyle='#fff';x.font=`800 24px ${FD}`;fitFont(x,item.player.name.toUpperCase(),bw-118,24,800,FD);x.fillText(item.player.name.toUpperCase(),bx+105,by+76);x.restore();});
     }else if(illustrated){
-      // Per l'infortunio l'immagine è centrata nell'area dedicata e separata dal testo.
       const infoTop=ev.type==='injury'?1006:982;
       const minuteY=infoTop+34;
       x.save();x.fillStyle='rgba(2,13,7,.94)';rrect(x,430,infoTop,220,50,16);x.fill();
       x.strokeStyle=accent;x.lineWidth=2;rrect(x,430,infoTop,220,50,16);x.stroke();x.restore();
       x.textAlign='center';x.fillStyle=accent;x.font=`900 36px ${FD}`;x.fillText(minute,W/2,minuteY);
       if(player)writeWrapped(x,player.toUpperCase(),W/2,minuteY+54,790,29,2,'#fff',900,FD,34);
-      writeWrapped(x,detail,W/2,player?minuteY+99:minuteY+68,790,18,2,'rgba(255,255,255,.88)',650,FB,23);
-    }else{
+      writeWrapped(x,detail,W/2,player?minuteY+99:minuteY+68,790,18,2,'rgba(255,255,255,.88)',650,FB,23);    }else{
       x.textAlign='center';x.fillStyle=accent;x.font=`900 58px ${FD}`;x.fillText(minute,W/2,900);
       if(player)writeWrapped(x,player.toUpperCase(),W/2,970,790,40,2,'#fff',800,FD,48);
       writeWrapped(x,detail,W/2,player?1060:1000,790,23,2,'rgba(255,255,255,.82)',600,FB,30);
@@ -2192,7 +2200,7 @@ async function renderMatchGraphic(ev) {
   // Footer isolato dal pannello contenuti.
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
   x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
-  if(ev.type==='sub')x.restore();
+  
   lastGraphicTextItems=capturedTextItems;
   await addSponsorToGraphic(canvas,['kickoff','halftime','fulltime'].includes(ev.type)?'phase':'event');
   return canvas;
