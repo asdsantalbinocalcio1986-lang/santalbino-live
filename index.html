@@ -1931,7 +1931,8 @@ async function renderMatchGraphic(ev) {
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
-  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const ownGoal=ev.type==='goal' && scoringSide(ev)===S.match.ourSide;
+  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':(ownGoal?'GOOOOOOOOAL':'GOL'),yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
   // Trama fibra di carbonio su tutta la superficie.
@@ -1980,7 +1981,7 @@ async function renderMatchGraphic(ev) {
   const rightGrad=x.createLinearGradient(0,0,0,H);rightGrad.addColorStop(0,shade(awayColor,.48));rightGrad.addColorStop(.52,shade(awayColor,.25));rightGrad.addColorStop(1,'#050708');
   x.fillStyle=leftGrad;x.fillRect(0,0,W/2,H);x.fillStyle=rightGrad;x.fillRect(W/2,0,W/2,H);
   // Il modello GOAL della Libreria viene usato come sfondo della grafica dei gol.
-  if(ev.type==='goal' && S.media?.library?.goal){
+  if(ownGoal && S.media?.library?.goal){
     const goalTemplate=await loadGraphicImage(S.media.library.goal);
     if(goalTemplate){
       const scale=Math.max(W/goalTemplate.width,H/goalTemplate.height),sw=W/scale,sh=H/scale;
