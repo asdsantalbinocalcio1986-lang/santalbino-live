@@ -1279,7 +1279,7 @@ const defaults = () => ({
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
   mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
-  media: { evOne: {}, evImg: {}, evImgRaw: {} },
+  media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' } },
   events: []
 });
 let S = (() => {
@@ -1607,7 +1607,7 @@ function migrateBundledLogos(state) {
   return changed;
 }
 function mergeState(raw) {
-  const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:Object.assign(d.media,raw.media||{})});
+  const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
 }
 async function verifyAdminAccess() {
   if (!db || !authUser) { CAN_EDIT = false; return false; }
@@ -1659,7 +1659,7 @@ function syncHtml() {
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
 function saveDraft() { try { localStorage.setItem(DK, JSON.stringify(S)); } catch (e) {} }
 function commit(now) {
-  S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}};
+  S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:''}, S.media?.library || {})};
   S.rev = (S.rev || 0) + 1; saveDraft(); renderHero(); updDatalists();
   if (!CAN_EDIT || LOCAL_ONLY || !dbReady) { setSync('error', 'accesso amministratore necessario'); return; }
   setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, now ? 80 : 700);
@@ -2379,7 +2379,7 @@ function feedHtml(list) {
 }
 let editId = null, armedDel = null;
 function regiaHtml() {
-  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['social', 'Social'], ['mvp', 'MVP'], ['set', 'Impost.']];
+  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
@@ -2398,9 +2398,24 @@ function regiaHtml() {
   }).join('');
   else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
+  else if (t === 'library') body = libraryHtml();
   else body = settingsHtml();
   return (LOCAL_ONLY || API.artifact ? syncHtml() : '') + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-rtab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` + body;
 }
+
+function libraryHtml() {
+  const lib = Object.assign({goal:'',formation:''}, S.media?.library || {});
+  const items = [
+    ['goal','GOAL','Modello usato come sfondo per le grafiche dei gol.'],
+    ['formation','FORMAZIONE','Modello di riferimento per la grafica delle formazioni.']
+  ];
+  return `<div class="card"><h2>Libreria grafica</h2><p class="small muted">Archivio permanente dei modelli. Le immagini vengono conservate in Supabase e i riferimenti sono condivisi con la regia.</p>
+    ${items.map(([k,label,desc]) => `<div class="f"><span><b>${label}</b></span><p class="small muted" style="margin:0">${desc}</p>${lib[k] ? `<a href="${esc(lib[k])}" target="_blank" rel="noopener"><img class="thumb" style="max-height:180px" src="${esc(lib[k])}" alt="Modello ${label}"></a><div class="small muted">Modello presente in libreria</div>` : '<div class="empty">Nessun modello caricato</div>'}
+      <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${lib[k] ? 'Sostituisci modello' : 'Carica modello'}<input type="file" accept="image/*" data-library="${k}" hidden></label>${lib[k] ? `<a class="btn sm" href="${esc(lib[k])}" target="_blank" rel="noopener">Apri originale</a><button class="btn sm danger" data-a="libraryRemove" data-k="${k}">Rimuovi riferimento</button>` : ''}</div></div>`).join('')}</div>
+    <div class="card"><h2>Collegamento GOAL</h2><p class="small muted">Il modello GOAL caricato viene collegato automaticamente allo sfondo degli eventi. Puoi anche importare nella libreria l'immagine già presente in Impostazioni → Immagini degli eventi.</p><button class="btn block" data-a="libraryImportGoal">Importa immagine GOAL già caricata</button><button class="btn primary block" data-a="libraryUseGoal" style="margin-top:8px">Usa modello GOAL per gli eventi</button></div>
+    <div class="card"><h2>Prossimo passaggio</h2><p class="small muted">Dopo aver conservato i due originali nella libreria, posso analizzarne composizione, testi, loghi e proporzioni e completare i generatori grafici. Il modello FORMAZIONE viene archiviato separatamente e non modifica la distinta online.</p></div>`;
+}
+
 function settingsHtml() {
   const I = (id, label, v, ph = '', type = 'text') => `<label class="f"><span>${label}</span><input type="${type}" id="${id}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
   const m = S.match;
@@ -2580,6 +2595,9 @@ document.addEventListener('click', async e => {
     case 'copyconvocati': { const raw = $('[data-convocati]').value; S.convocati = raw; commit(true); copyText(buildConvocatiText(raw)); break; }
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
+    case 'libraryUseGoal': { const url = S.media?.library?.goal || ''; if (!url) { toast('Carica prima un modello GOAL'); break; } L.evImg.goal = url; L.evImgRaw.goal = false; commit(true); renderMain(); toast('Modello GOAL collegato agli eventi'); break; }
+    case 'libraryRemove': { const k = a.dataset.k; if (S.media?.library) S.media.library[k] = ''; commit(true); renderMain(); toast('Riferimento rimosso dalla libreria'); break; }
+    case 'libraryImportGoal': { const url = L.evImg.goal || ''; if (!url) { toast('Non è presente un modello GOAL nelle Impostazioni'); break; } S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}, {goal:url}); commit(true); renderMain(); toast('Modello GOAL aggiunto alla libreria'); break; }
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
     case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
@@ -2632,6 +2650,7 @@ document.addEventListener('change', async e => {
     if (ds.photo && t.files[0]) { photos[ds.photo] = await resizeImage(t.files[0], 1600); renderMain(); }
     else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); S.logos[ds.logo] = await uploadSharedImage(t.files[0], 'loghi', 512, 'image/png', resizeLogo); commit(true); renderMain(); toast('Logo salvato e condiviso'); }
     else if (ds.evimg && t.files[0]) { toast('Caricamento immagine evento…'); L.evImg[ds.evimg] = await uploadSharedImage(t.files[0], 'eventi', 1080); commit(true); renderMain(); toast('Immagine salvata e condivisa'); }
+    else if (ds.library && t.files[0]) { const k = ds.library; toast('Caricamento modello…'); const url = await uploadSharedImage(t.files[0], 'libreria-grafica/' + k, 1600); S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}); S.media.library[k] = url; if (k === 'goal') { L.evImg.goal = url; L.evImgRaw.goal = false; } commit(true); renderMain(); toast('Modello salvato nella libreria'); }
     else if (t.matches && t.matches('[data-mvptpl]') && t.files[0]) { toast('Caricamento sfondo MVP…'); S.mvp.tpl = await uploadSharedImage(t.files[0], 'mvp', 1080); commit(true); renderMain(); toast('Sfondo MVP salvato e condiviso'); }
     else if (t.matches && t.matches('[data-mvpraw]')) { S.mvp.raw = t.checked; commit(true); }
     else if (ds.evraw) { L.evImgRaw[ds.evraw] = t.checked; saveL(); }
