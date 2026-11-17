@@ -1883,16 +1883,7 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
     ctx.save();ctx.strokeStyle='rgba(215,244,220,.20)';ctx.lineWidth=2;rr(-112,-105,224,210,8,null,'rgba(215,244,220,.18)');line([[0,-104],[0,104]]);circle(0,0,29,null,'rgba(215,244,220,.18)');ctx.restore();
   }
   if(type==='goal'){
-    // Hydra del club in primo piano: ampia, centrata e senza coprire i dati del gol.
-    const img=assets.hydra;
-    if(img){
-      const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
-      const scale=Math.min(650/iw,370/ih),dw=iw*scale,dh=ih*scale;
-      ctx.save();ctx.globalAlpha=.96;ctx.shadowColor='rgba(0,0,0,.58)';ctx.shadowBlur=22;ctx.shadowOffsetY=8;
-      ctx.drawImage(img,-dw/2,-dh/2,dw,dh);ctx.restore();
-    }else{
-      ctx.save();ctx.fillStyle=lime;ctx.font='900 34px sans-serif';ctx.textAlign='center';ctx.fillText('SANT’ALBINO',0,12);ctx.restore();
-    }
+    // La grafica GOAL mostra solo le informazioni dell'evento, senza Hydra o illustrazioni.
   }else if(type==='shot'||type==='miss'||type==='crossbar'){
     goal(-78,-65,156,110);
     if(type==='crossbar'){ball(4,-77,16);arrow([[-65,45],[-22,4],[0,-59]],yellow,5);for(let i=0;i<8;i++){const a=i*Math.PI/4;line([[4+20*Math.cos(a),-77+20*Math.sin(a)],[4+30*Math.cos(a),-77+30*Math.sin(a)]]);}}
