@@ -2116,17 +2116,19 @@ async function renderMatchGraphic(ev) {
   };
   drawTeamWatermark(homeLogo,265,430,390);drawTeamWatermark(awayLogo,815,430,390);
   drawLogo(x,homeLogo,teamName('home'),265,430,150,FD);drawLogo(x,awayLogo,teamName('away'),815,430,150,FD);
-  // Nomi squadra su blocchi della stessa altezza: una o due righe restano centrate sulla medesima linea.
-  const drawAlignedTeamName=(name,cx)=>{
-    const label=String(name||'').toUpperCase(),maxWidth=350,fontSize=26,lineHeight=31;
-    x.font=`800 ${fontSize}px ${FD}`;
-    const lines=wrapCanvasText(x,label,maxWidth,2,lineHeight);
-    x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';
-    const firstY=545-((lines.length-1)*lineHeight)/2;
-    lines.forEach((line,i)=>x.fillText(line,cx,firstY+i*lineHeight));
-  };
-  drawAlignedTeamName(teamName('home'),265);
-  drawAlignedTeamName(teamName('away'),815);
+  // Nomi squadra sempre sulla stessa riga e con dimensione uniforme.
+  const homeLabel=String(teamName('home')||'').toUpperCase();
+  const awayLabel=String(teamName('away')||'').toUpperCase();
+  let teamFontSize=26;
+  x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';
+  while(teamFontSize>15){
+    x.font=`800 ${teamFontSize}px ${FD}`;
+    if(Math.max(x.measureText(homeLabel).width,x.measureText(awayLabel).width)<=350)break;
+    teamFontSize--;
+  }
+  x.font=`800 ${teamFontSize}px ${FD}`;
+  x.fillText(homeLabel,265,545);
+  x.fillText(awayLabel,815,545);
   // Piastra risultato autonoma, larga e separata dai marchi.
   x.save();x.shadowColor='rgba(0,0,0,.42)';x.shadowBlur=28;x.shadowOffsetY=10;x.fillStyle='rgba(2,13,7,.88)';rrect(x,270,590,540,128,28);x.fill();x.restore();
   x.strokeStyle=accent;x.lineWidth=3;rrect(x,270,590,540,128,28);x.stroke();
