@@ -2047,7 +2047,8 @@ async function renderMatchGraphic(ev) {
   } else {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const hydra=ev.type==='goal'?await loadHydraImage():null;
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?840:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra});
+    const injuryArtworkCenterY=(785+1006)/2; // centro esatto tra il bordo superiore del pannello evento e l'inizio della fascia informativa
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
