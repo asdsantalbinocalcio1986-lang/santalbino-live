@@ -1790,7 +1790,9 @@ async function addSponsorToGraphic(canvas, layout) {
     convocati: {x: canvas.width-190, y: canvas.height-102, w: 160, h: 44}
   };
   const p = slots[layout] || slots.event, x = canvas.getContext('2d');
-  const style=graphicEditorStyle(layout);
+  const style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
+  p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
+  const scale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=scale;p.h*=scale;
   if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
   if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
   if(style.sponsor===false)return canvas;
@@ -2744,9 +2746,10 @@ function regiaHtml() {
 
 function graphicEditorConfig() {
   S.media=S.media||{};
-  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}};
+  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1}},templates:{}};
   S.media.graphicEditor=Object.assign(base,S.media.graphicEditor||{});
   S.media.graphicEditor.global=Object.assign({},base.global,S.media.graphicEditor.global||{});
+  S.media.graphicEditor.global.sponsorPos=Object.assign({},base.global.sponsorPos,S.media.graphicEditor.global.sponsorPos||{});
   S.media.graphicEditor.templates=S.media.graphicEditor.templates||{};
   return S.media.graphicEditor;
 }
@@ -2759,15 +2762,52 @@ function graphicEditorHtml() {
   const v=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{});
   const options=[['global','Stile globale'],['event','Grafiche eventi'],['phase','Kick off / intervallo / fine'],['matchday','Match Day'],['convocati','Convocati'],['formation','Formazioni']];
   return `<div class="card"><h2>Editor grafiche</h2>
-    <p class="small muted" style="margin-top:0">Editor leggero: colore principale, velatura, bordo e sponsor. Le modifiche globali valgono per tutte le grafiche; quelle specifiche sostituiscono i valori solo nel modello scelto.</p>
+    <p class="small muted" style="margin-top:0">Modifica lo stile e sposta lo sponsor direttamente sull’anteprima. Le impostazioni possono essere globali o specifiche per ogni modello.</p>
     <label class="f"><span>Ambito da modificare</span><select data-editor-scope>${options.map(([k,n])=>`<option value="${k}" ${key===k?'selected':''}>${n}</option>`).join('')}</select></label>
     <div class="row2"><label class="f"><span>Colore principale</span><input type="color" value="${esc(v.accent)}" data-editor="accent"></label>
     <label class="f"><span>Velatura scura · ${v.overlay}%</span><input type="range" min="0" max="35" value="${Number(v.overlay)||0}" data-editor="overlay"></label></div>
     <label class="f"><span>Spessore bordo · ${v.border}px</span><input type="range" min="0" max="12" value="${Number(v.border)||0}" data-editor="border"></label>
     <label class="check"><input type="checkbox" data-editor="sponsor" ${v.sponsor!==false?'checked':''}> Mostra uno sponsor casuale, se presente in Libreria</label>
+    <button class="btn block" style="margin-top:10px" data-a="editorPreview">Apri anteprima e sposta lo sponsor</button>
+    <div id="graphicEditorPreview" style="margin-top:12px"></div>
     <div class="row2 stack" style="margin-top:12px"><button class="btn primary" data-a="editorSave">Salva impostazioni</button><button class="btn" data-a="editorReset">Ripristina predefiniti</button></div>
-    <p class="small muted">Nessuna libreria esterna e nessuna modifica ai file immagine originali. Le impostazioni sono salvate con i dati di Sant'Albino Live.</p></div>`;
+    <p class="small muted">Nessuna libreria esterna. Le posizioni dello sponsor vengono memorizzate per il modello selezionato o a livello globale.</p></div>`;
 }
+function editorSponsorSlot(layout,w,h) {
+  const slots={event:{x:w-220,y:h-210,w:170,h:72},phase:{x:w-220,y:h-195,w:170,h:72},formation:{x:w-190,y:h-52,w:165,h:42},matchday:{x:w-190,y:h-102,w:160,h:44},convocati:{x:w-190,y:h-102,w:160,h:44}};
+  return slots[layout]||slots.event;
+}
+async function renderEditorCanvas(layout) {
+  if(layout==='matchday')return renderMatchDayGraphic();
+  if(layout==='convocati')return renderConvocatiGraphic();
+  if(layout==='formation')return renderFormationGraphic();
+  if(layout==='phase'){
+    const ev=S.events.find(e=>['kickoff','halftime','fulltime'].includes(e.type))||{id:'editor-preview-phase',type:'kickoff',minute:''};
+    return renderPhaseCard(ev);
+  }
+  const ev=S.events.find(e=>CARD_TYPES.includes(e.type));
+  if(!ev)throw new Error('Per l’anteprima eventi registra prima almeno un evento.');
+  return renderCard(ev);
+}
+async function openGraphicEditorPreview() {
+  const host=$('#graphicEditorPreview');if(!host)return;
+  const layout=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'event';
+  host.innerHTML='<p class="small muted">Genero l’anteprima…</p>';
+  try{
+    beginSponsorGraphic();
+    const canvas=await renderEditorCanvas(layout),url=canvas.toDataURL('image/jpeg',.88),slot=editorSponsorSlot(layout,canvas.width,canvas.height);
+    const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',style=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{}),pos=Object.assign({x:0,y:0,scale:1},style.sponsorPos||{});
+    const left=(slot.x+pos.x*canvas.width)/canvas.width*100,top=(slot.y+pos.y*canvas.height)/canvas.height*100;
+    const width=slot.w*pos.scale/canvas.width*100,height=slot.h*pos.scale/canvas.height*100;
+    host.innerHTML='<p class="small muted">Trascina il riquadro SPONSOR nella posizione desiderata. Il salvataggio è automatico al rilascio.</p><div id="editorDragFrame" style="position:relative;width:100%;aspect-ratio:'+canvas.width+'/'+canvas.height+';overflow:hidden;border-radius:12px;background:#071d16;touch-action:none"><img src="'+url+'" alt="Anteprima grafica" style="display:block;width:100%;height:100%;object-fit:fill;pointer-events:none"><div id="editorSponsorHandle" role="slider" aria-label="Sposta sponsor" tabindex="0" style="position:absolute;left:'+left+'%;top:'+top+'%;width:'+width+'%;height:'+height+'%;min-width:36px;min-height:20px;box-sizing:border-box;border:2px dashed #fff;background:rgba(227,198,109,.32);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font:bold 11px Arial;cursor:move;touch-action:none;text-shadow:0 1px 3px #000">SPONSOR</div></div>';
+    const frame=$('#editorDragFrame'),handle=$('#editorSponsorHandle');if(!frame||!handle)return;
+    let drag=null;
+    handle.addEventListener('pointerdown',e=>{e.preventDefault();handle.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y};});
+    handle.addEventListener('pointermove',e=>{if(!drag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,drag.ox+(e.clientX-drag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,drag.oy+(e.clientY-drag.y)/r.height));handle.style.left=((slot.x+nx*canvas.width)/canvas.width*100)+'%';handle.style.top=((slot.y+ny*canvas.height)/canvas.height*100)+'%';});
+    handle.addEventListener('pointerup',e=>{if(!drag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,drag.ox+(e.clientX-drag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,drag.oy+(e.clientY-drag.y)/r.height));drag=null;const target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{}));target.sponsorPos=Object.assign({x:0,y:0,scale:1},target.sponsorPos||{},{x:nx,y:ny});commit(true);openGraphicEditorPreview();});
+  }catch(err){host.innerHTML='<p class="small muted">'+esc(err?.message||'Anteprima non disponibile.')+'</p>';}
+}
+
 function libraryHtml() {
   const lib = Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {});
   const sponsors = Array.isArray(lib.sponsors) ? lib.sponsors : [];
@@ -2908,6 +2948,7 @@ document.addEventListener('click', async e => {
     case 'logout': signOutAdmin(); break;
     case 'mode': L.mode = L.mode === 'regia' ? 'public' : 'regia'; saveL(); $('#top').innerHTML = topHtml(); renderMain(); break;
     case 'editorSave': commit(true); toast('Impostazioni grafiche salvate'); break;
+    case 'editorPreview': await openGraphicEditorPreview(); break;
     case 'editorReset': { const c=graphicEditorConfig(); if(!L.editorTemplate||L.editorTemplate==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true}; else delete c.templates[L.editorTemplate]; commit(true); renderMain(); toast('Valori predefiniti ripristinati'); break; }
     case 'retry': publishNow(); break;
     case 'phase': { const c = S.clock;
