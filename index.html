@@ -1540,7 +1540,8 @@ async function initCaps() {
   authUser = session?.user || null;
   await verifyAdminAccess();
   const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
-  if (!error && data?.state) { S = mergeState(data.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); }
+  let legacyLogoMigration = false;
+  if (!error && data?.state) { S = mergeState(data.state); legacyLogoMigration = migrateBundledLogos(S); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); }
   else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
   dbReady = true;
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
@@ -1550,6 +1551,29 @@ async function initCaps() {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
   await refreshMvpVotes();
+  if (legacyLogoMigration && CAN_EDIT) commit(true);
+}
+function migrateBundledLogos(state) {
+  const legacy = {
+    home: { length: 132302, hash: '6dbbd3bc' },
+    away: { length: 69682, hash: '21f75b95' }
+  };
+  let changed = false;
+  for (const side of ['home', 'away']) {
+    const src = state.logos?.[side];
+    if (typeof src !== 'string' || !src.startsWith('data:image/png;base64,')) continue;
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < src.length; i++) {
+      hash ^= src.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    const signature = legacy[side];
+    if (src.length === signature.length && hash.toString(16).padStart(8, '0') === signature.hash) {
+      state.logos[side] = './assets/logo-' + side + '.png';
+      changed = true;
+    }
+  }
+  return changed;
 }
 function mergeState(raw) {
   const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:Object.assign(d.media,raw.media||{})});
