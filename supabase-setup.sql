@@ -40,12 +40,15 @@ begin
   if admin_email = 'INSERISCI_EMAIL_AMMINISTRATORE' or position('@' in admin_email) = 0 then
     raise exception 'Modifica admin_email nello script con l''email esatta dell''unico amministratore.';
   end if;
-  select count(*), min(id) into found_count, found_user_id
+  select count(*) into found_count
   from auth.users
   where lower(email) = lower(admin_email);
   if found_count <> 1 then
     raise exception 'Atteso un solo utente Supabase con questa email; trovati: %.', found_count;
   end if;
+  select id into found_user_id
+  from auth.users
+  where lower(email) = lower(admin_email);
   delete from public.santalbino_admins where user_id <> found_user_id;
   insert into public.santalbino_admins(user_id)
   values (found_user_id)
