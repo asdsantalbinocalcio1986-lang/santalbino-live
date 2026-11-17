@@ -1393,29 +1393,28 @@ function buildText(ev, sc) {
   let x = '';
   switch (ev.type) {
     case 'goal': {
-      const our = scoringSide(ev) === S.match.ourSide;
       const how = { rigore: ' su rigore', punizione: ' su punizione', testa: ' di testa' }[ev.kind] || '';
-      const head = ev.kind === 'autogol' ? 'AUTOGOL' : (our ? 'GOOOL!' : 'GOL');
+      const head = ev.kind === 'autogol' ? 'AUTOGOL' : 'GOOOAL';
       const d = ev.kind === 'autogol' ? (p ? `Autorete di ${p} (${t}).` : `Autorete del ${t}.`)
         : (p ? `Segna ${p} (${t})${how}${ev.assist ? `, assist di ${ev.assist}` : ''}.` : `Gol del ${t}${how}.`);
-      x = `⚽ ${m}${head} ${line}\n${d}`; break;
+      x = `⚽ ${m}${head}\n${line}\n${d}`; break;
     }
-    case 'yellow': x = `🟨 ${m}Cartellino giallo${p ? ' per ' + p : ''} (${t}).`; break;
-    case 'red': x = ev.kind === 'doppio' ? `🟥 ${m}Doppio giallo ed espulsione${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.` : `🟥 ${m}Cartellino rosso${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
-    case 'sub': x = `🔄 ${m}Sostituzione ${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
-    case 'save': x = `🧤 ${m}Gran parata${p ? ' di ' + p : ''} (${t})!`; break;
-    case 'shot': x = `⚽ ${m}Tiro${p ? ' di ' + p : ''} per ${t}.`; break;
-    case 'crossbar': x = `🥅 ${m}TRAVERSA!${p ? ' Colpita da ' + p : ''} (${t}).` ; break;
-    case 'corner': x = `🚩 ${m}Calcio d’angolo per ${t}.`; break;
-    case 'freekick': x = `🎯 ${m}Calcio di punizione per ${t}${p ? ', battuto da ' + p : ''}.`; break;
-    case 'miss': x = `😮 ${m}${ev.kind || 'Occasione'}${p ? ' per ' + p : ''} (${t})!`; break;
-    case 'injury': x = `🚑 ${m}Gioco fermo per soccorrere ${p || 'un giocatore'} (${t}).`; break;
-    case 'note': x = `📣 ${m}${ev.note || ''}`; break;
-    case 'mvp': x = `⭐ MIGLIORE IN CAMPO: ${p} (${t})${ev.votes ? ` con ${ev.votes} voti` : ''}. Grazie a tutti per aver votato!`; break;
-    case 'kickoff': x = `▶️ Fischio d'inizio! ${teamName('home')} vs ${teamName('away')}\n${[S.match.comp, S.match.venue].filter(Boolean).join(' · ')}`.trim(); break;
-    case 'halftime': x = `⏸️ Fine primo tempo: ${line}`; break;
-    case 'secondhalf': x = `▶️ Al via il secondo tempo. ${line}`; break;
-    case 'fulltime': x = `🏁 Fine partita! ${line}`; break;
+    case 'yellow': x = `🟨 ${m}CARTELLINO GIALLO\n${p ? p + ' (' + t + ')' : t}`; break;
+    case 'red': x = `🟥 ${m}ESPULSIONE\n${ev.kind === 'doppio' ? 'Doppio giallo' : 'Rosso diretto'}${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
+    case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
+    case 'save': x = `🧤 ${m}GRAN PARATA\n${p ? 'di ' + p + ' (' + t + ')' : t}`; break;
+    case 'shot': x = `⚽ ${m}TIRO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.`; break;
+    case 'crossbar': x = `🥅 ${m}TRAVERSA!\n${p ? 'Colpita da ' + p + ' (' + t + ')' : t}.`; break;
+    case 'corner': x = `🚩 ${m}CALCIO D’ANGOLO\nPer ${t}.`; break;
+    case 'freekick': x = `🎯 ${m}CALCIO DI PUNIZIONE\nPer ${t}${p ? ', battuto da ' + p : ''}.`; break;
+    case 'miss': x = `😮 ${m}${String(ev.kind || 'OCCASIONE').toUpperCase()}\n${p ? 'Per ' + p + ' (' + t + ')' : t + '!'}`; break;
+    case 'injury': x = `🚑 ${m}INFORTUNIO\nGioco fermo per soccorrere ${p || 'un giocatore'} (${t}).`; break;
+    case 'note': x = `📣 ${m}AGGIORNAMENTO\n${ev.note || ''}`; break;
+    case 'mvp': x = `⭐ MIGLIORE IN CAMPO\n${p} (${t})${ev.votes ? ` · ${ev.votes} voti` : ''}. Grazie a tutti per aver votato!`; break;
+    case 'kickoff': x = `▶️ FISCHIO D'INIZIO\n${teamName('home')} vs ${teamName('away')}\n${[S.match.comp, S.match.venue].filter(Boolean).join(' · ')}`.trim(); break;
+    case 'halftime': x = `⏸️ FINE PRIMO TEMPO\n${line}`; break;
+    case 'secondhalf': x = `▶️ SECONDO TEMPO\nAl via. ${line}`; break;
+    case 'fulltime': x = `🏁 FINE PARTITA\n${line}`; break;
   }
   return x + (S.match.hashtag ? `\n\n${S.match.hashtag}` : '');
 }
@@ -1932,7 +1931,7 @@ async function renderMatchGraphic(ev) {
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
   const ownGoal=ev.type==='goal' && scoringSide(ev)===S.match.ourSide;
-  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':(ownGoal?'GOOOOOOOOAL':'GOL'),yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
   // Trama fibra di carbonio su tutta la superficie.
