@@ -2148,36 +2148,53 @@ function loadGraphicImage(src) {
 async function renderFormationGraphic(side) {
   const players = parseRoster(S.rosters[side]);
   if (!players.length) throw new Error('Inserisci e salva prima la formazione.');
-  const W = 1080, H = 1350, canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
-  const x = canvas.getContext('2d'), template = await loadGraphicImage(S.media?.library?.formation || '');
-  if (template) {
-    const scale = Math.max(W / template.width, H / template.height), sw = W / scale, sh = H / scale;
-    x.drawImage(template, (template.width - sw) / 2, (template.height - sh) / 2, sw, sh, 0, 0, W, H);
-    x.fillStyle = 'rgba(2,10,6,.52)'; x.fillRect(0, 0, W, H);
-  } else {
-    const grad = x.createLinearGradient(0, 0, W, H); grad.addColorStop(0, '#07150c'); grad.addColorStop(.55, '#17482a'); grad.addColorStop(1, '#030a06'); x.fillStyle = grad; x.fillRect(0, 0, W, H);
-  }
-  x.fillStyle = 'rgba(2,10,6,.48)'; x.fillRect(48, 48, W - 96, H - 96);
-  x.strokeStyle = '#b7f36b'; x.lineWidth = 3; x.strokeRect(48, 48, W - 96, H - 96);
-  x.textAlign = 'center'; x.fillStyle = '#b7f36b'; x.font = '800 25px Arial,sans-serif'; x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER', W / 2, 112);
-  x.fillStyle = '#fff'; x.font = '900 76px Arial,sans-serif'; fitFont(x, 'FORMAZIONE UFFICIALE', 900, 76, 900, 'Arial,sans-serif'); x.fillText('FORMAZIONE UFFICIALE', W / 2, 215);
-  x.font = '800 42px Arial,sans-serif'; fitFont(x, teamName(side).toUpperCase(), 900, 42, 800, 'Arial,sans-serif'); x.fillText(teamName(side).toUpperCase(), W / 2, 285);
+  const base = photos[side]?.url;
+  if (!base) throw new Error('Carica prima la foto o il PDF della distinta: sarà lo sfondo della grafica.');
+  const image = await loadGraphicImage(base);
+  if (!image) throw new Error('Non riesco ad aprire l’immagine caricata.');
+  const scale = Math.min(1, 2000 / Math.max(image.width, image.height));
+  const W = Math.round(image.width * scale), H = Math.round(image.height * scale);
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const x = canvas.getContext('2d');
+  x.drawImage(image, 0, 0, W, H);
+
+  // La foto caricata è l'unico sfondo: niente template, loghi, cornici,
+  // titoli o decorazioni aggiuntive. La formazione viene sovrapposta in un
+  // pannello discreto nella parte bassa, lasciando visibile l'originale.
+  const margin = Math.round(W * .045);
+  const panelH = Math.round(H * (players.length > 16 ? .43 : players.length > 11 ? .36 : .30));
+  const panelY = H - panelH - margin;
+  x.fillStyle = 'rgba(0,0,0,.78)';
+  rrect(x, margin, panelY, W - margin * 2, panelH, Math.max(8, Math.round(W * .012)));
+  x.fill();
+
   const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
-  const drawRows = (list, heading, y, maxRows) => {
-    x.textAlign = 'left'; x.fillStyle = '#b7f36b'; x.font = '800 27px Arial,sans-serif'; x.fillText(heading, 112, y);
-    const shown = list.slice(0, maxRows), cols = shown.length > 5 ? 2 : 1, rows = Math.ceil(shown.length / cols), colW = cols === 2 ? 410 : 820;
-    shown.forEach((p, i) => {
-      const col = Math.floor(i / rows), row = i % rows, xx = 112 + col * 440, yy = y + 30 + row * 58;
-      x.fillStyle = 'rgba(255,255,255,.10)'; rrect(x, xx, yy, colW, 46, 10); x.fill();
-      x.fillStyle = '#b7f36b'; x.font = '800 22px Arial,sans-serif'; x.fillText(String(p.num || '—'), xx + 15, yy + 30);
-      x.fillStyle = '#fff'; x.font = '700 22px Arial,sans-serif'; fitFont(x, p.name, colW - 85, 22, 700, 'Arial,sans-serif'); x.fillText(p.name, xx + 70, yy + 30);
+  const pad = Math.round(W * .035);
+  const innerW = W - margin * 2 - pad * 2;
+  const twoCols = players.length > 9;
+  const colW = twoCols ? (innerW - pad) / 2 : innerW;
+  const rowsPerCol = twoCols ? Math.ceil(players.length / 2) : players.length;
+  const lineH = Math.min(Math.round(H * .034), Math.floor((panelH - pad * 2) / (rowsPerCol + (bench.length ? 1 : 0))));
+  let y = panelY + pad + lineH;
+  x.textAlign = 'left';
+  x.fillStyle = '#fff';
+  x.font = '800 ' + Math.max(15, Math.round(lineH * .82)) + 'px Arial,sans-serif';
+  x.fillText('FORMAZIONE', margin + pad, y);
+  y += Math.round(lineH * 1.12);
+  const drawList = (list, startIndex, color) => {
+    list.forEach((p, i) => {
+      const col = twoCols ? Math.floor((startIndex + i) / rowsPerCol) : 0;
+      const row = twoCols ? (startIndex + i) % rowsPerCol : i;
+      const xx = margin + pad + col * (colW + pad);
+      const yy = y + row * lineH;
+      x.fillStyle = color;
+      x.font = '700 ' + Math.max(12, Math.round(lineH * .66)) + 'px Arial,sans-serif';
+      const label = (p.num ? p.num + '  ' : '') + p.name + (p.starter ? '' : '  (R)');
+      fitFont(x, label, colW - 4, Math.max(12, Math.round(lineH * .66)), 700, 'Arial,sans-serif');
+      x.fillText(label, xx, yy);
     });
   };
-  drawRows(starters, 'TITOLARI  •  ' + starters.length, 355, 22);
-  if (bench.length) drawRows(bench, 'PANCHINA  •  ' + bench.length, Math.min(1040, 390 + Math.ceil(starters.length / (starters.length > 5 ? 2 : 1)) * 58), 10);
-  x.fillStyle = '#b7f36b'; x.fillRect(70, 1245, 940, 3);
-  x.textAlign = 'left'; x.fillStyle = '#fff'; x.font = '700 20px Arial,sans-serif'; x.fillText('ASD SANT’ALBINO TERME', 78, 1285);
-  x.textAlign = 'right'; x.fillStyle = 'rgba(255,255,255,.8)'; x.fillText(S.match.hashtag || '#SantAlbinoTerme', 1002, 1285);
+  drawList(players, 0, '#fff');
   return canvas;
 }
 let lineupGraphicSide = null;
