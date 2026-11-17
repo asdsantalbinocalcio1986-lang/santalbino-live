@@ -2860,7 +2860,7 @@ function parseOcrNumbers(text) {
     const matches = raw.match(/[0-9]{1,2}|[Il|]{1,2}/g) || [];
     for (const token of matches) {
       const n = Number(token.replace(/[Il|]/g, '1'));
-      if (n >= 1 && n <= 24 && !found.includes(String(n))) found.push(String(n));
+      if (n >= 1 && n <= 24) found.push(String(n));
     }
   }
   return found;
@@ -2889,46 +2889,56 @@ async function readLineup(side, stat) {
   try {
     stat.textContent = 'Caricamento del riconoscimento…';
     await ensureTesseract();
-    stat.textContent = 'Ritaglio delle colonne numero e nominativo…';
+    stat.textContent = 'Preparazione delle colonne della distinta…';
     const prepared = await prepareLineupImage(photos[side].blob);
     const logger = message => {
       if (message.status === 'recognizing text') stat.textContent = 'Riconoscimento testo: ' + Math.round((message.progress || 0) * 100) + '%';
       else if (message.status === 'loading language traineddata' || message.status === 'initializing api') stat.textContent = 'Caricamento del riconoscimento italiano…';
     };
     worker = await Tesseract.createWorker('ita', 1, { logger });
-    await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789Il|.' });
-    const numberResult = await worker.recognize(prepared.numberCrop);
-    const numbers = parseOcrNumbers(numberResult.data.text || '');
-    await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
-    const nameResult = await worker.recognize(prepared.nameCrop);
-    const names = parseOcrNames(nameResult.data.text || '');
+    const namePasses = [];
+    for (const mode of ['4','6','11','12']) {
+      await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
+      const result = await worker.recognize(prepared.nameCrop);
+      const parsed = parseOcrNames(result.data.text || '');
+      namePasses.push({ parsed, confidence: Number(result.data.confidence || 0), raw: result.data.text || '' });
+    }
+    namePasses.sort((a,b) => (b.parsed.length * 10 + b.confidence * .02) - (a.parsed.length * 10 + a.confidence * .02));
+    const names = namePasses[0]?.parsed || [];
 
-    if (!numbers.length || !names.length || numbers.length !== names.length) {
-      stat.textContent = 'Lettura non sufficientemente affidabile: rilevati ' + numbers.length + ' numeri e ' + names.length + ' nominativi. Non ho compilato la formazione per evitare abbinamenti errati. Prova una foto più frontale oppure inserisci/correggi manualmente.';
+    const numberPasses = [];
+    for (const mode of ['6','11','12']) {
+      await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789Il|.' });
+      const result = await worker.recognize(prepared.numberCrop);
+      const nums = parseOcrNumbers(result.data.text || '');
+      numberPasses.push({ nums, confidence: Number(result.data.confidence || 0) });
+    }
+    numberPasses.sort((a,b) => (b.nums.length * 10 + b.confidence * .02) - (a.nums.length * 10 + a.confidence * .02));
+    const numbers = numberPasses[0]?.nums || [];
+
+    if (!names.length) {
+      stat.textContent = 'Non riesco a leggere i nominativi. La foto non è stata importata: prova a ritagliare la tabella e fotografarla più frontalmente.';
       return;
     }
-    const players = numbers.map((num, i) => ({ num, name: names[i].name, starter: !names[i].reserve }));
-    const markedReserves = names.some(p => p.reserve);
-    if (!markedReserves && players.length > 11) players.forEach((p, i) => { p.starter = i < 11; });
+    // Non bloccare l'importazione se l'OCR dei numeri manoscritti è incerto:
+    // conserva l'ordine delle righe e lascia un segnaposto da correggere.
+    const players = names.map((p,i) => ({ num: numbers[i] || '', name: p.name, starter: !p.reserve }));
+    const hasR = names.some(p => p.reserve);
+    if (!hasR && players.length > 11) players.forEach((p,i) => { p.starter = i < 11; });
     const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
-    if (starters.length !== 11 && markedReserves) {
-      stat.textContent = 'Ho riconosciuto ' + players.length + ' righe, ma le sigle (R) non hanno prodotto 11 titolari. Non ho compilato la formazione: verifica la foto o inserisci i dati manualmente.';
-      return;
-    }
-    const format = p => p.num + ' ' + p.name;
+    const format = p => (p.num ? p.num + ' ' : '') + p.name;
     const output = starters.map(format);
     if (bench.length) { output.push('---'); bench.forEach(p => output.push(format(p))); }
     const field = document.querySelector('[data-roster="' + side + '"]');
     if (!field) throw new Error('Campo formazione non trovato.');
     field.value = output.join('\n');
     field.dispatchEvent(new Event('input', { bubbles: true }));
-    const duplicates = [...new Set(numbers.filter((n, i) => numbers.indexOf(n) !== i))];
     const warnings = [];
+    if (numbers.length !== names.length) warnings.push('numeri letti ' + numbers.length + ' su ' + names.length + ': completa i numeri mancanti');
     if (starters.length !== 11) warnings.push(starters.length + ' titolari rilevati');
-    if (duplicates.length) warnings.push('numeri duplicati: ' + duplicates.join(', '));
-    stat.textContent = 'Rilevati ' + players.length + ' giocatori (' + starters.length + ' titolari, ' + bench.length + ' riserve). ' +
-      (warnings.length ? 'Attenzione: ' + warnings.join(' · ') + '. ' : '') +
-      'Verifica i nominativi prima di premere “Salva e mostra online”.';
+    stat.textContent = 'Importati ' + players.length + ' nominativi (' + starters.length + ' titolari, ' + bench.length + ' riserve). ' +
+      (warnings.length ? 'Da verificare: ' + warnings.join(' · ') + '. ' : '') +
+      'Controlla soprattutto i numeri di maglia e correggi eventuali errori prima di salvare.';
   } catch (error) {
     console.error(error);
     stat.textContent = 'Lettura non riuscita: ' + (error.message || 'controlla la foto e riprova.');
