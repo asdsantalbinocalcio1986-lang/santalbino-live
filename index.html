@@ -1,6 +1,7 @@
 <!doctype html><html lang="it"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sant'Albino Live | Cronaca in diretta</title>
 <meta name="description" content="Sant'Albino Live: segui in diretta risultati, formazioni e cronaca delle partite dell'ASD Sant'Albino Terme.">
+<meta name="copyright" content="© 2026 ASD Sant'Albino Terme — Sant'Albino Live. Tutti i diritti riservati.">
 <meta name="theme-color" content="#0b3b22">
 <link rel="canonical" href="https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/">
 <meta property="og:type" content="website">
@@ -1243,6 +1244,11 @@ input:focus,select:focus,textarea:focus {
   .status.live { animation: none; }
 }
 </style></head><body><div id="root"></div>
+<footer id="copyright-footer" style="max-width:720px;margin:22px auto 0;padding:14px 10px 8px;text-align:center;color:#69766e;font:12px/1.6 system-ui,sans-serif;border-top:1px solid #d3dcd1">
+  <strong>© 2026 ASD Sant'Albino Terme — Sant'Albino Live.</strong> Tutti i diritti riservati.<br>
+  Software, interfaccia e grafiche originali protetti dal diritto d'autore. Riproduzione, modifica e redistribuzione non autorizzate.<br>
+  <a href="./COPYRIGHT.md" style="color:inherit;text-decoration:underline">Copyright e condizioni d'uso</a>
+</footer>
 <script id="startup-diagnostic">
 (function(){
   function show(title, detail){
@@ -2058,7 +2064,11 @@ async function renderMatchGraphic(ev) {
       // La testata del titolo viene disegnata qui, sopra l'eventuale immagine di sfondo:
       // in questo modo GOOOAL resta visibile sia sul template Sant'Albino sia sulla grafica ospite.
       x.textAlign='center';x.fillStyle='#fff';x.font=`900 112px ${FD}`;
-      x.shadowColor='rgba(0,0,0,.72)';x.shadowBlur=18;x.fillText(ev.kind==='autogol'?'AUTOGOL':'GOOOAL',W/2,955);x.shadowBlur=0;
+      const goalHeadline=ev.kind==='autogol'?'AUTOGOL':'GOOOAL';
+      const goalMetrics=x.measureText(goalHeadline);
+      const goalAreaCenterY=(836+1084)/2;
+      const goalHeadlineY=goalAreaCenterY+(goalMetrics.actualBoundingBoxAscent-goalMetrics.actualBoundingBoxDescent)/2;
+      x.shadowColor='rgba(0,0,0,.72)';x.shadowBlur=18;x.fillText(goalHeadline,W/2,goalHeadlineY);x.shadowBlur=0;
       // Etichetta del minuto e fascia informativa separate.
       x.save();x.fillStyle='rgba(2,13,7,.96)';rrect(x,420,786,240,50,16);x.fill();
       x.strokeStyle=accent;x.lineWidth=2;rrect(x,420,786,240,50,16);x.stroke();x.restore();
