@@ -1792,7 +1792,7 @@ async function addSponsorToGraphic(canvas, layout) {
   const p = slots[layout] || slots.event, x = canvas.getContext('2d');
   const style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
-  const scale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=scale;p.h*=scale;
+  const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
   if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
   if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
   if(style.sponsor===false)return canvas;
@@ -2179,7 +2179,7 @@ async function renderMatchGraphic(ev) {
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
   x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
   if(ev.type==='sub')x.restore();
-  await addSponsorToGraphic(canvas,'event');
+  await addSponsorToGraphic(canvas,['kickoff','halftime','fulltime'].includes(ev.type)?'phase':'event');
   return canvas;
 }
 async function renderCard(ev) { return renderMatchGraphic(ev); }
