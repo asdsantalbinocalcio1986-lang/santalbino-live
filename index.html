@@ -2269,8 +2269,6 @@ async function openLineupGraphic() {
 }
 
 async function renderMatchDayGraphic() {
-  const players = parseRoster(S.convocati);
-  if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
   const m = S.match, W = 1600, H = 1000, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d');
@@ -2280,36 +2278,36 @@ async function renderMatchDayGraphic() {
   x.fillStyle = bg; x.fillRect(0, 0, W, H);
   x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 2;
   for (let i=0;i<9;i++){ x.beginPath(); x.moveTo(i*W/8,0); x.lineTo(i*W/8,H); x.stroke(); }
-  x.fillStyle = 'rgba(2,13,9,.74)'; x.fillRect(0,0,W,310);
+  x.strokeStyle='rgba(255,255,255,.14)'; x.lineWidth=3;
+  x.beginPath(); x.arc(W/2,500,270,0,Math.PI*2); x.stroke();
+  x.beginPath(); x.moveTo(800,300); x.lineTo(800,950); x.stroke();
+  x.fillStyle='rgba(2,13,9,.72)'; x.fillRect(0,0,W,300);
   const logo = (img,name,cx) => {
-    x.fillStyle='#fff'; rrect(x,cx-92,38,184,184,24); x.fill();
-    if(img){ const k=Math.min(164/img.width,164/img.height),w=img.width*k,h=img.height*k; x.drawImage(img,cx-w/2,48+(164-h)/2,w,h); }
-    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,130); }
-    x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),420,30,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,260);
+    x.fillStyle='#fff'; rrect(x,cx-100,32,200,200,26); x.fill();
+    if(img){ const k=Math.min(180/img.width,180/img.height),w=img.width*k,h=img.height*k; x.drawImage(img,cx-w/2,42+(180-h)/2,w,h); }
+    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
+    x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),470,31,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,270);
   };
   logo(homeLogo,teamName('home'),330); logo(awayLogo,teamName('away'),1270);
-  x.fillStyle='#d7f1df'; x.font='900 64px Arial,sans-serif'; x.textAlign='center'; x.fillText('VS',800,125);
-  x.fillStyle='#e3c66c'; x.font='900 88px Arial,sans-serif'; x.fillText('MATCH DAY',800,350);
-  const info = [matchDateTime() || 'DATA E ORA DA DEFINIRE', (m.comp || 'GIRONE DA DEFINIRE').toUpperCase(), (m.venue || 'STADIO DA DEFINIRE').toUpperCase()];
-  const labels=['DATA · ORA','GIRONE','STADIO'];
-  const bx=[70,550,1030], bw=450;
-  for(let i=0;i<3;i++){
-    x.fillStyle='rgba(0,0,0,.48)'; rrect(x,bx[i],390,bw,100,18); x.fill();
-    x.fillStyle='#9fdbb5'; x.font='800 19px Arial'; x.textAlign='center'; x.fillText(labels[i],bx[i]+bw/2,420);
-    x.fillStyle='#fff'; fitFont(x,info[i],bw-28,28,800,'Arial,sans-serif'); x.fillText(info[i],bx[i]+bw/2,460);
-  }
-  x.fillStyle='rgba(0,0,0,.68)'; rrect(x,70,525,1460,405,24); x.fill();
-  x.fillStyle='#e3c66c'; x.font='900 34px Arial'; x.textAlign='left'; x.fillText('I CONVOCATI',110,580);
-  x.fillStyle='rgba(255,255,255,.65)'; x.font='700 19px Arial'; x.textAlign='right'; x.fillText(players.length+' GIOCATORI',1490,580);
-  const cols=2, rows=Math.ceil(players.length/cols), rowH=Math.min(48,Math.floor(285/Math.max(1,rows)));
-  const colW=690;
-  players.forEach((p,i)=>{
-    const col=Math.floor(i/rows), row=i%rows, xx=115+col*720, yy=635+row*rowH;
-    x.fillStyle=col===0?'#b8e7c8':'#e3c66c'; x.beginPath(); x.arc(xx+18,yy-5,15,0,Math.PI*2); x.fill();
-    x.fillStyle='#08291d'; x.font='800 16px Arial'; x.textAlign='center'; x.fillText(p.num||'•',xx+18,yy);
-    x.fillStyle='#fff'; x.textAlign='left'; fitFont(x,p.name,colW-65,25,800,'Arial,sans-serif'); x.fillText(p.name,xx+48,yy);
+  x.fillStyle='#d7f1df'; x.font='900 70px Arial,sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('VS',800,125);
+  x.fillStyle='#e3c66d'; x.font='900 104px Arial,sans-serif'; x.fillText('MATCH DAY',800,370);
+  x.fillStyle='rgba(255,255,255,.78)'; x.font='700 22px Arial,sans-serif'; x.fillText('IL PROSSIMO APPUNTAMENTO GIALLOVERDE',800,425);
+  const info = [
+    {label:'DATA',value:fmtDate(m.date)||'DA DEFINIRE',sub:'CALENDARIO'},
+    {label:'ORA',value:m.time||'DA DEFINIRE',sub:'FISCHIO D’INIZIO'},
+    {label:'GIRONE',value:(m.comp||'DA DEFINIRE').toUpperCase(),sub:'CAMPIONATO'},
+    {label:'STADIO',value:(m.venue||'DA DEFINIRE').toUpperCase(),sub:'SEDE DELLA GARA'}
+  ];
+  const positions=[{x:85,y:510,w:690,h:170},{x:825,y:510,w:690,h:170},{x:85,y:715,w:690,h:170},{x:825,y:715,w:690,h:170}];
+  info.forEach((item,i)=>{
+    const p=positions[i];
+    x.fillStyle='rgba(0,0,0,.66)'; rrect(x,p.x,p.y,p.w,p.h,24); x.fill();
+    x.strokeStyle=i%2===0?'rgba(184,231,200,.7)':'rgba(227,198,109,.7)'; x.lineWidth=3; rrect(x,p.x,p.y,p.w,p.h,24); x.stroke();
+    x.fillStyle=i%2===0?'#b8e7c8':'#e3c66d'; x.font='900 24px Arial,sans-serif'; x.textAlign='left'; x.textBaseline='middle'; x.fillText(item.label,p.x+34,p.y+43);
+    x.fillStyle='#fff'; fitFont(x,item.value,p.w-68,46,900,'Arial,sans-serif'); x.textAlign='center'; x.fillText(item.value,p.x+p.w/2,p.y+105);
+    x.fillStyle='rgba(255,255,255,.58)'; x.font='700 16px Arial,sans-serif'; x.fillText(item.sub,p.x+p.w/2,p.y+145);
   });
-  x.fillStyle='rgba(255,255,255,.72)'; x.font='700 18px Arial'; x.textAlign='center'; x.fillText('ASD SANT’ALBINO TERME  ·  FORZA GIALLOVERDI',800,970);
+  x.fillStyle='rgba(255,255,255,.82)'; x.font='800 20px Arial,sans-serif'; x.textAlign='center'; x.fillText('ASD SANT’ALBINO TERME  ·  FORZA GIALLOVERDI',800,950);
   return canvas;
 }
 async function openMatchDayGraphic() {
@@ -2319,7 +2317,7 @@ async function openMatchDayGraphic() {
   try {
     const canvas=await renderMatchDayGraphic(),url=canvas.toDataURL('image/jpeg',.92);
     if(!dlg.open)return;
-    dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica MATCH DAY con convocati"><button class="btn primary block" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button>';
+    dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica MATCH DAY con i dati della partita"><button class="btn primary block" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button>';
   } catch(err) {
     dlg.innerHTML='<div class="sheethead"><h2>Grafica non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">'+esc(err.message||'Errore nella generazione')+'</p>';
   }
