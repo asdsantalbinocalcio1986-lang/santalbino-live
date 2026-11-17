@@ -2148,61 +2148,96 @@ function loadGraphicImage(src) {
 async function renderFormationGraphic(side) {
   const players = parseRoster(S.rosters[side]);
   if (!players.length) throw new Error('Inserisci e salva prima la formazione.');
-  const base = photos[side]?.url;
-  let image = null;
-  if (base) {
-    try { image = await loadGraphicImage(base); } catch (_) { image = null; }
-  }
-  // Senza immagine caricata crea una grafica autonoma con campo da calcio.
-  const W = image ? Math.round(image.width * Math.min(1, 2000 / Math.max(image.width, image.height))) : 1600;
-  const H = image ? Math.round(image.height * Math.min(1, 2000 / Math.max(image.width, image.height))) : 900;
-  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const W = 1600, H = 900, canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d');
-  if (image) {
-    x.drawImage(image, 0, 0, W, H);
+  const base = photos[side]?.url;
+  const [background, homeLogo, awayLogo] = await Promise.all([
+    base ? loadGraphicImage(base) : Promise.resolve(null),
+    loadGraphicImage(S.logos.home),
+    loadGraphicImage(S.logos.away)
+  ]);
+  if (background) {
+    const scale = Math.max(W / background.width, H / background.height);
+    const sw = W / scale, sh = H / scale;
+    x.drawImage(background, (background.width - sw) / 2, (background.height - sh) / 2, sw, sh, 0, 0, W, H);
+    x.fillStyle = 'rgba(4,18,13,.70)'; x.fillRect(0, 0, W, H);
   } else {
     const grad = x.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, '#174d35'); grad.addColorStop(1, '#092b20');
+    grad.addColorStop(0, '#1b6845'); grad.addColorStop(1, '#08291d');
     x.fillStyle = grad; x.fillRect(0, 0, W, H);
-    x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = 5;
-    const inset = 42;
-    x.strokeRect(inset, inset, W - inset * 2, H - inset * 2);
-    x.beginPath(); x.moveTo(W/2, inset); x.lineTo(W/2, H-inset); x.stroke();
-    x.beginPath(); x.arc(W/2, H/2, 105, 0, Math.PI*2); x.stroke();
-    x.strokeRect(inset, H*.28, W*.16, H*.44);
-    x.strokeRect(W-inset-W*.16, H*.28, W*.16, H*.44);
-    x.fillStyle = 'rgba(255,255,255,.055)';
-    for(let k=0;k<8;k++) x.fillRect(inset+k*(W-2*inset)/8, inset, (W-2*inset)/16, H-2*inset);
+    x.strokeStyle = 'rgba(255,255,255,.12)'; x.lineWidth = 3;
+    for (let k = 0; k < 9; k++) {
+      x.beginPath(); x.moveTo(k * W / 8, 0); x.lineTo(k * W / 8, H); x.stroke();
+    }
+    x.beginPath(); x.arc(W / 2, H / 2, 250, 0, Math.PI * 2); x.stroke();
+    x.strokeRect(35, 35, W - 70, H - 70);
   }
-  const margin = Math.round(W * .045);
-  const panelH = Math.round(H * (players.length > 16 ? .58 : players.length > 11 ? .48 : .38));
-  const panelY = H - panelH - margin;
-  x.fillStyle = 'rgba(0,0,0,.78)';
-  rrect(x, margin, panelY, W - margin * 2, panelH, Math.max(8, Math.round(W * .012)));
+  // Fascia superiore: i due stemmi sono sempre presenti e separati da VS.
+  x.fillStyle = 'rgba(3,13,10,.82)'; x.fillRect(0, 0, W, 230);
+  const drawClub = (img, name, cx) => {
+    const size = 150, bx = cx - size / 2, by = 28;
+    x.save();
+    x.fillStyle = 'rgba(255,255,255,.10)';
+    x.beginPath(); x.arc(cx, by + size / 2, size / 2 + 9, 0, Math.PI * 2); x.fill();
+    if (img) {
+      const scale = Math.min((size - 12) / img.width, (size - 12) / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      x.drawImage(img, cx - w / 2, by + (size - h) / 2, w, h);
+    } else {
+      x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.font = '900 42px Arial,sans-serif';
+      const initials = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase();
+      x.fillText(initials || 'FC', cx, by + size / 2);
+    }
+    x.restore();
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    fitFont(x, name.toUpperCase(), 430, 32, 800, 'Arial,sans-serif');
+    x.fillText(name.toUpperCase(), cx, 205);
+  };
+  drawClub(homeLogo, teamName('home'), 330);
+  drawClub(awayLogo, teamName('away'), 1270);
+  x.fillStyle = '#d6f2df'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '900 64px Arial,sans-serif'; x.fillText('VS', W / 2, 105);
+  x.fillStyle = '#fff'; x.font = '800 28px Arial,sans-serif';
+  x.fillText('FORMAZIONE', W / 2, 180);
+  // Distinta ampia e leggibile, sfrutta tutta l'area sottostante.
+  const margin = 55, panelY = 260, panelH = 585;
+  x.fillStyle = 'rgba(0,0,0,.76)';
+  rrect(x, margin, panelY, W - margin * 2, panelH, 24);
   x.fill();
   const starters = players.filter(p => p.starter);
   const bench = players.filter(p => !p.starter);
-  const pad = Math.round(W * .035);
-  const innerW = W - margin * 2 - pad * 2;
-  const twoCols = players.length > 9;
-  const colW = twoCols ? (innerW - pad) / 2 : innerW;
-  const rowsPerCol = twoCols ? Math.ceil(players.length / 2) : players.length;
-  const lineH = Math.min(Math.round(H * .043), Math.floor((panelH - pad * 2) / (rowsPerCol + 2)));
-  let y = panelY + pad + lineH;
-  x.textAlign = 'left'; x.fillStyle = '#fff';
-  x.font = '800 ' + Math.max(18, Math.round(lineH * .82)) + 'px Arial,sans-serif';
-  x.fillText('FORMAZIONE', margin + pad, y);
-  y += Math.round(lineH * 1.12);
-  players.forEach((p, i) => {
-    const col = twoCols ? Math.floor(i / rowsPerCol) : 0;
-    const row = twoCols ? i % rowsPerCol : i;
-    const xx = margin + pad + col * (colW + pad);
-    const yy = y + row * lineH;
-    const label = (p.num ? p.num + '  ' : '') + p.name + (p.starter ? '' : '  (R)');
-    x.fillStyle = p.starter ? '#fff' : '#b8e7c8';
-    fitFont(x, label, colW - 4, Math.max(14, Math.round(lineH * .66)), 700, 'Arial,sans-serif');
-    x.fillText(label, xx, yy);
+  const colGap = 55, innerX = margin + 45, innerW = W - 2 * (margin + 45);
+  const colW = (innerW - colGap) / 2;
+  const rows = Math.ceil(players.length / 2);
+  const rowH = Math.min(43, Math.floor((panelH - 150) / Math.max(1, rows)));
+  const top = panelY + 115;
+  x.textBaseline = 'middle'; x.textAlign = 'left';
+  x.font = '900 30px Arial,sans-serif'; x.fillStyle = '#9fe0b5';
+  x.fillText('TITOLARI', innerX, panelY + 58);
+  x.fillText('PANCHINA', innerX + colW + colGap, panelY + 58);
+  const left = starters, right = bench;
+  const drawPlayers = (list, colX, color) => list.forEach((p, i) => {
+    const yy = top + i * rowH;
+    if (yy > panelY + panelH - 30) return;
+    x.fillStyle = color;
+    x.beginPath(); x.arc(colX + 14, yy, 14, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#08291d'; x.textAlign = 'center'; x.font = '800 16px Arial,sans-serif';
+    x.fillText(p.num || '•', colX + 14, yy + 1);
+    x.textAlign = 'left'; x.fillStyle = '#fff';
+    const label = p.name || '';
+    fitFont(x, label, colW - 55, 26, 700, 'Arial,sans-serif');
+    x.fillText(label, colX + 42, yy);
   });
+  drawPlayers(left, innerX, '#b8e7c8');
+  drawPlayers(right, innerX + colW + colGap, '#f0c56b');
+  if (!bench.length) {
+    x.fillStyle = 'rgba(255,255,255,.65)'; x.font = 'italic 22px Arial,sans-serif';
+    x.fillText('Nessuna riserva indicata', innerX + colW + colGap, top);
+  }
+  x.fillStyle = 'rgba(255,255,255,.72)'; x.textAlign = 'center';
+  x.font = '600 18px Arial,sans-serif'; x.fillText(teamName(side).toUpperCase(), W / 2, 870);
   return canvas;
 }
 let lineupGraphicSide = null;
