@@ -2244,7 +2244,7 @@ function regiaHtml() {
     const pl = parseRoster(S.rosters[s]), ns = pl.filter(p => p.starter).length;
     return `<div class="card"><h2>${esc(teamName(s))}</h2>
       <label class="f"><span>Foto della lista di presentazione</span><input type="file" accept="image/*" data-photo="${s}"></label>
-      ${photos[s] ? `<img class="thumb" src="${photos[s].url}" alt="Lista di presentazione"><button class="btn sm" data-a="readlist" data-s="${s}">Leggi i nomi dalla foto</button><div class="small muted" data-ocrstat="${s}" style="margin:6px 0 0"></div>` : ''}
+      ${photos[s] ? `<img class="thumb" src="${photos[s].url}" alt="Lista di presentazione"><button class="btn sm" data-a="readlist" data-s="${s}">Leggi e prepara la formazione</button><div class="small muted" data-ocrstat="${s}" style="margin:6px 0 0"></div>` : ''}
       <label class="f" style="margin-top:10px"><span>Giocatori, uno per riga: numero e cognome</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
@@ -2472,96 +2472,143 @@ function wireSheet() {
 
 /* lettura della formazione dalla foto, fatta da Claude */
 
-async function readLineup(side, stat) {
-  if (!photos[side]) {
-    toast('Prima scegli la foto');
-    return;
-  }
-
-  if (!window.Tesseract) {
-    stat.textContent = 'Motore OCR non caricato. Aggiorna la pagina e riprova.';
-    return;
-  }
-
-  stat.textContent = 'Preparazione della lettura...';
-
-  try {
-    const result = await Tesseract.recognize(
-      photos[side].blob,
-      'ita',
-      {
-        logger: message => {
-          if (message.status === 'recognizing text') {
-            stat.textContent =
-              'Riconoscimento testo: ' +
-              Math.round((message.progress || 0) * 100) + '%';
-          }
+function prepareLineupImage(blob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(blob);
+    img.onload = () => {
+      try {
+        // Ingrandisce la foto per rendere più leggibili numeri e cognomi.
+        const scale = Math.min(1.6, 2560 / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        const pixels = ctx.getImageData(0, 0, w, h);
+        const data = pixels.data;
+        // Versione in scala di grigi con contrasto aumentato: aiuta su foto
+        // di fogli non perfettamente illuminati o con stampa poco marcata.
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = data[i] * .299 + data[i + 1] * .587 + data[i + 2] * .114;
+          const value = Math.max(0, Math.min(255, (gray - 128) * 1.55 + 128));
+          data[i] = data[i + 1] = data[i + 2] = value;
         }
+        ctx.putImageData(pixels, 0, 0);
+        canvas.toBlob(enhanced => {
+          URL.revokeObjectURL(url);
+          if (!enhanced) return reject(new Error('Non riesco a elaborare la foto.'));
+          resolve({ original: canvas, enhanced });
+        }, 'image/png');
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
       }
-    );
-
-    const text = result.data.text || '';
-
-    const lines = text
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean);
-
-    const players = [];
-
-    for (const line of lines) {
-      const clean = line.replace(/\s+/g, ' ').trim();
-
-      if (
-        /^(titolari|formazione|panchina|riserve|a disposizione|allenatore|dirigente)/i.test(clean)
-      ) continue;
-
-      const match = clean.match(/^(\d{1,2})[\s.)\-:]+(.{3,})$/);
-
-      if (match) {
-        players.push({
-          n: match[1],
-          nome: match[2].trim()
-        });
-      }
-    }
-
-    if (!players.length) {
-      stat.textContent =
-        'Nessun giocatore riconosciuto con sicurezza. Prova una foto più nitida.';
-      return;
-    }
-
-    const titolari = players.slice(0, 11);
-    const panchina = players.slice(11);
-
-    const format = p =>
-      `${p.n} ${p.nome}`.trim();
-
-    const output = titolari.map(format);
-
-    if (panchina.length) {
-      output.push('---');
-      panchina.forEach(p => output.push(format(p)));
-    }
-
-    const field = document.querySelector(
-      `[data-roster="${side}"]`
-    );
-
-    field.value = output.join('\n');
-    field.dispatchEvent(new Event('input', { bubbles: true }));
-
-    stat.textContent =
-      `Riconosciuti ${players.length} giocatori. Controlla e correggi la lista prima di salvare.`;
-
-  } catch (error) {
-    console.error(error);
-    stat.textContent =
-      'Lettura non riuscita. Controlla la foto e riprova.';
-  }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Immagine non leggibile')); };
+    img.src = url;
+  });
 }
 
+function parseOcrLineup(text) {
+  const lines = (text || '').split(/\r?\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const players = [];
+  let bench = false;
+  for (const raw of lines) {
+    const line = raw.replace(/^[|¦•·]+\s*/, '').trim();
+    if (/^(panchina|riserve|a disposizione|giocatori di riserva|sostituti)\b/i.test(line)) { bench = true; continue; }
+    if (/^(titolari|formazione|distinta|lista giocatori|convocati|allenatore|dirigente|staff|arbitro|assistenti)\b/i.test(line)) continue;
+    if (/^[-–—=_]{2,}$/.test(line)) { bench = true; continue; }
+    // Accetta i separatori più comuni e corregge solo le confusioni OCR
+    // più frequenti quando sono chiaramente in posizione di numero maglia.
+    const m = line.match(/^(?:n(?:\.|°|º)?\s*)?([0-9]{1,2}|[Il|]{1,2})\s*[.)\-:|]?\s+(.{2,})$/i);
+    if (!m) continue;
+    let num = m[1].replace(/[Il|]/g, '1');
+    const name = m[2].replace(/^[|:;,.\-]+\s*/, '').replace(/[|]+/g, 'I').trim();
+    if (!name || !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(name)) continue;
+    // Evita di interpretare righe con anni, date o numeri isolati come giocatori.
+    if (/^(19|20)\d{2}\b/.test(num)) continue;
+    players.push({ num, name, starter: !bench });
+  }
+  // Se la foto non riporta la panchina in modo esplicito, i primi undici
+  // giocatori riconosciuti vengono considerati titolari.
+  let starters = players.filter(p => p.starter).length;
+  if (!bench || starters > 11) {
+    players.forEach((p, i) => { p.starter = i < 11; });
+  } else if (starters < 11 && players.length > 11) {
+    let seen = 0;
+    players.forEach(p => { if (p.starter && seen++ >= 11) p.starter = false; });
+  }
+  return players;
+}
+
+async function readLineup(side, stat) {
+  if (!photos[side]) { toast('Prima scegli la foto'); return; }
+  if (!window.Tesseract || !Tesseract.createWorker) {
+    stat.textContent = 'Motore OCR non disponibile. Aggiorna la pagina e riprova.';
+    return;
+  }
+  const button = document.querySelector('[data-a="readlist"][data-s="' + side + '"]');
+  if (button) { button.disabled = true; button.textContent = 'Lettura in corso…'; }
+  let worker;
+  try {
+    stat.textContent = 'Ottimizzazione della foto…';
+    const prepared = await prepareLineupImage(photos[side].blob);
+    const logger = message => {
+      if (message.status === 'recognizing text') {
+        stat.textContent = 'Riconoscimento testo: ' + Math.round((message.progress || 0) * 100) + '%';
+      } else if (message.status === 'loading language traineddata' || message.status === 'initializing api') {
+        stat.textContent = 'Caricamento del riconoscimento italiano…';
+      }
+    };
+    worker = await Tesseract.createWorker('ita', 1, { logger });
+    const candidates = [];
+    // Due modalità di lettura: colonna ordinata e testo sparso.
+    for (const mode of ['4', '11']) {
+      await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1' });
+      const result = await worker.recognize(mode === '4' ? prepared.original : prepared.enhanced);
+      const parsed = parseOcrLineup(result.data.text || '');
+      const confidence = Number(result.data.confidence || 0);
+      const duplicates = parsed.length - new Set(parsed.map(p => p.num).filter(Boolean)).size;
+      const score = parsed.length * 10 + Math.min(99, confidence) * .08 - duplicates * 5
+        + (parsed.length >= 11 && parsed.length <= 25 ? 8 : 0);
+      candidates.push({ parsed, score, confidence, raw: result.data.text || '' });
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    const players = best.parsed;
+    if (!players.length) {
+      stat.textContent = 'Non sono riuscito a individuare righe con numero e nome. Prova una foto più frontale, nitida e ben illuminata oppure inserisci la lista manualmente.';
+      return;
+    }
+    const starters = players.filter(p => p.starter);
+    const bench = players.filter(p => !p.starter);
+    const format = p => (p.num ? p.num + ' ' : '') + p.name;
+    const output = starters.map(format);
+    if (bench.length) { output.push('---'); bench.forEach(p => output.push(format(p))); }
+    const field = document.querySelector('[data-roster="' + side + '"]');
+    if (!field) throw new Error('Campo formazione non trovato.');
+    field.value = output.join('\n');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    const nums = players.map(p => p.num).filter(Boolean);
+    const dup = [...new Set(nums.filter((n, i) => nums.indexOf(n) !== i))];
+    const warnings = [];
+    if (starters.length !== 11) warnings.push(starters.length + ' titolari rilevati');
+    if (dup.length) warnings.push('numeri duplicati: ' + dup.join(', '));
+    if (players.length > 25) warnings.push('controlla possibili righe extra');
+    stat.textContent = 'Rilevati ' + players.length + ' giocatori (' + starters.length + ' titolari, ' + bench.length + ' panchinari). ' +
+      (warnings.length ? 'Attenzione: ' + warnings.join(' · ') + '. ' : '') +
+      'Verifica nomi e numeri nella casella prima di premere “Salva e mostra online”.';
+  } catch (error) {
+    console.error(error);
+    stat.textContent = 'Lettura non riuscita: ' + (error.message || 'controlla la foto e riprova.');
+  } finally {
+    if (worker) { try { await worker.terminate(); } catch (e) {} }
+    if (button) { button.disabled = false; button.textContent = 'Leggi i nomi dalla foto'; }
+  }
+}
 
 /* ================= avvio ================= */
 (async function start() {
