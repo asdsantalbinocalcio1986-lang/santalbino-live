@@ -1806,7 +1806,7 @@ async function addSponsorToGraphic(canvas, layout) {
 
 async function renderPhaseCard(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif";
+  const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif"; applyGraphicTypography(x,'phase',W,H);
   const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
   const score = ev.type === 'kickoff' ? [0, 0] : scoreOf(prior);
   const goals = prior.filter(e => e.type === 'goal');
@@ -2223,7 +2223,7 @@ async function renderFormationGraphic() {
   }
   const W = 1600, H = 1100, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
-  const x = canvas.getContext('2d');
+  const x = canvas.getContext('2d'); applyGraphicTypography(x,'formation',W,H);
   const [background, homeLogo, awayLogo] = await Promise.all([
     loadGraphicImage(photos.home?.url || photos.away?.url),
     loadGraphicImage(teams.home.logo),
@@ -2333,7 +2333,7 @@ async function openLineupGraphic() {
 async function renderMatchDayGraphic() {
   const m = S.match, W = 1600, H = 1000, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
-  const x = canvas.getContext('2d');
+  const x = canvas.getContext('2d'); applyGraphicTypography(x,'matchday',W,H);
   const [homeLogo, awayLogo] = await Promise.all([loadGraphicImage(S.logos.home), loadGraphicImage(S.logos.away)]);
   const bg = x.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, '#17633d'); bg.addColorStop(.52, '#0b3424'); bg.addColorStop(1, '#071d16');
@@ -2378,7 +2378,7 @@ async function renderConvocatiGraphic() {
   if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
   const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
-  const x=canvas.getContext('2d'), clubLogo=await loadGraphicImage(S.logos[side]);
+  const x=canvas.getContext('2d'); applyGraphicTypography(x,'convocati',W,H); const clubLogo=await loadGraphicImage(S.logos[side]);
   const bg=x.createLinearGradient(0,0,W,H);
   bg.addColorStop(0,'#17633d'); bg.addColorStop(.55,'#0b3424'); bg.addColorStop(1,'#061b13');
   x.fillStyle=bg; x.fillRect(0,0,W,H);
@@ -2772,6 +2772,19 @@ function graphicEditorConfig() {
 function graphicEditorStyle(layout) {
   const cfg=graphicEditorConfig(),key=({event:'event',phase:'phase',formation:'formation',matchday:'matchday',convocati:'convocati'})[layout]||'event';
   return Object.assign({},cfg.global,cfg.templates[key]||{});
+}
+function applyGraphicTypography(ctx,layout,width,height){
+  const style=graphicEditorStyle(layout),native=ctx.fillText.bind(ctx),family=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[style.fontFamily];
+  ctx.fillText=function(text,x,y,maxWidth){
+    const original=ctx.font,m=original.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\\s+(.+)$/);
+    if(m){let size=Math.max(12,Math.min(180,Number(m[2])*(Number(style.fontScale)||1)));ctx.font=m[1]+size+'px '+(family||m[3]);}
+    const value=String(text??''),align=ctx.textAlign||'start',px=Number(x)||0;
+    const room=align==='center'?Math.max(24,2*Math.min(px,width-px)-48):align==='right'?Math.max(24,px-42):Math.max(24,width-px-42);
+    const limit=Number.isFinite(maxWidth)?Math.min(room,maxWidth):room;
+    while(ctx.measureText(value).width>limit){const z=ctx.font.match(/^(.*?)(\\d+(?:\\.\\d+)?)px(.*)$/);if(!z||Number(z[2])<=11)break;ctx.font=z[1]+(Number(z[2])-1)+'px'+z[3];}
+    const yy=Math.max(24,Math.min(height-24,Number(y)||0)),result=native(value,x,yy,maxWidth);
+    ctx.font=original;return result;
+  };
 }
 function graphicEditorHtml() {
   const cfg=graphicEditorConfig(),key=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'global';
