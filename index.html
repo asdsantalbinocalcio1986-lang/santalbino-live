@@ -2499,7 +2499,7 @@ function regiaHtml() {
   else if (t === 'lineup') body = ['home', 'away'].map(s => {
     const pl = parseRoster(S.rosters[s]), ns = pl.filter(p => p.starter).length;
     return `<div class="card"><h2>${esc(teamName(s))}</h2>
-      <label class="f"><span>Foto della lista di presentazione</span><input type="file" accept="image/*" data-photo="${s}"></label>
+      <label class="f"><span>Foto o PDF della lista di presentazione</span><input type="file" accept="image/*,.pdf,application/pdf" data-photo="${s}"><div class="small muted">Per i PDF viene letta la prima pagina.</div></label>
       ${photos[s] ? `<img class="thumb" src="${photos[s].url}" alt="Lista di presentazione"><button class="btn sm" data-a="readlist" data-s="${s}">Leggi e prepara la formazione</button><div class="small muted" data-ocrstat="${s}" style="margin:6px 0 0"></div>` : ''}
       <label class="f" style="margin-top:10px"><span>Giocatori, uno per riga: numero e cognome</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
@@ -2758,7 +2758,15 @@ document.addEventListener('input', e => {
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
   try {
-    if (ds.photo && t.files[0]) { photos[ds.photo] = await resizeImage(t.files[0], 1600); renderMain(); }
+    if (ds.photo && t.files[0]) {
+      const selected = t.files[0];
+      const isPdf = selected.type === 'application/pdf' || /\.pdf$/i.test(selected.name || '');
+      toast(isPdf ? 'Conversione della prima pagina PDF…' : 'Caricamento immagine…');
+      const imageFile = isPdf ? await loadPdfFirstPage(selected) : selected;
+      photos[ds.photo] = await resizeImage(imageFile, 2000, 'image/jpeg', .9);
+      renderMain();
+      if (isPdf) toast('Prima pagina del PDF pronta per il riconoscimento');
+    }
     else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); S.logos[ds.logo] = await uploadSharedImage(t.files[0], 'loghi', 512, 'image/png', resizeLogo); commit(true); renderMain(); toast('Logo salvato e condiviso'); }
     else if (ds.evimg && t.files[0]) { toast('Caricamento immagine evento…'); L.evImg[ds.evimg] = await uploadSharedImage(t.files[0], 'eventi', 1080); commit(true); renderMain(); toast('Immagine salvata e condivisa'); }
     else if (ds.library && t.files[0]) { const k = ds.library; toast('Caricamento modello…'); const url = await uploadSharedImage(t.files[0], 'libreria-grafica/' + k, 1600); S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}); S.media.library[k] = url; if (k === 'goal') { L.evImg.goal = url; L.evImgRaw.goal = false; } commit(true); renderMain(); toast('Modello salvato nella libreria'); }
@@ -2783,6 +2791,33 @@ function wireSheet() {
     }
   });
   $('#postDlg').addEventListener('input', e => { if (e.target.id === 'postText') { socialOf(postId).text = e.target.value; saveL(); } });
+}
+
+async function loadPdfFirstPage(file) {
+  if (!window.pdfjsLib) {
+    if (!window.__lineupPdfLoader) {
+      window.__lineupPdfLoader = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        script.onload = () => window.pdfjsLib ? resolve(window.pdfjsLib) : reject(new Error('Lettore PDF non disponibile.'));
+        script.onerror = () => reject(new Error('Impossibile caricare il lettore PDF. Controlla la connessione.'));
+        document.head.appendChild(script);
+      }).catch(err => { window.__lineupPdfLoader = null; throw err; });
+    }
+    await window.__lineupPdfLoader;
+  }
+  const pdfjs = window.pdfjsLib;
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data }).promise;
+  if (!pdf.numPages) throw new Error('Il PDF non contiene pagine leggibili.');
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: Math.min(2.2, 2800 / Math.max(page.view[2], page.view[3])) });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Conversione della pagina PDF non riuscita.')), 'image/png'));
+  return new File([blob], (file.name || 'distinta').replace(/\.pdf$/i, '') + '-pagina-1.png', { type: 'image/png' });
 }
 
 /* lettura della formazione dalla foto, fatta da Claude */
