@@ -2804,8 +2804,8 @@ function prepareLineupImage(blob) {
         // La distinta FIGC ha colonne separate: N° del ruolo a sinistra,
         // Cognome e nome al centro. Escludiamo nascita, matricola e documenti.
         const crop = (x1, x2) => {
-          const sx = Math.round(w * x1), sy = Math.round(h * .302);
-          const sw = Math.round(w * (x2 - x1)), sh = Math.round(h * .592);
+          const sx = Math.round(w * x1), sy = Math.round(h * .275);
+          const sw = Math.round(w * (x2 - x1)), sh = Math.round(h * .675);
           const c = document.createElement('canvas'); c.width = sw; c.height = sh;
           const cx = c.getContext('2d', { willReadFrequently: true });
           cx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
@@ -2818,8 +2818,8 @@ function prepareLineupImage(blob) {
           cx.putImageData(p, 0, 0);
           return c;
         };
-        const numberCrop = crop(.112, .177);
-        const nameCrop = crop(.278, .56);
+        const numberCrop = crop(.105, .18);
+        const nameCrop = crop(.265, .59);
         URL.revokeObjectURL(url);
         resolve({ numberCrop, nameCrop });
       } catch (err) {
@@ -2853,9 +2853,17 @@ function parseOcrNames(text) {
 }
 
 function parseOcrNumbers(text) {
-  return (text || '').split(/\r?\n/).map(x => x.trim())
-    .map(x => x.match(/^\s*([0-9]{1,2}|[Il|]{1,2})\s*[.)]?\s*$/))
-    .filter(Boolean).map(m => m[1].replace(/[Il|]/g, '1'));
+  // La colonna è una sequenza verticale: PSM 11 può restituire più numeri
+  // sulla stessa riga o separarli da rumore. Estraiamo solo valori 1..24.
+  const found = [];
+  for (const raw of (text || '').split(/\\r?\\n/)) {
+    const matches = raw.match(/[0-9]{1,2}|[Il|]{1,2}/g) || [];
+    for (const token of matches) {
+      const n = Number(token.replace(/[Il|]/g, '1'));
+      if (n >= 1 && n <= 24 && !found.includes(String(n))) found.push(String(n));
+    }
+  }
+  return found;
 }
 
 let tesseractLoader = null;
@@ -2888,10 +2896,10 @@ async function readLineup(side, stat) {
       else if (message.status === 'loading language traineddata' || message.status === 'initializing api') stat.textContent = 'Caricamento del riconoscimento italiano…';
     };
     worker = await Tesseract.createWorker('ita', 1, { logger });
-    await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789Il|.' });
+    await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789Il|.' });
     const numberResult = await worker.recognize(prepared.numberCrop);
     const numbers = parseOcrNumbers(numberResult.data.text || '');
-    await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
+    await worker.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
     const nameResult = await worker.recognize(prepared.nameCrop);
     const names = parseOcrNames(nameResult.data.text || '');
 
