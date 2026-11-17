@@ -2149,52 +2149,60 @@ async function renderFormationGraphic(side) {
   const players = parseRoster(S.rosters[side]);
   if (!players.length) throw new Error('Inserisci e salva prima la formazione.');
   const base = photos[side]?.url;
-  if (!base) throw new Error('Carica prima la foto o il PDF della distinta: sarà lo sfondo della grafica.');
-  const image = await loadGraphicImage(base);
-  if (!image) throw new Error('Non riesco ad aprire l’immagine caricata.');
-  const scale = Math.min(1, 2000 / Math.max(image.width, image.height));
-  const W = Math.round(image.width * scale), H = Math.round(image.height * scale);
+  let image = null;
+  if (base) {
+    try { image = await loadGraphicImage(base); } catch (_) { image = null; }
+  }
+  // Senza immagine caricata crea una grafica autonoma con campo da calcio.
+  const W = image ? Math.round(image.width * Math.min(1, 2000 / Math.max(image.width, image.height))) : 1600;
+  const H = image ? Math.round(image.height * Math.min(1, 2000 / Math.max(image.width, image.height))) : 900;
   const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d');
-  x.drawImage(image, 0, 0, W, H);
-
-  // La foto caricata è l'unico sfondo: niente template, loghi, cornici,
-  // titoli o decorazioni aggiuntive. La formazione viene sovrapposta in un
-  // pannello discreto nella parte bassa, lasciando visibile l'originale.
+  if (image) {
+    x.drawImage(image, 0, 0, W, H);
+  } else {
+    const grad = x.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#174d35'); grad.addColorStop(1, '#092b20');
+    x.fillStyle = grad; x.fillRect(0, 0, W, H);
+    x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = 5;
+    const inset = 42;
+    x.strokeRect(inset, inset, W - inset * 2, H - inset * 2);
+    x.beginPath(); x.moveTo(W/2, inset); x.lineTo(W/2, H-inset); x.stroke();
+    x.beginPath(); x.arc(W/2, H/2, 105, 0, Math.PI*2); x.stroke();
+    x.strokeRect(inset, H*.28, W*.16, H*.44);
+    x.strokeRect(W-inset-W*.16, H*.28, W*.16, H*.44);
+    x.fillStyle = 'rgba(255,255,255,.055)';
+    for(let k=0;k<8;k++) x.fillRect(inset+k*(W-2*inset)/8, inset, (W-2*inset)/16, H-2*inset);
+  }
   const margin = Math.round(W * .045);
-  const panelH = Math.round(H * (players.length > 16 ? .43 : players.length > 11 ? .36 : .30));
+  const panelH = Math.round(H * (players.length > 16 ? .58 : players.length > 11 ? .48 : .38));
   const panelY = H - panelH - margin;
   x.fillStyle = 'rgba(0,0,0,.78)';
   rrect(x, margin, panelY, W - margin * 2, panelH, Math.max(8, Math.round(W * .012)));
   x.fill();
-
-  const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
+  const starters = players.filter(p => p.starter);
+  const bench = players.filter(p => !p.starter);
   const pad = Math.round(W * .035);
   const innerW = W - margin * 2 - pad * 2;
   const twoCols = players.length > 9;
   const colW = twoCols ? (innerW - pad) / 2 : innerW;
   const rowsPerCol = twoCols ? Math.ceil(players.length / 2) : players.length;
-  const lineH = Math.min(Math.round(H * .034), Math.floor((panelH - pad * 2) / (rowsPerCol + (bench.length ? 1 : 0))));
+  const lineH = Math.min(Math.round(H * .043), Math.floor((panelH - pad * 2) / (rowsPerCol + 2)));
   let y = panelY + pad + lineH;
-  x.textAlign = 'left';
-  x.fillStyle = '#fff';
-  x.font = '800 ' + Math.max(15, Math.round(lineH * .82)) + 'px Arial,sans-serif';
+  x.textAlign = 'left'; x.fillStyle = '#fff';
+  x.font = '800 ' + Math.max(18, Math.round(lineH * .82)) + 'px Arial,sans-serif';
   x.fillText('FORMAZIONE', margin + pad, y);
   y += Math.round(lineH * 1.12);
-  const drawList = (list, startIndex, color) => {
-    list.forEach((p, i) => {
-      const col = twoCols ? Math.floor((startIndex + i) / rowsPerCol) : 0;
-      const row = twoCols ? (startIndex + i) % rowsPerCol : i;
-      const xx = margin + pad + col * (colW + pad);
-      const yy = y + row * lineH;
-      x.fillStyle = color;
-      x.font = '700 ' + Math.max(12, Math.round(lineH * .66)) + 'px Arial,sans-serif';
-      const label = (p.num ? p.num + '  ' : '') + p.name + (p.starter ? '' : '  (R)');
-      fitFont(x, label, colW - 4, Math.max(12, Math.round(lineH * .66)), 700, 'Arial,sans-serif');
-      x.fillText(label, xx, yy);
-    });
-  };
-  drawList(players, 0, '#fff');
+  players.forEach((p, i) => {
+    const col = twoCols ? Math.floor(i / rowsPerCol) : 0;
+    const row = twoCols ? i % rowsPerCol : i;
+    const xx = margin + pad + col * (colW + pad);
+    const yy = y + row * lineH;
+    const label = (p.num ? p.num + '  ' : '') + p.name + (p.starter ? '' : '  (R)');
+    x.fillStyle = p.starter ? '#fff' : '#b8e7c8';
+    fitFont(x, label, colW - 4, Math.max(14, Math.round(lineH * .66)), 700, 'Arial,sans-serif');
+    x.fillText(label, xx, yy);
+  });
   return canvas;
 }
 let lineupGraphicSide = null;
