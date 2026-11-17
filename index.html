@@ -1738,7 +1738,7 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
   const lime='#b7f36b',white='#f2f7f1',red='#f05252',yellow='#ffd447';
   if(type==='injury'){
     rr(-144,-144,288,288,30,'#ffffff','#e8eee9');
-  }else{
+  }else if(type!=='yellow'&&type!=='red'){
     rr(-144,-144,288,288,30,'#10271b','rgba(255,255,255,.18)');
     const bg=ctx.createLinearGradient(-130,-130,130,130);bg.addColorStop(0,'rgba(66,137,83,.32)');bg.addColorStop(1,'rgba(4,16,10,.08)');rr(-137,-137,274,274,24,bg);
     ctx.save();ctx.strokeStyle='rgba(215,244,220,.20)';ctx.lineWidth=2;rr(-112,-105,224,210,8,null,'rgba(215,244,220,.18)');line([[0,-104],[0,104]]);circle(0,0,29,null,'rgba(215,244,220,.18)');ctx.restore();
@@ -1768,8 +1768,12 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
     goal(-78,-68,156,105);for(let i=0;i<4;i++)player(-38+i*25,51,'#dce8df','stand');
     ball(-78,13,15);arrow([[-62,7],[-25,-18],[12,-51],[38,-58]],lime,5);
   }else if(type==='yellow'||type==='red'){
-    const c=type==='yellow'?yellow:red;ctx.save();ctx.translate(0,-2);ctx.rotate(-.10);rr(-47,-76,94,152,12,c,'rgba(255,255,255,.8)');ctx.restore();
-    ctx.save();ctx.strokeStyle=white;ctx.lineWidth=7;ctx.lineCap='round';line([[39,55],[70,76],[91,56]]);circle(92,55,7,yellow,white);ctx.restore();
+    // Solo cartellino: nessuna mano, fischietto o decorazione aggiuntiva.
+    const c=type==='yellow'?yellow:red;
+    ctx.save();ctx.shadowColor='rgba(0,0,0,.42)';ctx.shadowBlur=18;ctx.shadowOffsetY=10;
+    ctx.translate(0,-2);ctx.rotate(-.06);
+    rr(-52,-82,104,164,10,c,'rgba(255,255,255,.92)');
+    ctx.restore();
   }else if(type==='sub'){
     player(-58,5,red,'stand');player(58,5,'#69d79a','run');arrow([[-25,-48],[25,-48]],'#69d79a',6);arrow([[25,66],[-25,66]],red,5);
   }else if(type==='injury'){
@@ -1898,7 +1902,7 @@ async function renderMatchGraphic(ev) {
   } else {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const hydra=ev.type==='goal'?await loadHydraImage():null;
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:880,ev.type==='goal'?108:125,{ev,hydra});
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:880,ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
