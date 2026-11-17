@@ -2481,12 +2481,16 @@ function prepareLineupImage(blob) {
         const scale = Math.min(1.6, 2560 / Math.max(img.width, img.height));
         const w = Math.max(1, Math.round(img.width * scale));
         const h = Math.max(1, Math.round(img.height * scale));
+        const original = document.createElement('canvas');
+        original.width = w; original.height = h;
+        const originalCtx = original.getContext('2d');
+        originalCtx.imageSmoothingEnabled = true;
+        originalCtx.imageSmoothingQuality = 'high';
+        originalCtx.drawImage(img, 0, 0, w, h);
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx.drawImage(original, 0, 0);
         const pixels = ctx.getImageData(0, 0, w, h);
         const data = pixels.data;
         // Versione in scala di grigi con contrasto aumentato: aiuta su foto
@@ -2500,7 +2504,7 @@ function prepareLineupImage(blob) {
         canvas.toBlob(enhanced => {
           URL.revokeObjectURL(url);
           if (!enhanced) return reject(new Error('Non riesco a elaborare la foto.'));
-          resolve({ original: canvas, enhanced });
+          resolve({ original, enhanced });
         }, 'image/png');
       } catch (err) {
         URL.revokeObjectURL(url);
