@@ -2148,10 +2148,25 @@ function buildMatchReport() {
   if (details.length) paragraphs.push(`Nel corso dell'incontro: ${details.join(' ')}`);
   const mvp = S.events.find(e => e.type === 'mvp');
   if (mvp) paragraphs.push(`Il pubblico ha scelto ${mvp.player} (${teamName(mvp.team)}) come migliore in campo${mvp.votes ? ', con ' + mvp.votes + ' voti' : ''}.`);
-  return `RESOCONTO FINALE\n${title}\n${meta}\n\n${paragraphs.join('\n\n')}\n\n${S.match.hashtag || ''}`.trim();
+
+  // Inserisce nel resoconto le rose effettivamente registrate nella regia.
+  const lineupSections = ['home', 'away'].map(side => {
+    const players = parseRoster(S.rosters[side]);
+    if (!players.length) return `FORMAZIONE ${teamName(side).toUpperCase()}\nFormazione non inserita.`;
+    const starters = players.filter(p => p.starter);
+    const bench = players.filter(p => !p.starter);
+    const format = p => (p.num ? p.num + ' ' : '') + p.name;
+    return [
+      `FORMAZIONE ${teamName(side).toUpperCase()}`,
+      starters.length ? `Titolari: ${starters.map(format).join(', ')}.` : '',
+      bench.length ? `Panchina: ${bench.map(format).join(', ')}.` : ''
+    ].filter(Boolean).join('\n');
+  });
+  const lineups = `FORMAZIONI\n\n${lineupSections.join('\n\n')}`;
+  return `RESOCONTO FINALE\n${title}\n${meta}\n\n${paragraphs.join('\n\n')}\n\n${lineups}\n\n${S.match.hashtag || ''}`.trim();
 }
 function reportHtml() {
-  return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="14" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
+  return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita, con le formazioni di entrambe le squadre. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="22" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
 }
 
 /* ================= vista pubblica ================= */
