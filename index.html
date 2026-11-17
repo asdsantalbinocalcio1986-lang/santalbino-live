@@ -1988,6 +1988,15 @@ async function renderMatchGraphic(ev) {
   const leftGrad=x.createLinearGradient(0,0,0,H);leftGrad.addColorStop(0,shade(homeColor,.48));leftGrad.addColorStop(.52,shade(homeColor,.25));leftGrad.addColorStop(1,'#050708');
   const rightGrad=x.createLinearGradient(0,0,0,H);rightGrad.addColorStop(0,shade(awayColor,.48));rightGrad.addColorStop(.52,shade(awayColor,.25));rightGrad.addColorStop(1,'#050708');
   x.fillStyle=leftGrad;x.fillRect(0,0,W/2,H);x.fillStyle=rightGrad;x.fillRect(W/2,0,W/2,H);
+  // Il modello GOAL della Libreria viene usato come sfondo della grafica dei gol.
+  if(ev.type==='goal' && S.media?.library?.goal){
+    const goalTemplate=await loadGraphicImage(S.media.library.goal);
+    if(goalTemplate){
+      const scale=Math.max(W/goalTemplate.width,H/goalTemplate.height),sw=W/scale,sh=H/scale;
+      x.save();x.drawImage(goalTemplate,(goalTemplate.width-sw)/2,(goalTemplate.height-sh)/2,sw,sh,0,0,W,H);
+      x.fillStyle='rgba(2,10,6,.48)';x.fillRect(0,0,W,H);x.restore();
+    }
+  }
   // Fotografia reale del terreno, vista dall'alto, dietro ai loghi delle squadre.
   // Immagine Unsplash di Willian Justen de Vasconcellos, utilizzabile con licenza Unsplash.
   if(pitchImage){
@@ -2085,6 +2094,67 @@ async function renderCard(ev) { return renderMatchGraphic(ev); }
 async function renderPhaseCard(ev) { return renderMatchGraphic(ev); }
 const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .92)); };
 const cardUrl = async ev => (await renderCard(ev)).toDataURL('image/jpeg', .88);
+
+
+function loadGraphicImage(src) {
+  return new Promise(resolve => {
+    if (!src) return resolve(null);
+    const img = new Image(); let done = false;
+    const finish = value => { if (done) return; done = true; clearTimeout(timer); img.onload = null; img.onerror = null; resolve(value); };
+    const timer = setTimeout(() => finish(null), 9000);
+    if (/^https?:/i.test(src)) img.crossOrigin = 'anonymous';
+    img.onload = () => finish(img); img.onerror = () => finish(null); img.src = src;
+  });
+}
+async function renderFormationGraphic(side) {
+  const players = parseRoster(S.rosters[side]);
+  if (!players.length) throw new Error('Inserisci e salva prima la formazione.');
+  const W = 1080, H = 1350, canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const x = canvas.getContext('2d'), template = await loadGraphicImage(S.media?.library?.formation || '');
+  if (template) {
+    const scale = Math.max(W / template.width, H / template.height), sw = W / scale, sh = H / scale;
+    x.drawImage(template, (template.width - sw) / 2, (template.height - sh) / 2, sw, sh, 0, 0, W, H);
+    x.fillStyle = 'rgba(2,10,6,.52)'; x.fillRect(0, 0, W, H);
+  } else {
+    const grad = x.createLinearGradient(0, 0, W, H); grad.addColorStop(0, '#07150c'); grad.addColorStop(.55, '#17482a'); grad.addColorStop(1, '#030a06'); x.fillStyle = grad; x.fillRect(0, 0, W, H);
+  }
+  x.fillStyle = 'rgba(2,10,6,.48)'; x.fillRect(48, 48, W - 96, H - 96);
+  x.strokeStyle = '#b7f36b'; x.lineWidth = 3; x.strokeRect(48, 48, W - 96, H - 96);
+  x.textAlign = 'center'; x.fillStyle = '#b7f36b'; x.font = '800 25px Arial,sans-serif'; x.fillText('ASD SANT’ALBINO TERME  •  MATCH CENTER', W / 2, 112);
+  x.fillStyle = '#fff'; x.font = '900 76px Arial,sans-serif'; fitFont(x, 'FORMAZIONE UFFICIALE', 900, 76, 900, 'Arial,sans-serif'); x.fillText('FORMAZIONE UFFICIALE', W / 2, 215);
+  x.font = '800 42px Arial,sans-serif'; fitFont(x, teamName(side).toUpperCase(), 900, 42, 800, 'Arial,sans-serif'); x.fillText(teamName(side).toUpperCase(), W / 2, 285);
+  const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
+  const drawRows = (list, heading, y, maxRows) => {
+    x.textAlign = 'left'; x.fillStyle = '#b7f36b'; x.font = '800 27px Arial,sans-serif'; x.fillText(heading, 112, y);
+    const shown = list.slice(0, maxRows), cols = shown.length > 8 ? 2 : 1, rows = Math.ceil(shown.length / cols), colW = cols === 2 ? 410 : 820;
+    shown.forEach((p, i) => {
+      const col = Math.floor(i / rows), row = i % rows, xx = 112 + col * 440, yy = y + 30 + row * 58;
+      x.fillStyle = 'rgba(255,255,255,.10)'; rrect(x, xx, yy, colW, 46, 10); x.fill();
+      x.fillStyle = '#b7f36b'; x.font = '800 22px Arial,sans-serif'; x.fillText(String(p.num || '—'), xx + 15, yy + 30);
+      x.fillStyle = '#fff'; x.font = '700 22px Arial,sans-serif'; fitFont(x, p.name, colW - 85, 22, 700, 'Arial,sans-serif'); x.fillText(p.name, xx + 70, yy + 30);
+    });
+  };
+  drawRows(starters, 'TITOLARI  •  ' + starters.length, 355, 22);
+  if (bench.length) drawRows(bench, 'PANCHINA  •  ' + bench.length, Math.min(1040, 390 + Math.ceil(starters.length / (starters.length > 8 ? 2 : 1)) * 58), 10);
+  x.fillStyle = '#b7f36b'; x.fillRect(70, 1245, 940, 3);
+  x.textAlign = 'left'; x.fillStyle = '#fff'; x.font = '700 20px Arial,sans-serif'; x.fillText('ASD SANT’ALBINO TERME', 78, 1285);
+  x.textAlign = 'right'; x.fillStyle = 'rgba(255,255,255,.8)'; x.fillText(S.match.hashtag || '#SantAlbinoTerme', 1002, 1285);
+  return canvas;
+}
+let lineupGraphicSide = null;
+async function openLineupGraphic(side) {
+  lineupGraphicSide = side;
+  const dlg = $('#graphicDlg');
+  dlg.innerHTML = '<div class="sheethead"><h2>Grafica formazione</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione immagine…</p>';
+  if (!dlg.open) dlg.showModal();
+  try {
+    const canvas = await renderFormationGraphic(side), url = canvas.toDataURL('image/jpeg', .9);
+    if (lineupGraphicSide !== side || !dlg.open) return;
+    dlg.innerHTML = '<div class="sheethead"><h2>Formazione ' + esc(teamName(side)) + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="' + url + '" alt="Grafica formazione"><button class="btn primary block" type="button" data-a="saveLineupGraphic">Salva immagine</button>';
+  } catch (err) {
+    dlg.innerHTML = '<div class="sheethead"><h2>Immagine non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nella generazione.') + '</p>';
+  }
+}
 
 function resizeImage(file, max, type = 'image/jpeg', q = .82) {
   return new Promise((res, rej) => {
@@ -2394,7 +2464,7 @@ function regiaHtml() {
       ${photos[s] ? `<img class="thumb" src="${photos[s].url}" alt="Lista di presentazione"><button class="btn sm" data-a="readlist" data-s="${s}">Leggi e prepara la formazione</button><div class="small muted" data-ocrstat="${s}" style="margin:6px 0 0"></div>` : ''}
       <label class="f" style="margin-top:10px"><span>Giocatori, uno per riga: numero e cognome</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
-      <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
+      <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('');
   else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
@@ -2546,6 +2616,8 @@ document.addEventListener('click', async e => {
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
+    case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s); break;
+    case 'saveLineupGraphic': if (lineupGraphicSide) { const cv = await renderFormationGraphic(lineupGraphicSide); cv.toBlob(blob => { if (blob) saveBlob(blob, 'formazione-' + lineupGraphicSide + '.jpg'); }, 'image/jpeg', .92); } break;
     case 'graphicclose': $('#graphicDlg').close(); break;
     case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'edit': editId = ev.id; renderMain(); break;
