@@ -33,7 +33,7 @@ grant execute on function public.is_santalbino_admin() to anon, authenticated;
 -- utente, lo script si interrompe senza concedere accessi in modo permissivo.
 do $$
 declare
-  admin_email text := 'INSERISCI_EMAIL_AMMINISTRATORE';
+  admin_email text := 'andreadeligia1@outlook.it';
   found_user_id uuid;
   found_count integer;
 begin
