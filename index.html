@@ -2047,7 +2047,7 @@ async function renderMatchGraphic(ev) {
   } else {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const hydra=ev.type==='goal'?await loadHydraImage():null;
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:880,ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra});
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?840:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
@@ -2078,12 +2078,14 @@ async function renderMatchGraphic(ev) {
       if(player){x.textAlign='center';fitFont(x,player.toUpperCase(),790,29,900,FD);x.fillStyle='#fff';x.font=`900 29px ${FD}`;x.fillText(player.toUpperCase(),W/2,1116);}
       x.textAlign='center';fitFont(x,detail,790,17,700,FB);x.fillStyle='rgba(255,255,255,.92)';x.font=`700 17px ${FB}`;x.fillText(detail,W/2,1148);
     }else if(illustrated){
-      // Gerarchia uniforme per ammonizioni, espulsioni, infortuni, cambi e altre azioni illustrate.
-      x.save();x.fillStyle='rgba(2,13,7,.94)';rrect(x,430,982,220,50,16);x.fill();
-      x.strokeStyle=accent;x.lineWidth=2;rrect(x,430,982,220,50,16);x.stroke();x.restore();
-      x.textAlign='center';x.fillStyle=accent;x.font=`900 36px ${FD}`;x.fillText(minute,W/2,1016);
-      if(player)writeWrapped(x,player.toUpperCase(),W/2,1070,790,29,2,'#fff',900,FD,34);
-      writeWrapped(x,detail,W/2,player?1115:1084,790,18,2,'rgba(255,255,255,.88)',650,FB,23);
+      // Per l'infortunio l'immagine è centrata nell'area dedicata e separata dal testo.
+      const infoTop=ev.type==='injury'?1006:982;
+      const minuteY=infoTop+34;
+      x.save();x.fillStyle='rgba(2,13,7,.94)';rrect(x,430,infoTop,220,50,16);x.fill();
+      x.strokeStyle=accent;x.lineWidth=2;rrect(x,430,infoTop,220,50,16);x.stroke();x.restore();
+      x.textAlign='center';x.fillStyle=accent;x.font=`900 36px ${FD}`;x.fillText(minute,W/2,minuteY);
+      if(player)writeWrapped(x,player.toUpperCase(),W/2,minuteY+54,790,29,2,'#fff',900,FD,34);
+      writeWrapped(x,detail,W/2,player?minuteY+99:minuteY+68,790,18,2,'rgba(255,255,255,.88)',650,FB,23);
     }else{
       x.textAlign='center';x.fillStyle=accent;x.font=`900 58px ${FD}`;x.fillText(minute,W/2,900);
       if(player)writeWrapped(x,player.toUpperCase(),W/2,970,790,40,2,'#fff',800,FD,48);
