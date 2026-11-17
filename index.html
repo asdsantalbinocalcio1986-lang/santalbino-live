@@ -2012,7 +2012,7 @@ async function renderMatchGraphic(ev) {
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
   const x=canvas.getContext('2d'),FB="'Manrope',sans-serif",FD="'Barlow Condensed',sans-serif";
   const capturedTextItems=[],nativeFillText=x.fillText.bind(x);
-  const templateKey='event_'+ev.type,templateElements=graphicEditorConfig().templates[templateKey]?.elements||{},fontStyle=graphicEditorStyle('event');
+  const templateKey='event_'+ev.type,templateConfig=graphicEditorConfig().templates[templateKey]||{},templateElements=templateConfig.elements||{},fontStyle=Object.assign({},graphicEditorStyle('event'),templateConfig);
   x.fillText=function(text,tx,ty,...args){
     const index=capturedTextItems.length,key=String(index),cfg=templateElements[key]||{};
     const value=cfg.text!==undefined?String(cfg.text):String(text),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0;
@@ -3097,7 +3097,7 @@ function saveMatch() {
 }
 /* campi e file */
 document.addEventListener('input', e => {
-  if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(['accent','fontFamily'].includes(k)?e.target.value:(k==='fontScale'?Number(e.target.value)/100:Number(e.target.value)));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
+  if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope,target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(['accent','fontFamily'].includes(k)?e.target.value:(k==='fontScale'?Number(e.target.value)/100:Number(e.target.value)));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
   const s = e.target.dataset && e.target.dataset.roster;
   if (s) { const pl = parseRoster(e.target.value), n = pl.filter(p => p.starter).length; $(`[data-count="${s}"]`).textContent = `${n} titolari · ${pl.length - n} in panchina`; return; }
   if (e.target.matches('[data-convocati]')) { const preview = $('[data-convocati-preview]'); if (preview) preview.value = buildConvocatiText(); return; }
@@ -3111,7 +3111,7 @@ document.addEventListener('change', async e => {
   if(t.matches('[data-editor-scope]')){L.editorTemplate=t.value;saveL();renderMain();return;}
   if(t.matches('[data-event-template]')){L.editorEventTemplate=t.value;renderMain();return;}
 
-  if(t.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=ds.editor;target[k]=k==='sponsor'?t.checked:(['accent','fontFamily'].includes(k)?t.value:(k==='fontScale'?Number(t.value)/100:Number(t.value)));commit(true);return;}
+  if(t.matches('[data-editor]')){const cfg=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope,target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=ds.editor;target[k]=k==='sponsor'?t.checked:(['accent','fontFamily'].includes(k)?t.value:(k==='fontScale'?Number(t.value)/100:Number(t.value)));commit(true);return;}
   try {
     if (ds.photo && t.files[0]) {
       const selected = t.files[0];
