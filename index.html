@@ -2004,10 +2004,18 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
   }
   ctx.restore();
 }
+let lastGraphicTextItems=[];
 async function renderMatchGraphic(ev) {
   if(document.fonts&&document.fonts.ready) await document.fonts.ready;
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
   const x=canvas.getContext('2d'),FB="'Manrope',sans-serif",FD="'Barlow Condensed',sans-serif";
+  const capturedTextItems=[],nativeFillText=x.fillText.bind(x);
+  x.fillText=function(text,tx,ty,...args){
+    const index=capturedTextItems.length,key=String(index),cfg=ev.graphicElements?.[key]||{};
+    const value=cfg.text!==undefined?String(cfg.text):String(text),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0;
+    capturedTextItems.push({index,text:value,original:String(text),x:Number(tx)||0,y:Number(ty)||0,dx,dy});
+    return nativeFillText(value,(Number(tx)||0)+dx,(Number(ty)||0)+dy,...args);
+  };
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
@@ -2177,6 +2185,7 @@ async function renderMatchGraphic(ev) {
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
   x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
   if(ev.type==='sub')x.restore();
+  lastGraphicTextItems=capturedTextItems;
   await addSponsorToGraphic(canvas,['kickoff','halftime','fulltime'].includes(ev.type)?'phase':'event');
   return canvas;
 }
@@ -2763,7 +2772,7 @@ function graphicEditorHtml() {
   const selectedEvent=S.events.find(e=>e.id===(L.editorEventId||''))||S.events.find(e=>CARD_TYPES.includes(e.type));
   const evFields=selectedEvent?{title:selectedEvent.graphicTitle||'',player:selectedEvent.player||'',minute:selectedEvent.min||'',note:selectedEvent.note||'',assist:selectedEvent.assist||'',inn:selectedEvent.inn||'',out:selectedEvent.out||'',x:Number(selectedEvent.graphicOffset?.x)||0,y:Number(selectedEvent.graphicOffset?.y)||0}:{};
   return `<div class="card"><h2>Editor grafiche</h2>
-    <p class="small muted" style="margin-top:0">Seleziona l’ambito dal menu qui sotto. Per modificare un singolo evento scegli “Grafiche eventi”: comparirà l’elenco degli eventi registrati e i relativi campi. Dopo le modifiche premi “Apri anteprima” per verificare la grafica.</p>
+    <p class="small muted" style="margin-top:0">Seleziona “Grafiche eventi” e poi l’evento. Nell’anteprima ogni testo è numerato: puoi trascinarlo singolarmente e modificarne contenuto e coordinate nella sezione dedicata. Le modifiche sono salvate sul singolo evento.</p>
     <label class="f"><span>Ambito da modificare</span><select data-editor-scope>${options.map(([k,n])=>`<option value="${k}" ${key===k?'selected':''}>${n}</option>`).join('')}</select></label>
     ${key==='event'?`<hr><h3>Personalizzazione del singolo evento</h3><label class="f"><span>Evento da modificare</span><select data-event-select>${S.events.filter(e=>CARD_TYPES.includes(e.type)).map(e=>`<option value="${esc(e.id)}" ${selectedEvent?.id===e.id?'selected':''}>${esc(e.min||'LIVE')}′ · ${esc(describe(e,scoreAt(S.events.indexOf(e))).title)}</option>`).join('')}</select></label>
     ${selectedEvent?`<div class="row2"><label class="f"><span>Titolo personalizzato</span><input data-event-edit="graphicTitle" value="${esc(evFields.title)}" placeholder="Titolo predefinito"></label><label class="f"><span>Giocatore</span><input data-event-edit="player" value="${esc(evFields.player)}"></label></div><div class="row2"><label class="f"><span>Minuto</span><input data-event-edit="min" value="${esc(evFields.minute)}"></label><label class="f"><span>Assist</span><input data-event-edit="assist" value="${esc(evFields.assist)}"></label></div><div class="row2"><label class="f"><span>Entra</span><input data-event-edit="inn" value="${esc(evFields.inn)}"></label><label class="f"><span>Esce</span><input data-event-edit="out" value="${esc(evFields.out)}"></label></div><label class="f"><span>Testo / nota</span><input data-event-edit="note" value="${esc(evFields.note)}"></label><div class="row2"><label class="f"><span>Sposta testi X · ${evFields.x}px</span><input type="range" min="-300" max="300" step="5" value="${evFields.x}" data-event-edit="x"></label><label class="f"><span>Sposta testi Y · ${evFields.y}px</span><input type="range" min="-300" max="300" step="5" value="${evFields.y}" data-event-edit="y"></label></div><p class="small muted">Queste modifiche riguardano solo l’evento selezionato. Lo spostamento agisce sul blocco centrale di contenuto.</p>`:'<p class="muted">Registra un evento per poterlo personalizzare.</p>'}`:''}
@@ -2771,7 +2780,7 @@ function graphicEditorHtml() {
     <label class="f"><span>Velatura scura · ${v.overlay}%</span><input type="range" min="0" max="35" value="${Number(v.overlay)||0}" data-editor="overlay"></label></div>
     <label class="f"><span>Spessore bordo · ${v.border}px</span><input type="range" min="0" max="12" value="${Number(v.border)||0}" data-editor="border"></label>
     <label class="check"><input type="checkbox" data-editor="sponsor" ${v.sponsor!==false?'checked':''}> Mostra uno sponsor casuale, se presente in Libreria</label>
-    <button class="btn block" style="margin-top:10px" data-a="editorPreview">Apri anteprima e sposta lo sponsor</button>
+    <button class="btn block" style="margin-top:10px" data-a="editorPreview">Apri anteprima e modifica gli elementi</button>
     <div id="graphicEditorPreview" style="margin-top:12px"></div>
     <div class="row2 stack" style="margin-top:12px"><button class="btn primary" data-a="editorSave">Salva impostazioni</button><button class="btn" data-a="editorReset">Ripristina predefiniti</button></div>
     <p class="small muted">Nessuna libreria esterna. Le posizioni dello sponsor vengono memorizzate per il modello selezionato o a livello globale.</p></div>`;
@@ -2802,15 +2811,28 @@ async function openGraphicEditorPreview() {
     const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',style=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{}),pos=Object.assign({x:0,y:0,scale:1},style.sponsorPos||{});
     const left=(slot.x+pos.x*canvas.width)/canvas.width*100,top=(slot.y+pos.y*canvas.height)/canvas.height*100;
     const width=slot.w*pos.scale/canvas.width*100,height=slot.h*pos.scale/canvas.height*100;
-    host.innerHTML='<p class="small muted">Trascina il riquadro SPONSOR nella posizione desiderata. Il salvataggio è automatico al rilascio.</p><div id="editorDragFrame" style="position:relative;width:100%;aspect-ratio:'+canvas.width+'/'+canvas.height+';overflow:hidden;border-radius:12px;background:#071d16;touch-action:none"><img src="'+url+'" alt="Anteprima grafica" style="display:block;width:100%;height:100%;object-fit:fill;pointer-events:none"><div id="editorSponsorHandle" role="slider" aria-label="Sposta sponsor" tabindex="0" style="position:absolute;left:'+left+'%;top:'+top+'%;width:'+width+'%;height:'+height+'%;min-width:36px;min-height:20px;box-sizing:border-box;border:2px dashed #fff;background:rgba(227,198,109,.32);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font:bold 11px Arial;cursor:move;touch-action:none;text-shadow:0 1px 3px #000">SPONSOR</div></div>';
+    const ev=layout==='event'?S.events.find(e=>e.id===(L.editorEventId||'')):null;
+    const items=layout==='event'?lastGraphicTextItems:[];
+    const handles=items.map(item=>'<div data-text-handle="'+item.index+'" title="'+esc(item.text).replace(/"/g,'&quot;')+'" style="position:absolute;left:'+((item.x+item.dx)/canvas.width*100)+'%;top:'+((item.y+item.dy)/canvas.height*100)+'%;transform:translate(-50%,-50%);z-index:3;min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border:1px solid #fff;background:rgba(15,75,42,.88);border-radius:5px;color:#fff;font:700 11px Arial;display:flex;align-items:center;justify-content:center;cursor:move;touch-action:none;user-select:none">'+(item.index+1)+'</div>').join('');
+    const controls=items.length?'<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">Testi della grafica: '+items.length+' elementi modificabili</summary><p class="small muted">Modifica il testo oppure trascina il numero corrispondente direttamente sull’immagine. X e Y sono spostamenti in pixel rispetto alla posizione originale.</p>'+items.map(item=>{const val=esc(item.text).replace(/"/g,'&quot;');return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 76px 76px;gap:6px;align-items:end;padding:7px 0;border-bottom:1px solid #ddd"><label class="f" style="margin:0"><span>Elemento '+(item.index+1)+'</span><input data-text-value="'+item.index+'" value="'+val+'"></label><label class="f" style="margin:0"><span>X</span><input type="number" step="2" data-text-x="'+item.index+'" value="'+item.dx+'"></label><label class="f" style="margin:0"><span>Y</span><input type="number" step="2" data-text-y="'+item.index+'" value="'+item.dy+'"></label></div>';}).join('')+'</details>':'';
+    host.innerHTML='<p class="small muted">'+(layout==='event'?'Ogni numero identifica un singolo elemento testuale: trascinalo per spostarlo. Apri “Testi della grafica” per modificare contenuto e coordinate.':'Trascina il riquadro SPONSOR nella posizione desiderata.')+'</p><div id="editorDragFrame" style="position:relative;width:100%;aspect-ratio:'+canvas.width+'/'+canvas.height+';overflow:hidden;border-radius:12px;background:#071d16;touch-action:none"><img src="'+url+'" alt="Anteprima grafica" style="display:block;width:100%;height:100%;object-fit:fill;pointer-events:none">'+handles+'<div id="editorSponsorHandle" role="slider" aria-label="Sposta sponsor" tabindex="0" style="position:absolute;left:'+left+'%;top:'+top+'%;width:'+width+'%;height:'+height+'%;min-width:36px;min-height:20px;box-sizing:border-box;border:2px dashed #fff;background:rgba(227,198,109,.32);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font:bold 11px Arial;cursor:move;touch-action:none;text-shadow:0 1px 3px #000;z-index:4">SPONSOR</div></div>'+controls;
     const frame=$('#editorDragFrame'),handle=$('#editorSponsorHandle');if(!frame||!handle)return;
-    let drag=null;
-    handle.addEventListener('pointerdown',e=>{e.preventDefault();handle.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y};});
-    handle.addEventListener('pointermove',e=>{if(!drag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,drag.ox+(e.clientX-drag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,drag.oy+(e.clientY-drag.y)/r.height));handle.style.left=((slot.x+nx*canvas.width)/canvas.width*100)+'%';handle.style.top=((slot.y+ny*canvas.height)/canvas.height*100)+'%';});
-    handle.addEventListener('pointerup',e=>{if(!drag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,drag.ox+(e.clientX-drag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,drag.oy+(e.clientY-drag.y)/r.height));drag=null;const target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{}));target.sponsorPos=Object.assign({x:0,y:0,scale:1},target.sponsorPos||{},{x:nx,y:ny});commit(true);openGraphicEditorPreview();});
+    let sponsorDrag=null;
+    handle.addEventListener('pointerdown',e=>{e.preventDefault();handle.setPointerCapture(e.pointerId);sponsorDrag={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y};});
+    handle.addEventListener('pointermove',e=>{if(!sponsorDrag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,sponsorDrag.ox+(e.clientX-sponsorDrag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,sponsorDrag.oy+(e.clientY-sponsorDrag.y)/r.height));handle.style.left=((slot.x+nx*canvas.width)/canvas.width*100)+'%';handle.style.top=((slot.y+ny*canvas.height)/canvas.height*100)+'%';});
+    handle.addEventListener('pointerup',e=>{if(!sponsorDrag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,sponsorDrag.ox+(e.clientX-sponsorDrag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,sponsorDrag.oy+(e.clientY-sponsorDrag.y)/r.height));sponsorDrag=null;const target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{}));target.sponsorPos=Object.assign({x:0,y:0,scale:1},target.sponsorPos||{},{x:nx,y:ny});commit(true);openGraphicEditorPreview();});
+    const saveTextChange=(index,patch)=>{if(!ev)return;ev.graphicElements=ev.graphicElements||{};ev.graphicElements[String(index)]=Object.assign({},ev.graphicElements[String(index)]||{},patch);commit(true);openGraphicEditorPreview();};
+    host.querySelectorAll('[data-text-value]').forEach(input=>input.addEventListener('change',()=>saveTextChange(input.dataset.textValue,{text:input.value})));
+    host.querySelectorAll('[data-text-x]').forEach(input=>input.addEventListener('change',()=>saveTextChange(input.dataset.textX,{dx:Number(input.value)||0})));
+    host.querySelectorAll('[data-text-y]').forEach(input=>input.addEventListener('change',()=>saveTextChange(input.dataset.textY,{dy:Number(input.value)||0})));
+    host.querySelectorAll('[data-text-handle]').forEach(h=>{
+      let drag=null;
+      h.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();h.setPointerCapture(e.pointerId);const item=items[Number(h.dataset.textHandle)];drag={x:e.clientX,y:e.clientY,ox:item.dx,oy:item.dy};});
+      h.addEventListener('pointermove',e=>{if(!drag)return;e.preventDefault();const r=frame.getBoundingClientRect(),item=items[Number(h.dataset.textHandle)],dx=drag.ox+(e.clientX-drag.x)*canvas.width/r.width,dy=drag.oy+(e.clientY-drag.y)*canvas.height/r.height;h.style.left=((item.x+dx)/canvas.width*100)+'%';h.style.top=((item.y+dy)/canvas.height*100)+'%';});
+      h.addEventListener('pointerup',e=>{if(!drag)return;const r=frame.getBoundingClientRect(),dx=Math.round(drag.ox+(e.clientX-drag.x)*canvas.width/r.width),dy=Math.round(drag.oy+(e.clientY-drag.y)*canvas.height/r.height),index=Number(h.dataset.textHandle);drag=null;saveTextChange(index,{dx,dy});});
+    });
   }catch(err){host.innerHTML='<p class="small muted">'+esc(err?.message||'Anteprima non disponibile.')+'</p>';}
 }
-
 function libraryHtml() {
   const lib = Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {});
   const sponsors = Array.isArray(lib.sponsors) ? lib.sponsors : [];
