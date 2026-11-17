@@ -2850,6 +2850,7 @@ function parseOcrLineup(text) {
   const lines = (text || '').split(/\r?\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
   const players = [];
   let bench = false;
+  let hasReserveMarkers = false;
   for (const raw of lines) {
     const line = raw.replace(/^[|¦•·]+\s*/, '').trim();
     if (/^(panchina|riserve|a disposizione|giocatori di riserva|sostituti)\b/i.test(line)) { bench = true; continue; }
@@ -2862,6 +2863,7 @@ function parseOcrLineup(text) {
     let num = m[1].replace(/[Il|]/g, '1');
     let name = m[2].replace(/^[|:;,\.\-]+\s*/, '').replace(/[|]+/g, 'I').trim();
     const markedReserve = /\(\s*R\s*\)/i.test(name);
+    if (markedReserve) hasReserveMarkers = true;
     // R = riserva e P = portiere: sigle escluse dal nominativo.
     name = name.replace(/\(\s*[RP]\s*\)/gi, '').replace(/\s{2,}/g, ' ').trim();
     if (!name || !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(name)) continue;
@@ -2872,9 +2874,9 @@ function parseOcrLineup(text) {
   // Se la foto non riporta la panchina in modo esplicito, i primi undici
   // giocatori riconosciuti vengono considerati titolari.
   let starters = players.filter(p => p.starter).length;
-  if (!bench || starters > 11) {
+  if (!hasReserveMarkers && (!bench || starters > 11)) {
     players.forEach((p, i) => { p.starter = i < 11; });
-  } else if (starters < 11 && players.length > 11) {
+  } else if (!hasReserveMarkers && starters < 11 && players.length > 11) {
     let seen = 0;
     players.forEach(p => { if (p.starter && seen++ >= 11) p.starter = false; });
   }
