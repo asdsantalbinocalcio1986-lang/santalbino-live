@@ -2117,26 +2117,33 @@ async function renderMatchGraphic(ev) {
   drawTeamWatermark(homeLogo,265,430,390);drawTeamWatermark(awayLogo,815,430,390);
   drawLogo(x,homeLogo,teamName('home'),265,430,150,FD);drawLogo(x,awayLogo,teamName('away'),815,430,150,FD);
   // Nomi delle due squadre: identica area, identico font e righe centrate sulla stessa quota.
-  // Se un nome occupa due righe, anche l'altro viene centrato nello stesso blocco verticale.
+  // Si bypassano gli offset per-elemento memorizzati dal vecchio editor: non devono sfalsare le etichette.
   const teamLabels=[
     {text:String(teamName('home')||'').toUpperCase(),cx:265},
     {text:String(teamName('away')||'').toUpperCase(),cx:815}
   ];
   const teamLabelWidth=350,teamLabelLineHeight=30,maxTeamLabelLines=2;
+  const teamLabelFamily=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||FD;
+  const teamLabelScale=Number(fontStyle.fontScale)||1;
   let teamLabelFontSize=26,teamLabelLines=[];
   while(teamLabelFontSize>=14){
-    x.font=`800 ${teamLabelFontSize}px ${FD}`;
+    x.font=`800 ${Math.max(12,teamLabelFontSize*teamLabelScale)}px ${teamLabelFamily}`;
     teamLabelLines=teamLabels.map(item=>wrapCanvasText(x,item.text,teamLabelWidth,maxTeamLabelLines,teamLabelLineHeight));
     const fits=teamLabelLines.every(lines=>lines.length<=maxTeamLabelLines&&lines.every(line=>x.measureText(line).width<=teamLabelWidth));
     if(fits)break;
     teamLabelFontSize--;
   }
   x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';
-  x.font=`800 ${teamLabelFontSize}px ${FD}`;
+  x.font=`800 ${Math.max(12,teamLabelFontSize*teamLabelScale)}px ${teamLabelFamily}`;
   teamLabels.forEach((item,index)=>{
     const lines=teamLabelLines[index]||[item.text];
     const firstBaseline=560-((lines.length-1)*teamLabelLineHeight)/2;
-    lines.forEach((line,lineIndex)=>x.fillText(line,item.cx,firstBaseline+lineIndex*teamLabelLineHeight));
+    lines.forEach((line,lineIndex)=>{
+      const textIndex=capturedTextItems.length,key=String(textIndex),cfg=templateElements[key]||{};
+      const value=cfg.text!==undefined?String(cfg.text):line;
+      capturedTextItems.push({index:textIndex,text:value,original:line,x:item.cx,y:firstBaseline+lineIndex*teamLabelLineHeight,dx:0,dy:0});
+      nativeFillText(value,item.cx,firstBaseline+lineIndex*teamLabelLineHeight);
+    });
   });
   // Piastra risultato autonoma, larga e separata dai marchi.
   x.save();x.shadowColor='rgba(0,0,0,.42)';x.shadowBlur=28;x.shadowOffsetY=10;x.fillStyle='rgba(2,13,7,.88)';rrect(x,270,590,540,128,28);x.fill();x.restore();
