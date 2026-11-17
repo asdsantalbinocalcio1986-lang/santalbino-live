@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!doctype html><html lang="it"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sant'Albino Live | Cronaca in diretta</title>
 <meta name="description" content="Sant'Albino Live: segui in diretta risultati, formazioni e cronaca delle partite dell'ASD Sant'Albino Terme.">
 <meta name="theme-color" content="#0b3b22">
@@ -64,7 +64,7 @@
 @media (max-width:360px){
   .standings-frame iframe{height:940px}
 }
-</style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head><body><title>Santa Live</title><meta name="claude:viewport-fit-sides" content="cover"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
+</style><meta name="theme-color" content="#0b3b22"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
   --bg:#eef2ec; --surface:#ffffff; --surface2:#e4eae2; --ink:#10201a; --muted:#56655c; --line:#d3dcd1;
@@ -1242,7 +1242,7 @@ input:focus,select:focus,textarea:focus {
 @media (prefers-reduced-motion: reduce) {
   .status.live { animation: none; }
 }
-</style><div id="root"></div>
+</style></head><body><div id="root"></div>
 <script id="startup-diagnostic">
 (function(){
   function show(title, detail){
@@ -1519,25 +1519,32 @@ async function initCaps() {
   if (LOCAL_ONLY) { CAN_EDIT = false; setSync('error', 'backend non configurato'); return; }
   db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   db.auth.onAuthStateChange((event, session) => {
-    authUser = session?.user || null; CAN_EDIT = !!authUser;
+    authUser = session?.user || null;
+    if (!authUser) {
+      CAN_EDIT = false; L.mode = 'public';
+      if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
+    } else if (event !== 'PASSWORD_RECOVERY') {
+      // Defer Supabase queries until the auth callback has returned.
+      setTimeout(async () => {
+        await verifyAdminAccess();
+        L.mode = CAN_EDIT ? 'regia' : 'public';
+        if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
+      }, 0);
+    }
     if (event === 'PASSWORD_RECOVERY') {
       const dlg = $('#recoveryDlg');
       if (dlg && !dlg.open) dlg.showModal();
     }
-    if (event !== 'PASSWORD_RECOVERY') {
-      if (!CAN_EDIT) L.mode = 'public'; else L.mode = 'regia';
-      if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
-    }
   });
   const { data: { session } } = await db.auth.getSession();
   authUser = session?.user || null;
-  CAN_EDIT = !!authUser;
+  await verifyAdminAccess();
   const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
   if (!error && data?.state) { S = mergeState(data.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); }
   else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
   dbReady = true;
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !window.__santalbinoSaving) { S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); refreshMvpVotes(); }
+    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); refreshMvpVotes(); }
    }).subscribe();
   db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
@@ -1547,11 +1554,24 @@ async function initCaps() {
 function mergeState(raw) {
   const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:Object.assign(d.media,raw.media||{})});
 }
+async function verifyAdminAccess() {
+  if (!db || !authUser) { CAN_EDIT = false; return false; }
+  const { data, error } = await db.rpc('is_santalbino_admin');
+  CAN_EDIT = !error && data === true;
+  if (error) console.warn('Verifica amministratore non riuscita:', error.message);
+  return CAN_EDIT;
+}
 async function signInAdmin() {
   const email = $('#authEmail')?.value.trim(), password = $('#authPassword')?.value;
   if (!email || !password) { toast('Inserisci email e password'); return; }
   const {error} = await db.auth.signInWithPassword({email,password});
   if (error) { $('#authError').textContent = 'Accesso non riuscito: verifica le credenziali.'; return; }
+  authUser = (await db.auth.getUser()).data.user || null;
+  if (!(await verifyAdminAccess())) {
+    await db.auth.signOut();
+    $('#authError').textContent = 'Questo account non è abilitato alla regia di Sant\'Albino Live.';
+    return;
+  }
   $('#authDlg').close(); $('#authPassword').value = '';
 }
 async function requestPasswordReset() {
@@ -1572,10 +1592,10 @@ async function saveNewPassword() {
   msg.textContent = 'Password aggiornata. Accesso alla regia in corso…';
   setTimeout(() => { $('#recoveryDlg').close(); $('#authDlg').close(); L.mode = 'regia'; saveL(); $('#top').innerHTML = topHtml(); renderMain(); }, 700);
 }
-async function signOutAdmin() { if (db) await db.auth.signOut(); }
+async function signOutAdmin() { if (db) await db.auth.signOut(); CAN_EDIT = false; authUser = null; L.mode = 'public'; }
 
 /* ================= sincronizzazione online ================= */
-let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false;
+let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publishPending = false;
 function setSync(st, detail = '') { syncState = st; syncDetail = detail; const el = $('#sync'); if (el) el.outerHTML = syncHtml(); }
 function syncHtml() {
   const txt = { ok: 'Pagina live aggiornata', dirty: 'Modifiche da sincronizzare…', sending: 'Sincronizzazione in corso…', error: 'Sincronizzazione non disponibile' + (syncDetail ? ` (${esc(syncDetail)})` : ''), local: 'Modalità locale: configura il database' }[LOCAL_ONLY ? 'local' : syncState];
@@ -1590,11 +1610,32 @@ function commit(now) {
   setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, now ? 80 : 700);
 }
 async function publishNow() {
-  if (publishing || !db || !CAN_EDIT) return;
-  publishing = true; setSync('sending'); window.__santalbinoSaving = true;
-  const {error} = await db.from('live_state').upsert({id:1,state:S,updated_at:new Date().toISOString()});
+  if (!db || !CAN_EDIT) return;
+  if (publishing) { publishPending = true; return; }
+  publishing = true; publishPending = false;
+  const snapshot = JSON.parse(JSON.stringify(S));
+  const snapshotRev = Number(snapshot.rev || 0);
+  setSync('sending'); window.__santalbinoSaving = true;
+  let error = null;
+  try {
+    const result = await db.from('live_state').upsert({id:1,state:snapshot,updated_at:new Date().toISOString()});
+    error = result.error;
+  } catch (err) { error = err; }
   window.__santalbinoSaving = false; publishing = false;
-  if (error) setSync('error', 'controlla tabella e autorizzazioni'); else { setSync('ok'); flushStash(); }
+  if (error) {
+    publishPending = false;
+    setSync('error', 'controlla connessione, tabella e autorizzazioni');
+    console.error('Pubblicazione Sant\'Albino Live:', error);
+    return;
+  }
+  if (publishPending || Number(S.rev || 0) !== snapshotRev) {
+    publishPending = false;
+    setSync('dirty');
+    clearTimeout(pubTimer);
+    pubTimer = setTimeout(publishNow, 80);
+    return;
+  }
+  setSync('ok'); flushStash();
 }
 function flushStash() { const id = stash.get('open-post'); if (id) { stash.del('open-post'); openPost(id); } }
 
@@ -2633,16 +2674,29 @@ function parseOcrLineup(text) {
   return players;
 }
 
+let tesseractLoader = null;
+async function ensureTesseract() {
+  if (window.Tesseract && window.Tesseract.createWorker) return window.Tesseract;
+  if (!tesseractLoader) {
+    tesseractLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      script.async = true;
+      script.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Motore OCR non disponibile.'));
+      script.onerror = () => reject(new Error('Impossibile caricare il motore OCR. Controlla la connessione e riprova.'));
+      document.head.appendChild(script);
+    }).catch(error => { tesseractLoader = null; throw error; });
+  }
+  return tesseractLoader;
+}
 async function readLineup(side, stat) {
   if (!photos[side]) { toast('Prima scegli la foto'); return; }
-  if (!window.Tesseract || !Tesseract.createWorker) {
-    stat.textContent = 'Motore OCR non disponibile. Aggiorna la pagina e riprova.';
-    return;
-  }
   const button = document.querySelector('[data-a="readlist"][data-s="' + side + '"]');
   if (button) { button.disabled = true; button.textContent = 'Lettura in corso…'; }
   let worker;
   try {
+    stat.textContent = 'Caricamento del riconoscimento…';
+    await ensureTesseract();
     stat.textContent = 'Ottimizzazione della foto…';
     const prepared = await prepareLineupImage(photos[side].blob);
     const logger = message => {
