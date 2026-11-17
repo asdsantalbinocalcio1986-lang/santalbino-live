@@ -2816,10 +2816,25 @@ function prepareLineupImage(blob) {
           data[i] = data[i + 1] = data[i + 2] = value;
         }
         ctx.putImageData(pixels, 0, 0);
+        // Ritaglio mirato: solo numero di ruolo e cognome/nome.
+        const sx = Math.round(w * .075), sy = Math.round(h * .235);
+        const sw = Math.round(w * .425), sh = Math.round(h * .565);
+        const table = document.createElement('canvas'); table.width = sw; table.height = sh;
+        table.getContext('2d').drawImage(original, sx, sy, sw, sh, 0, 0, sw, sh);
+        const tableEnhanced = document.createElement('canvas'); tableEnhanced.width = sw; tableEnhanced.height = sh;
+        const tc = tableEnhanced.getContext('2d', { willReadFrequently: true });
+        tc.drawImage(table, 0, 0);
+        const tp = tc.getImageData(0, 0, sw, sh), td = tp.data;
+        for (let i = 0; i < td.length; i += 4) {
+          const gray = td[i] * .299 + td[i + 1] * .587 + td[i + 2] * .114;
+          const value = Math.max(0, Math.min(255, (gray - 142) * 1.9 + 142));
+          td[i] = td[i + 1] = td[i + 2] = value;
+        }
+        tc.putImageData(tp, 0, 0);
         canvas.toBlob(enhanced => {
           URL.revokeObjectURL(url);
           if (!enhanced) return reject(new Error('Non riesco a elaborare la foto.'));
-          resolve({ original, enhanced });
+          resolve({ original, enhanced, table, tableEnhanced });
         }, 'image/png');
       } catch (err) {
         URL.revokeObjectURL(url);
@@ -2845,11 +2860,14 @@ function parseOcrLineup(text) {
     const m = line.match(/^(?:n(?:\.|°|º)?\s*)?([0-9]{1,2}|[Il|]{1,2})\s*[.)\-:|]?\s+(.{2,})$/i);
     if (!m) continue;
     let num = m[1].replace(/[Il|]/g, '1');
-    const name = m[2].replace(/^[|:;,.\-]+\s*/, '').replace(/[|]+/g, 'I').trim();
+    let name = m[2].replace(/^[|:;,\.\-]+\s*/, '').replace(/[|]+/g, 'I').trim();
+    const markedReserve = /\(\s*R\s*\)/i.test(name);
+    // R = riserva e P = portiere: sigle escluse dal nominativo.
+    name = name.replace(/\(\s*[RP]\s*\)/gi, '').replace(/\s{2,}/g, ' ').trim();
     if (!name || !/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(name)) continue;
     // Evita di interpretare righe con anni, date o numeri isolati come giocatori.
     if (/^(19|20)\d{2}\b/.test(num)) continue;
-    players.push({ num, name, starter: !bench });
+    players.push({ num, name, starter: !bench && !markedReserve });
   }
   // Se la foto non riporta la panchina in modo esplicito, i primi undici
   // giocatori riconosciuti vengono considerati titolari.
@@ -2897,15 +2915,22 @@ async function readLineup(side, stat) {
     };
     worker = await Tesseract.createWorker('ita', 1, { logger });
     const candidates = [];
-    // Due modalità di lettura: colonna ordinata e testo sparso.
-    for (const mode of ['4', '11']) {
-      await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1' });
-      const result = await worker.recognize(mode === '4' ? prepared.original : prepared.enhanced);
+    // OCR prioritario sul ritaglio delle due sole colonne richieste.
+    const passes = [
+      { mode: '4', image: prepared.table },
+      { mode: '6', image: prepared.tableEnhanced },
+      { mode: '11', image: prepared.enhanced }
+    ];
+    for (const pass of passes) {
+      await worker.setParameters({ tessedit_pageseg_mode: pass.mode, preserve_interword_spaces: '1' });
+      const result = await worker.recognize(pass.image);
       const parsed = parseOcrLineup(result.data.text || '');
       const confidence = Number(result.data.confidence || 0);
       const duplicates = parsed.length - new Set(parsed.map(p => p.num).filter(Boolean)).size;
+      const reserves = parsed.filter(p => !p.starter).length;
       const score = parsed.length * 10 + Math.min(99, confidence) * .08 - duplicates * 5
-        + (parsed.length >= 11 && parsed.length <= 25 ? 8 : 0);
+        + (parsed.length >= 11 && parsed.length <= 25 ? 8 : 0)
+        + (reserves > 0 ? 12 : 0) + (parsed.length === 20 ? 10 : 0);
       candidates.push({ parsed, score, confidence, raw: result.data.text || '' });
     }
     candidates.sort((a, b) => b.score - a.score);
