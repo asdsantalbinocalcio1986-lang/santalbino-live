@@ -2176,9 +2176,20 @@ async function renderMatchGraphic(ev) {
     }else if(ev.type==='sub'){
       const side=ev.team||S.match.ourSide||'home',roster=parseRoster(S.rosters[side]||'');
       const getSubName=raw=>{const value=String(raw||'').trim();const found=/^\d{1,2}$/.test(value)?roster.find(p=>p.num===value):roster.find(p=>p.name.toLowerCase()===value.toLowerCase());return (found?.name||value||'—').toUpperCase();};
+      // Metadati essenziali della sostituzione: squadra e minuto, senza illustrazioni o frecce.
+      const subTeam=teamName(side).toUpperCase();
+      x.save();
+      x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';
+      fitFont(x,subTeam,850,29,900,FD);x.font=`900 29px ${FD}`;
+      x.shadowColor='rgba(0,0,0,.65)';x.shadowBlur=12;x.fillText(subTeam,W/2,828);x.shadowBlur=0;
+      const subMinute=ev.min?String(ev.min)+"′":'LIVE';
+      x.fillStyle='rgba(2,13,7,.96)';rrect(x,430,846,220,42,14);x.fill();
+      x.strokeStyle=accent;x.lineWidth=2;rrect(x,430,846,220,42,14);x.stroke();
+      x.fillStyle=accent;x.font=`900 27px ${FD}`;x.fillText(subMinute,W/2,876);
+      x.restore();
       const bubbles=[{label:'ENTRA',name:getSubName(ev.inn),color:'#b7f36b',x:92},{label:'ESCE',name:getSubName(ev.out),color:'#72c5ff',x:550}];
       bubbles.forEach(item=>{
-        const bx=item.x,by=900,bw=438,bh=154;
+        const bx=item.x,by=914,bw=438,bh=154;
         x.save();
         x.shadowColor='rgba(0,0,0,.38)';x.shadowBlur=22;x.shadowOffsetY=8;
         x.fillStyle='rgba(2,13,7,.96)';rrect(x,bx,by,bw,bh,25);x.fill();
