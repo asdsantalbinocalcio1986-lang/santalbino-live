@@ -2962,7 +2962,6 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
-  const editorScope=t.closest('[data-editor-scope]'); if(editorScope){L.editorTemplate=editorScope.value;saveL();renderMain();return;}
   const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
