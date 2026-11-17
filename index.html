@@ -1285,7 +1285,7 @@ const defaults = () => ({
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
   mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
-  media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' } },
+  media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
 let S = (() => {
@@ -1676,7 +1676,7 @@ function syncHtml() {
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
 function saveDraft() { try { localStorage.setItem(DK, JSON.stringify(S)); } catch (e) {} }
 function commit(now) {
-  S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:''}, S.media?.library || {})};
+  S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {}), graphicEditor:Object.assign({global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}},S.media?.graphicEditor||{})};
   S.rev = (S.rev || 0) + 1; saveDraft(); renderHero(); updDatalists();
   if (!CAN_EDIT || LOCAL_ONLY || !dbReady) { setSync('error', 'accesso amministratore necessario'); return; }
   setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, now ? 80 : 700);
@@ -1790,6 +1790,10 @@ async function addSponsorToGraphic(canvas, layout) {
     convocati: {x: canvas.width-190, y: canvas.height-102, w: 160, h: 44}
   };
   const p = slots[layout] || slots.event, x = canvas.getContext('2d');
+  const style=graphicEditorStyle(layout);
+  if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
+  if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
+  if(style.sponsor===false)return canvas;
   x.save();
   x.fillStyle = 'rgba(255,255,255,.96)';
   rrect(x,p.x,p.y,p.w,p.h,12); x.fill();
@@ -2713,7 +2717,7 @@ function feedHtml(list) {
 }
 let editId = null, armedDel = null;
 function regiaHtml() {
-  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['set', 'Impost.']];
+  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
@@ -2733,10 +2737,37 @@ function regiaHtml() {
   else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
+  else if (t === 'editor') body = graphicEditorHtml();
   else body = settingsHtml();
   return (LOCAL_ONLY || API.artifact ? syncHtml() : '') + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-rtab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` + body;
 }
 
+function graphicEditorConfig() {
+  S.media=S.media||{};
+  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}};
+  S.media.graphicEditor=Object.assign(base,S.media.graphicEditor||{});
+  S.media.graphicEditor.global=Object.assign({},base.global,S.media.graphicEditor.global||{});
+  S.media.graphicEditor.templates=S.media.graphicEditor.templates||{};
+  return S.media.graphicEditor;
+}
+function graphicEditorStyle(layout) {
+  const cfg=graphicEditorConfig(),key=({event:'event',phase:'phase',formation:'formation',matchday:'matchday',convocati:'convocati'})[layout]||'event';
+  return Object.assign({},cfg.global,cfg.templates[key]||{});
+}
+function graphicEditorHtml() {
+  const cfg=graphicEditorConfig(),key=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'global';
+  const v=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{});
+  const options=[['global','Stile globale'],['event','Grafiche eventi'],['phase','Kick off / intervallo / fine'],['matchday','Match Day'],['convocati','Convocati'],['formation','Formazioni']];
+  return `<div class="card"><h2>Editor grafiche</h2>
+    <p class="small muted" style="margin-top:0">Editor leggero: colore principale, velatura, bordo e sponsor. Le modifiche globali valgono per tutte le grafiche; quelle specifiche sostituiscono i valori solo nel modello scelto.</p>
+    <label class="f"><span>Ambito da modificare</span><select data-editor-scope>${options.map(([k,n])=>`<option value="${k}" ${key===k?'selected':''}>${n}</option>`).join('')}</select></label>
+    <div class="row2"><label class="f"><span>Colore principale</span><input type="color" value="${esc(v.accent)}" data-editor="accent"></label>
+    <label class="f"><span>Velatura scura · ${v.overlay}%</span><input type="range" min="0" max="35" value="${Number(v.overlay)||0}" data-editor="overlay"></label></div>
+    <label class="f"><span>Spessore bordo · ${v.border}px</span><input type="range" min="0" max="12" value="${Number(v.border)||0}" data-editor="border"></label>
+    <label class="check"><input type="checkbox" data-editor="sponsor" ${v.sponsor!==false?'checked':''}> Mostra uno sponsor casuale, se presente in Libreria</label>
+    <div class="row2 stack" style="margin-top:12px"><button class="btn primary" data-a="editorSave">Salva impostazioni</button><button class="btn" data-a="editorReset">Ripristina predefiniti</button></div>
+    <p class="small muted">Nessuna libreria esterna e nessuna modifica ai file immagine originali. Le impostazioni sono salvate con i dati di Sant'Albino Live.</p></div>`;
+}
 function libraryHtml() {
   const lib = Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {});
   const sponsors = Array.isArray(lib.sponsors) ? lib.sponsors : [];
@@ -2866,6 +2897,7 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
+  const editorScope=t.closest('[data-editor-scope]'); if(editorScope){L.editorTemplate=editorScope.value;saveL();renderMain();return;}
   const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
@@ -2875,6 +2907,8 @@ document.addEventListener('click', async e => {
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
     case 'mode': L.mode = L.mode === 'regia' ? 'public' : 'regia'; saveL(); $('#top').innerHTML = topHtml(); renderMain(); break;
+    case 'editorSave': commit(true); toast('Impostazioni grafiche salvate'); break;
+    case 'editorReset': { const c=graphicEditorConfig(); if(!L.editorTemplate||L.editorTemplate==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true}; else delete c.templates[L.editorTemplate]; commit(true); renderMain(); toast('Valori predefiniti ripristinati'); break; }
     case 'retry': publishNow(); break;
     case 'phase': { const c = S.clock;
       if (c.phase === 'ft') { if (!armedNew) { armedNew = true; a.textContent = 'Tocca ancora: nuova partita'; setTimeout(() => { armedNew = false; renderMain(); }, 3500); } else { armedNew = false; resetMatch(); } break; }
@@ -2984,6 +3018,7 @@ function saveMatch() {
 }
 /* campi e file */
 document.addEventListener('input', e => {
+  if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(k==='accent'?e.target.value:Number(e.target.value));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
   const s = e.target.dataset && e.target.dataset.roster;
   if (s) { const pl = parseRoster(e.target.value), n = pl.filter(p => p.starter).length; $(`[data-count="${s}"]`).textContent = `${n} titolari · ${pl.length - n} in panchina`; return; }
   if (e.target.matches('[data-convocati]')) { const preview = $('[data-convocati-preview]'); if (preview) preview.value = buildConvocatiText(); return; }
@@ -2994,6 +3029,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
+  if(t.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=ds.editor;target[k]=k==='sponsor'?t.checked:(k==='accent'?t.value:Number(t.value));commit(true);return;}
   try {
     if (ds.photo && t.files[0]) {
       const selected = t.files[0];
