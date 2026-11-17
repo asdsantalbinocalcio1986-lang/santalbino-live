@@ -1921,7 +1921,7 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
     const outNum=shirt(ev.out),inNum=shirt(ev.inn);
     const panel=(x0,label,num,color)=>{
       rr(x0,-82,108,164,16,'#10271b',color);
-      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.font='800 15px ' + (ctx.font.match(/^[^ ]+/)||['Arial'])[0];ctx.fillText(label,x0+54,-48);
+      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.font="800 15px 'Manrope',sans-serif";ctx.fillText(label,x0+54,-48);
       ctx.fillStyle='#fff';ctx.font="900 64px 'Barlow Condensed',sans-serif";ctx.fillText(num,x0+54,18);
     };
     panel(-140,'ESCE',outNum,red);panel(32,'ENTRA',inNum,'#69d79a');
