@@ -110,7 +110,7 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .tl-team .badge i{font-size:11px}
 .tl-team span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tl-main{font:700 24px/1.15 var(--fd);letter-spacing:.02em;text-transform:uppercase;margin-top:4px;overflow-wrap:anywhere}
-.tl-sub{font-size:14px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.tl-sub{font-size:14px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}\n.tl-image-btn{margin-top:9px}\n#graphicDlg{width:min(92vw,560px);max-height:92dvh;overflow:auto;border:0;border-radius:18px;padding:16px;background:var(--surface);color:var(--ink);box-shadow:0 18px 60px rgba(0,0,0,.35)}\n#graphicDlg::backdrop{background:rgba(0,0,0,.72)}\n.graphic-preview{display:block;width:100%;max-height:68dvh;object-fit:contain;border-radius:12px;margin:0 auto 12px}
 .tl.goal .tl-sub b{color:var(--ink)}
 .tl-phase{display:grid;grid-template-columns:50px 26px 1fr;gap:10px;align-items:center;margin:4px 0 14px}
 .tl-phase .tl-ic{margin:0;background:var(--ink);color:var(--bg)}
@@ -1806,7 +1806,7 @@ async function renderMatchGraphic(ev) {
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
-  const titleMap={kickoff:'KICK OFF',halftime:'half time',secondhalf:'SECOND HALF',fulltime:'Full time',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOL!',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
   // Trama fibra di carbonio su tutta la superficie.
@@ -1999,7 +1999,7 @@ function timelineHtml() {
     return `<li class="tl ${e.type}" style="--col:${COL[e.type]}">
       <div class="tl-min">${esc(e.min || '')}${e.min ? '′' : ''}</div><div class="tl-ic">${IC[e.type] || ''}</div>
       <div class="tl-card"><div class="tl-top"><span class="tl-title">${esc(d.title)}</span>${e.type === 'note' ? '' : `<span class="tl-team">${badge(side)}<span>${esc(teamName(side))}</span></span>`}</div>
-        ${d.main ? `<div class="tl-main">${esc(d.main)}</div>` : ''}<div class="tl-sub">${d.sub}</div></div></li>`;
+        ${d.main ? `<div class="tl-main">${esc(d.main)}</div>` : ''}<div class="tl-sub">${d.sub}</div>${CARD_TYPES.includes(e.type) ? `<button class="btn sm tl-image-btn" type="button" data-a="viewgraphic" data-id="${esc(e.id)}">Apri immagine</button>` : ''}</div></li>`;
   }).join('');
   return `<ul class="tl-list">${items}</ul>`;
 }
@@ -2085,6 +2085,21 @@ function mvpPublicHtml() {
 
 
 async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) el.src = await cardUrl(vi.mv); }
+let graphicId = null;
+async function openGraphic(id) {
+  const ev = S.events.find(e => e.id === id); if (!ev || !CARD_TYPES.includes(ev.type)) return;
+  graphicId = id;
+  const dlg = $('#graphicDlg');
+  dlg.innerHTML = '<div class="sheethead"><h2>Immagine evento</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione immagine…</p>';
+  if (!dlg.open) dlg.showModal();
+  try {
+    const url = await cardUrl(ev);
+    if (graphicId !== id || !dlg.open) return;
+    dlg.innerHTML = `<div class="sheethead"><h2>${esc(describe(ev, scoreAt(S.events.indexOf(ev))).title)}</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="${url}" alt="Grafica ${esc(ev.type)}"><button class="btn primary block" type="button" data-a="savegraphic">Salva immagine</button>`;
+  } catch (err) {
+    dlg.innerHTML = `<div class="sheethead"><h2>Immagine non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">${esc(err?.message || 'Errore nella generazione della grafica.')}</p>`;
+  }
+}
 let armedMvp = false;
 function mvpRegiaHtml() {
   const vi = voteInfo(), C = candidates();
@@ -2345,6 +2360,9 @@ document.addEventListener('click', async e => {
       break; }
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
+    case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
+    case 'graphicclose': $('#graphicDlg').close(); break;
+    case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'edit': editId = ev.id; renderMain(); break;
     case 'canceledit': editId = null; renderMain(); break;
     case 'saveedit': socialOf(ev.id).text = $('[data-edtext]', row).value; saveL(); editId = null; renderMain(); break;
@@ -2530,7 +2548,7 @@ async function readLineup(side, stat) {
 (async function start() {
   ROOT = $('#root');
   const mk = (tag, id) => { const d = document.createElement(tag); d.id = id; document.body.appendChild(d); return d; };
-  mk('dialog', 'sheet').setAttribute('aria-label', 'Nuovo evento'); mk('dialog', 'postDlg').setAttribute('aria-label', 'Pubblica su Facebook');
+  mk('dialog', 'sheet').setAttribute('aria-label', 'Nuovo evento'); mk('dialog', 'postDlg').setAttribute('aria-label', 'Pubblica su Facebook'); mk('dialog', 'graphicDlg').setAttribute('aria-label', 'Immagine evento');
   const auth = mk('dialog','authDlg'); auth.innerHTML = `<form id="authForm"><div class="sheethead"><h2>Accesso amministratore</h2><button type="button" class="btn sm" id="authClose">Chiudi</button></div><label class="f"><span>Email</span><input id="authEmail" type="email" autocomplete="username" required></label><label class="f"><span>Password</span><input id="authPassword" type="password" autocomplete="current-password" required></label><p id="authError" class="small muted"></p><button class="btn primary block" type="submit">Accedi</button><button class="btn block" type="button" id="forgotPassword">Recupera password</button></form>`;
   const recovery = mk('dialog','recoveryDlg'); recovery.innerHTML = `<form id="recoveryForm"><div class="sheethead"><h2>Imposta una nuova password</h2><button type="button" class="btn sm" id="recoveryClose">Chiudi</button></div><label class="f"><span>Nuova password (almeno 8 caratteri)</span><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></label><label class="f"><span>Ripeti la nuova password</span><input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="8" required></label><p id="recoveryError" class="small muted"></p><button class="btn primary block" type="submit">Salva nuova password</button></form>`;
   $('#authForm').addEventListener('submit', e => {e.preventDefault(); signInAdmin();}); $('#authClose').addEventListener('click',()=>auth.close());
