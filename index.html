@@ -2770,7 +2770,7 @@ function graphicEditorHtml() {
   const cfg=graphicEditorConfig(),key=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'global';
   const v=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{});
   const options=[['global','Stile globale'],['event','Template eventi'],['phase','Kick off / intervallo / fine'],['matchday','Match Day'],['convocati','Convocati'],['formation','Formazioni']];
-  const eventTypes=[['goal','Gol'],['yellow','Ammonizione'],['red','Espulsione'],['injury','Infortunio'],['sub','Sostituzione'],['mvp','MVP'],['kickoff','Calcio d’inizio'],['halftime','Fine primo tempo'],['secondhalf','Inizio secondo tempo'],['fulltime','Fine partita']];
+  const eventTypes=[['goal','Gol'],['yellow','Ammonizione'],['red','Espulsione'],['injury','Infortunio'],['sub','Sostituzione'],['mvp','MVP'],['save','Parata'],['shot','Tiro'],['crossbar','Traversa'],['corner','Calcio d’angolo'],['freekick','Calcio di punizione'],['miss','Occasione'],['note','Aggiornamento'],['kickoff','Calcio d’inizio'],['halftime','Fine primo tempo'],['secondhalf','Inizio secondo tempo'],['fulltime','Fine partita']];
   const eventType=eventTypes.some(([t])=>t===L.editorEventTemplate)?L.editorEventTemplate:'goal';
   return `<div class="card"><h2>Editor grafiche</h2>
     <p class="small muted" style="margin-top:0">Modifica i template grafici: ogni modifica applicata a una tipologia sarà utilizzata automaticamente per tutti gli eventi di quel tipo, anche quelli futuri. Non stai modificando una singola registrazione della cronaca.</p>
@@ -2797,7 +2797,7 @@ async function renderEditorCanvas(layout) {
     const ev=S.events.find(e=>['kickoff','halftime','fulltime'].includes(e.type))||{id:'editor-preview-phase',type:'kickoff',minute:''};
     return renderPhaseCard(ev);
   }
-  const type=['goal','yellow','red','injury','sub','mvp','kickoff','halftime','secondhalf','fulltime'].includes(L.editorEventTemplate)?L.editorEventTemplate:'goal';
+  const type=['goal','yellow','red','injury','sub','mvp','save','shot','crossbar','corner','freekick','miss','note','kickoff','halftime','secondhalf','fulltime'].includes(L.editorEventTemplate)?L.editorEventTemplate:'goal';
   const sample={id:'__template_preview__',type,team:'home',min:'67',player:'Mario Rossi',assist:'Luca Bianchi',inn:'Paolo Verdi',out:'Andrea Neri',kind:'',note:'Esempio di testo',votes:8};
   return renderMatchGraphic(sample);
 }
