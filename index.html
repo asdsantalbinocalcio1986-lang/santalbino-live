@@ -1467,8 +1467,12 @@ function convocatiRegiaHtml() {
     <label class="f"><span>Giocatori convocati · uno per riga</span><textarea data-convocati rows="14" placeholder="Rossi&#10;Bianchi&#10;Verdi&#10;...">${esc(S.convocati)}</textarea></label>
     <div class="small muted" style="margin:-6px 0 12px">${count} giocatori inseriti</div>
     <button class="btn primary block" data-a="saveconvocati">Salva lista convocati</button></div>
+    <div class="card"><h2>Grafica convocati</h2>
+      <p class="small muted" style="margin-top:0">Crea un’immagine dedicata con il logo del Sant’Albino, i dati essenziali della gara e l’elenco completo dei convocati.</p>
+      <button class="btn primary block" data-a="viewConvocatiGraphic">Genera grafica convocati</button>
+      <button class="btn block" style="margin-top:8px" data-a="saveConvocatiGraphic">Salva immagine convocati</button></div>
     <div class="card"><h2>Grafica MATCH DAY</h2>
-      <p class="small muted" style="margin-top:0">Immagine pre-partita con i loghi delle due società, data e ora, girone, stadio e tutti i convocati.</p>
+      <p class="small muted" style="margin-top:0">Immagine pre-partita con i loghi delle due società, data e ora, girone e stadio, senza formazioni o nominativi.</p>
       <button class="btn primary block" data-a="viewMatchDayGraphic">Genera grafica MATCH DAY</button>
       <button class="btn block" style="margin-top:8px" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button></div>
     <div class="card"><h2>Post pre-partita</h2>
@@ -2310,6 +2314,58 @@ async function renderMatchDayGraphic() {
   x.fillStyle='rgba(255,255,255,.82)'; x.font='800 20px Arial,sans-serif'; x.textAlign='center'; x.fillText('ASD SANT’ALBINO TERME  ·  FORZA GIALLOVERDI',800,950);
   return canvas;
 }
+async function renderConvocatiGraphic() {
+  const players = parseRoster(S.convocati);
+  if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
+  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const x=canvas.getContext('2d'), clubLogo=await loadGraphicImage(S.logos[side]);
+  const bg=x.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#17633d'); bg.addColorStop(.55,'#0b3424'); bg.addColorStop(1,'#061b13');
+  x.fillStyle=bg; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(255,255,255,.08)'; x.lineWidth=2;
+  for(let k=0;k<10;k++){x.beginPath();x.moveTo(k*W/9,0);x.lineTo(k*W/9,H);x.stroke();}
+  x.fillStyle='rgba(0,0,0,.68)'; x.fillRect(0,0,W,300);
+  if(clubLogo){
+    const scale=Math.min(205/clubLogo.width,205/clubLogo.height),w=clubLogo.width*scale,h=clubLogo.height*scale;
+    x.fillStyle='#fff';rrect(x,85,38,220,220,26);x.fill();
+    x.drawImage(clubLogo,95+(200-w)/2,48+(200-h)/2,w,h);
+  }
+  x.textAlign='left';x.textBaseline='middle';x.fillStyle='#e3c66d';x.font='900 32px Arial,sans-serif';x.fillText('ASD SANT’ALBINO TERME',350,92);
+  x.fillStyle='#fff';x.font='900 86px Arial,sans-serif';x.fillText('I CONVOCATI',350,190);
+  x.fillStyle='rgba(255,255,255,.78)';x.font='700 23px Arial,sans-serif';
+  const opponent=teamName(other(side));
+  x.fillText((teamName(side)+'  vs  '+opponent).toUpperCase(),350,250);
+  const meta=[fmtDate(m.date),m.time].filter(Boolean).join(' · ');
+  const details=[meta,(m.comp||'').toUpperCase(),(m.venue||'').toUpperCase()].filter(Boolean);
+  x.fillStyle='rgba(0,0,0,.48)';rrect(x,85,330,1430,100,20);x.fill();
+  x.fillStyle='#d8efdf';x.font='800 25px Arial,sans-serif';x.textAlign='center';
+  x.fillText(details.length?details.join('     |     '):'DETTAGLI PARTITA DA DEFINIRE',800,382);
+  x.fillStyle='rgba(0,0,0,.62)';rrect(x,85,475,1430,625,24);x.fill();
+  x.fillStyle='#e3c66d';x.font='900 30px Arial,sans-serif';x.textAlign='left';x.fillText('ELENCO UFFICIALE',125,530);
+  x.fillStyle='rgba(255,255,255,.65)';x.font='700 20px Arial,sans-serif';x.textAlign='right';x.fillText(players.length+' CONVOCATI',1475,530);
+  const rows=Math.ceil(players.length/2), rowH=Math.min(76,Math.floor(500/Math.max(1,rows)));
+  players.forEach((p,i)=>{
+    const col=Math.floor(i/rows),row=i%rows,xx=130+col*710,yy=600+row*rowH;
+    x.fillStyle=col===0?'#b8e7c8':'#e3c66d';x.beginPath();x.arc(xx+24,yy-5,22,0,Math.PI*2);x.fill();
+    x.fillStyle='#08291d';x.font='900 19px Arial,sans-serif';x.textAlign='center';x.fillText(p.num||String(i+1),xx+24,yy);
+    x.fillStyle='#fff';x.textAlign='left';fitFont(x,p.name,620,31,800,'Arial,sans-serif');x.fillText(p.name,xx+62,yy);
+  });
+  x.fillStyle='rgba(255,255,255,.75)';x.font='800 20px Arial,sans-serif';x.textAlign='center';x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1155);
+  return canvas;
+}
+async function openConvocatiGraphic() {
+  const dlg=$('#graphicDlg');
+  dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
+  if(!dlg.open)dlg.showModal();
+  try{
+    const canvas=await renderConvocatiGraphic(),url=canvas.toDataURL('image/jpeg',.93);
+    if(!dlg.open)return;
+    dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica elenco convocati"><button class="btn primary block" data-a="saveConvocatiGraphic">Salva immagine convocati</button>';
+  }catch(err){
+    dlg.innerHTML='<div class="sheethead"><h2>Grafica non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">'+esc(err.message||'Errore nella generazione')+'</p>';
+  }
+}
 async function openMatchDayGraphic() {
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
@@ -2784,6 +2840,8 @@ document.addEventListener('click', async e => {
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
     case 'viewlineupgraphic': await openLineupGraphic(); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
+    case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
+    case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.94); break; }
     case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
     case 'saveLineupGraphic': { const cv = await renderFormationGraphic(); cv.toBlob(blob => { if (blob) saveBlob(blob, 'formazioni-entrambe-le-squadre.jpg'); }, 'image/jpeg', .92); break; }
     case 'graphicclose': $('#graphicDlg').close(); break;
