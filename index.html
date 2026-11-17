@@ -2327,9 +2327,13 @@ async function openPost(id) {
     d.innerHTML = `<div class="sheethead"><h2>Pubblica su Facebook</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div>
       ${isCard ? `<img class="thumb" style="max-height:44dvh;margin:0 auto 10px" src="${postUrl}" alt="Immagine dell'evento"><p class="small muted" style="margin-top:0;text-align:center">Su telefono puoi anche tenere premuto sull’immagine per salvarla.</p>` : ''}
       <label class="f"><span>Testo del post</span><textarea id="postText" rows="5">${esc(evText(ev))}</textarea></label>
-      <div class="row2 stack">${isCard ? '<button class="btn" data-a="saveimg">1. Salva immagine</button>' : ''}<button class="btn" data-a="copypost">${isCard ? '2. ' : '1. '}Copia testo</button></div>
-      <a class="btn primary block" style="margin-top:10px" href="${esc(fbLink())}" target="_blank" rel="noopener">${isCard ? '3. ' : '2. '}Apri Facebook</a>
-      <p class="small muted">Nel nuovo post della pagina allega l’immagine e incolla il testo.</p>
+      <div class="row2 stack">${isCard ? '<button class="btn" data-a="saveimg">Salva immagine</button>' : ''}<button class="btn" data-a="copypost">Copia testo</button></div>
+      <div class="card" style="margin-top:12px"><h3>Condividi l’evento</h3>
+        <a class="btn block" style="margin-bottom:8px" data-a="sharewa" href="#">Condividi su WhatsApp</a>
+        ${isCard ? '<button class="btn block" style="margin-bottom:8px" data-a="shareig">Condividi immagine su Instagram</button>' : '<button class="btn block" style="margin-bottom:8px" data-a="copyig">Copia testo per Instagram</button>'}
+        <a class="btn primary block" href="${esc(fbLink())}" target="_blank" rel="noopener">Apri Facebook</a>
+        <p class="small muted" style="margin-bottom:0">WhatsApp apre la scelta dei destinatari. Instagram usa la condivisione del dispositivo se disponibile; altrimenti salva la grafica e apre Instagram per il caricamento manuale.</p>
+      </div>
       <button class="btn block" data-a="markdone">${so.status === 'pubblicato' ? 'Segna come da pubblicare' : 'Fatto: segna come pubblicato'}</button>`;
   } catch (err) {
     console.error('Errore preparazione post:', err);
@@ -2388,6 +2392,37 @@ document.addEventListener('click', async e => {
     case 'del': if (armedDel === ev.id) { armedDel = null; delEvent(ev.id); } else { armedDel = ev.id; renderMain(); setTimeout(() => { if (armedDel === ev.id) { armedDel = null; renderMain(); } }, 3500); } break;
     case 'postclose': $('#postDlg').close(); break;
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
+    case 'sharewa': {
+      const so = socialOf(postId); so.text = $('#postText').value; saveL();
+      const shareText = so.text + '\n\nSegui la partita in diretta: https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/';
+      window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
+      break;
+    }
+    case 'copyig': {
+      const so = socialOf(postId); so.text = $('#postText').value; saveL();
+      await copyText(so.text + (S.match.hashtag ? '\n\n' + S.match.hashtag : ''));
+      break;
+    }
+    case 'shareig': {
+      const ev2 = S.events.find(x => x.id === postId); if (!ev2) break;
+      const so = socialOf(postId); so.text = $('#postText').value; saveL();
+      try {
+        const blob = await cardBlob(ev2);
+        const file = new File([blob], 'santalbino-evento.jpg', { type: 'image/jpeg' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Sant’Albino Terme', text: so.text });
+        } else {
+          await saveBlob(blob, 'santalbino-evento.jpg');
+          window.open('https://www.instagram.com/', '_blank', 'noopener');
+          toast('Immagine salvata: allegala nel nuovo post Instagram');
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') break;
+        console.error('Condivisione Instagram:', err);
+        toast('Condivisione diretta non disponibile: salva l’immagine e caricala su Instagram');
+      }
+      break;
+    }
     case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'markdone': { const so = socialOf(postId); so.status = so.status === 'pubblicato' ? 'bozza' : 'pubblicato'; saveL(); $('#postDlg').close(); renderMain(); break; }
     case 'copyall': if (S.events.length) copyText(S.events.map(x => evText(x).replace(/\n\n#\S+$/, '')).join('\n\n')); break;
