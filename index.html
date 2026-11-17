@@ -2055,7 +2055,11 @@ async function renderMatchGraphic(ev) {
     else if(ev.type==='injury')detail+='  •  GIOCO FERMO';
     else if(ev.type==='save')detail+='  •  PARATA';
     if(ev.type==='goal'){
-      // Etichetta del minuto e fascia informativa separate: Hydra dominante ma dati sempre leggibili.
+      // La testata del titolo viene disegnata qui, sopra l'eventuale immagine di sfondo:
+      // in questo modo GOOOAL resta visibile sia sul template Sant'Albino sia sulla grafica ospite.
+      x.textAlign='center';x.fillStyle='#fff';x.font=`900 112px ${FD}`;
+      x.shadowColor='rgba(0,0,0,.72)';x.shadowBlur=18;x.fillText(ev.kind==='autogol'?'AUTOGOL':'GOOOAL',W/2,955);x.shadowBlur=0;
+      // Etichetta del minuto e fascia informativa separate.
       x.save();x.fillStyle='rgba(2,13,7,.96)';rrect(x,420,786,240,50,16);x.fill();
       x.strokeStyle=accent;x.lineWidth=2;rrect(x,420,786,240,50,16);x.stroke();x.restore();
       x.textAlign='center';x.fillStyle=accent;x.font=`900 36px ${FD}`;x.fillText(minute,W/2,820);
