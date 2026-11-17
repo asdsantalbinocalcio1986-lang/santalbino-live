@@ -65,6 +65,7 @@
 @media (max-width:360px){
   .standings-frame iframe{height:940px}
 }
+@media(max-width:600px){#graphicEditorPreview [style*="grid-template-columns:minmax(0,1fr) 76px 76px"]{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}#graphicEditorPreview input{min-width:0;max-width:100%}#editorDragFrame{touch-action:none;max-width:100%}}
 </style><meta name="theme-color" content="#0b3b22"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
@@ -1917,7 +1918,8 @@ function loadHydraImage(){
   return hydraImagePromise;
 }
 function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
-  const k=size/200;ctx.save();ctx.translate(cx,cy);ctx.scale(k,k);
+  const edit=assets.editor?(graphicEditorConfig().templates['event_'+type]?.artwork||{}):{},scale=Math.max(.45,Math.min(2.2,Number(edit.scale)||1)),dx=Number(edit.dx)||0,dy=Number(edit.dy)||0;
+  const k=size/200;ctx.save();ctx.translate(cx+dx,cy+dy);ctx.scale(k*scale,k*scale);
   const line=pts=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();};
   const poly=(pts,fill,stroke)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}};
   const rr=(x,y,w,h,r,fill,stroke)=>{rrect(ctx,x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=3;ctx.stroke();}};
@@ -2010,12 +2012,17 @@ async function renderMatchGraphic(ev) {
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
   const x=canvas.getContext('2d'),FB="'Manrope',sans-serif",FD="'Barlow Condensed',sans-serif";
   const capturedTextItems=[],nativeFillText=x.fillText.bind(x);
-  const templateKey='event_'+ev.type,templateElements=graphicEditorConfig().templates[templateKey]?.elements||{};
+  const templateKey='event_'+ev.type,templateElements=graphicEditorConfig().templates[templateKey]?.elements||{},fontStyle=graphicEditorStyle('event');
   x.fillText=function(text,tx,ty,...args){
     const index=capturedTextItems.length,key=String(index),cfg=templateElements[key]||{};
     const value=cfg.text!==undefined?String(cfg.text):String(text),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0;
     capturedTextItems.push({index,text:value,original:String(text),x:Number(tx)||0,y:Number(ty)||0,dx,dy});
-    return nativeFillText(value,(Number(tx)||0)+dx,(Number(ty)||0)+dy,...args);
+    const originalFont=x.font,match=originalFont.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\\s+(.+)$/);
+    if(match){const size=Math.max(12,Math.min(180,Number(match[2])*(Number(fontStyle.fontScale)||1)));const family=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||match[3];x.font=match[1]+size+'px '+family;}
+    const align=x.textAlign||'start',measure=x.measureText(value).width,available=align==='center'?Math.max(20,2*Math.min(Number(tx)||0,W-(Number(tx)||0))-48):align==='right'?Math.max(20,(Number(tx)||0)-42):Math.max(20,W-(Number(tx)||0)-42);
+    if(measure>available){const m=x.font.match(/^(.*?)(\\d+(?:\\.\\d+)?)px(.*)$/);if(m){let size=Number(m[2]);while(x.measureText(value).width>available&&size>11){size-=1;x.font=m[1]+size+'px'+m[3];}}}
+    const baseline=Math.max(28,Math.min(H-28,(Number(ty)||0)+dy));
+    const result=nativeFillText(value,(Number(tx)||0)+dx,baseline,...args);x.font=originalFont;return result;
   };
   const idx=S.events.findIndex(e=>e.id===ev.id),prior=idx>=0?S.events.slice(0,idx+1):S.events;
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
@@ -2135,7 +2142,7 @@ async function renderMatchGraphic(ev) {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const hydra=ev.type==='goal'?await loadHydraImage():null;
     const injuryArtworkCenterY=(785+1006)/2; // centro esatto tra il bordo superiore del pannello evento e l'inizio della fascia informativa
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra});
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra,editor:true});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
@@ -2755,7 +2762,7 @@ function regiaHtml() {
 
 function graphicEditorConfig() {
   S.media=S.media||{};
-  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1}},templates:{}};
+  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1},templates:{}};
   S.media.graphicEditor=Object.assign(base,S.media.graphicEditor||{});
   S.media.graphicEditor.global=Object.assign({},base.global,S.media.graphicEditor.global||{});
   S.media.graphicEditor.global.sponsorPos=Object.assign({},base.global.sponsorPos,S.media.graphicEditor.global.sponsorPos||{});
@@ -2779,6 +2786,9 @@ function graphicEditorHtml() {
     <div class="row2"><label class="f"><span>Colore principale</span><input type="color" value="${esc(v.accent)}" data-editor="accent"></label>
     <label class="f"><span>Velatura scura · ${v.overlay}%</span><input type="range" min="0" max="35" value="${Number(v.overlay)||0}" data-editor="overlay"></label></div>
     <label class="f"><span>Spessore bordo · ${v.border}px</span><input type="range" min="0" max="12" value="${Number(v.border)||0}" data-editor="border"></label>
+    <label class="f"><span>Famiglia carattere</span><select data-editor="fontFamily"><option value="Manrope" ${v.fontFamily==='Manrope'?'selected':''}>Manrope</option><option value="Barlow" ${v.fontFamily==='Barlow'?'selected':''}>Barlow Condensed</option><option value="Arial" ${v.fontFamily==='Arial'?'selected':''}>Arial</option><option value="Georgia" ${v.fontFamily==='Georgia'?'selected':''}>Georgia</option></select></label>
+    <label class="f"><span>Dimensione caratteri · ${Math.round((Number(v.fontScale)||1)*100)}%</span><input type="range" min="70" max="130" step="5" value="${Math.round((Number(v.fontScale)||1)*100)}" data-editor="fontScale"></label>
+
     <label class="check"><input type="checkbox" data-editor="sponsor" ${v.sponsor!==false?'checked':''}> Mostra uno sponsor casuale, se presente in Libreria</label>
     <button class="btn block" style="margin-top:10px" data-a="editorPreview">Apri anteprima del template</button>
     <div id="graphicEditorPreview" style="margin-top:12px"></div>
@@ -2813,15 +2823,19 @@ async function openGraphicEditorPreview() {
     const width=slot.w*pos.scale/canvas.width*100,height=slot.h*pos.scale/canvas.height*100;
     const ev=layout==='event'?L.editorEventTemplate:null;
     const items=layout==='event'?lastGraphicTextItems:[];
+    const artworkCfg=layout==='event'?(graphicEditorConfig().templates['event_'+ev]?.artwork||{}):{};
+    const artHandle=layout==='event'?'<div id="editorArtworkHandle" role="slider" aria-label="Sposta illustrazione" style="position:absolute;left:'+(50+(Number(artworkCfg.dx)||0)/canvas.width*100)+'%;top:'+(('goal'===ev?960:880)+(Number(artworkCfg.dy)||0))/canvas.height*100+'%;width:'+((ev==='goal'?216:250)*(Number(artworkCfg.scale)||1))/canvas.width*100+'%;height:'+((ev==='goal'?216:250)*(Number(artworkCfg.scale)||1))/canvas.height*100+'%;transform:translate(-50%,-50%);border:2px dashed #f7d66b;background:rgba(227,198,109,.10);border-radius:10px;z-index:2;touch-action:none;cursor:move"></div>':'';
     const handles=items.map(item=>'<div data-text-handle="'+item.index+'" title="'+esc(item.text).replace(/"/g,'&quot;')+'" style="position:absolute;left:'+((item.x+item.dx)/canvas.width*100)+'%;top:'+((item.y+item.dy)/canvas.height*100)+'%;transform:translate(-50%,-50%);z-index:3;min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border:1px solid #fff;background:rgba(15,75,42,.88);border-radius:5px;color:#fff;font:700 11px Arial;display:flex;align-items:center;justify-content:center;cursor:move;touch-action:none;user-select:none">'+(item.index+1)+'</div>').join('');
     const controls=items.length?'<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">Testi della grafica: '+items.length+' elementi modificabili</summary><p class="small muted">Modifica il testo oppure trascina il numero corrispondente direttamente sull’immagine. X e Y sono spostamenti in pixel rispetto alla posizione originale.</p>'+items.map(item=>{const val=esc(item.text).replace(/"/g,'&quot;');return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 76px 76px;gap:6px;align-items:end;padding:7px 0;border-bottom:1px solid #ddd"><label class="f" style="margin:0"><span>Elemento '+(item.index+1)+'</span><input data-text-value="'+item.index+'" value="'+val+'"></label><label class="f" style="margin:0"><span>X</span><input type="number" step="2" data-text-x="'+item.index+'" value="'+item.dx+'"></label><label class="f" style="margin:0"><span>Y</span><input type="number" step="2" data-text-y="'+item.index+'" value="'+item.dy+'"></label></div>';}).join('')+'</details>':'';
-    host.innerHTML='<p class="small muted">'+(layout==='event'?'Ogni numero identifica un singolo elemento testuale: trascinalo per spostarlo. Apri “Testi della grafica” per modificare contenuto e coordinate.':'Trascina il riquadro SPONSOR nella posizione desiderata.')+'</p><div id="editorDragFrame" style="position:relative;width:100%;aspect-ratio:'+canvas.width+'/'+canvas.height+';overflow:hidden;border-radius:12px;background:#071d16;touch-action:none"><img src="'+url+'" alt="Anteprima grafica" style="display:block;width:100%;height:100%;object-fit:fill;pointer-events:none">'+handles+'<div id="editorSponsorHandle" role="slider" aria-label="Sposta sponsor" tabindex="0" style="position:absolute;left:'+left+'%;top:'+top+'%;width:'+width+'%;height:'+height+'%;min-width:36px;min-height:20px;box-sizing:border-box;border:2px dashed #fff;background:rgba(227,198,109,.32);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font:bold 11px Arial;cursor:move;touch-action:none;text-shadow:0 1px 3px #000;z-index:4">SPONSOR</div></div>'+controls;
+    host.innerHTML='<p class="small muted">'+(layout==='event'?'Ogni numero identifica un singolo elemento testuale: trascinalo per spostarlo. Apri “Testi della grafica” per modificare contenuto e coordinate.':'Trascina il riquadro SPONSOR nella posizione desiderata.')+'</p><div id="editorDragFrame" style="position:relative;width:100%;aspect-ratio:'+canvas.width+'/'+canvas.height+';overflow:hidden;border-radius:12px;background:#071d16;touch-action:none"><img src="'+url+'" alt="Anteprima grafica" style="display:block;width:100%;height:100%;object-fit:fill;pointer-events:none"'>'+handles+artHandle+'<div id="editorSponsorHandle" role="slider" aria-label="Sposta sponsor" tabindex="0" style="position:absolute;left:'+left+'%;top:'+top+'%;width:'+width+'%;height:'+height+'%;min-width:36px;min-height:20px;box-sizing:border-box;border:2px dashed #fff;background:rgba(227,198,109,.32);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font:bold 11px Arial;cursor:move;touch-action:none;text-shadow:0 1px 3px #000;z-index:4">SPONSOR</div></div>'+controls;
     const frame=$('#editorDragFrame'),handle=$('#editorSponsorHandle');if(!frame||!handle)return;
+    const art=$('#editorArtworkHandle');if(art&&ev){let drag=null;art.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();art.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,ox:Number(artworkCfg.dx)||0,oy:Number(artworkCfg.dy)||0};});art.addEventListener('pointermove',e=>{if(!drag)return;const r=frame.getBoundingClientRect();art.style.left=(50+(drag.ox+(e.clientX-drag.x)*canvas.width/r.width)/canvas.width*100)+'%';art.style.top=((('goal'===ev?960:880)+drag.oy+(e.clientY-drag.y)*canvas.height/r.height)/canvas.height*100)+'%';});art.addEventListener('pointerup',e=>{if(!drag)return;const r=frame.getBoundingClientRect(),dx=Math.round(drag.ox+(e.clientX-drag.x)*canvas.width/r.width),dy=Math.round(drag.oy+(e.clientY-drag.y)*canvas.height/r.height);drag=null;saveArtworkChange({dx,dy});});}
     let sponsorDrag=null;
     handle.addEventListener('pointerdown',e=>{e.preventDefault();handle.setPointerCapture(e.pointerId);sponsorDrag={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y};});
     handle.addEventListener('pointermove',e=>{if(!sponsorDrag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,sponsorDrag.ox+(e.clientX-sponsorDrag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,sponsorDrag.oy+(e.clientY-sponsorDrag.y)/r.height));handle.style.left=((slot.x+nx*canvas.width)/canvas.width*100)+'%';handle.style.top=((slot.y+ny*canvas.height)/canvas.height*100)+'%';});
     handle.addEventListener('pointerup',e=>{if(!sponsorDrag)return;const r=frame.getBoundingClientRect(),nx=Math.max(-.8,Math.min(.8,sponsorDrag.ox+(e.clientX-sponsorDrag.x)/r.width)),ny=Math.max(-.8,Math.min(.8,sponsorDrag.oy+(e.clientY-sponsorDrag.y)/r.height));sponsorDrag=null;const target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{}));target.sponsorPos=Object.assign({x:0,y:0,scale:1},target.sponsorPos||{},{x:nx,y:ny});commit(true);openGraphicEditorPreview();});
     const saveTextChange=(index,patch)=>{if(!ev)return;const cfg=graphicEditorConfig(),key='event_'+ev,target=cfg.templates[key]=Object.assign({},cfg.templates[key]||{});target.elements=target.elements||{};target.elements[String(index)]=Object.assign({},target.elements[String(index)]||{},patch);commit(true);openGraphicEditorPreview();};
+    const saveArtworkChange=(patch)=>{if(!ev)return;const cfg=graphicEditorConfig(),target=cfg.templates['event_'+ev]=Object.assign({},cfg.templates['event_'+ev]||{});target.artwork=Object.assign({},target.artwork||{},patch);commit(true);openGraphicEditorPreview();};
     host.querySelectorAll('[data-text-value]').forEach(input=>input.addEventListener('change',()=>saveTextChange(input.dataset.textValue,{text:input.value})));
     host.querySelectorAll('[data-text-x]').forEach(input=>input.addEventListener('change',()=>saveTextChange(input.dataset.textX,{dx:Number(input.value)||0})));
     host.querySelectorAll('[data-text-y]').forEach(input=>input.addEventListener('change',()=>saveTextChange(input.dataset.textY,{dy:Number(input.value)||0})));
@@ -3083,7 +3097,7 @@ function saveMatch() {
 }
 /* campi e file */
 document.addEventListener('input', e => {
-  if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(k==='accent'?e.target.value:Number(e.target.value));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
+  if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(['accent','fontFamily'].includes(k)?e.target.value:(k==='fontScale'?Number(e.target.value)/100:Number(e.target.value)));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
   const s = e.target.dataset && e.target.dataset.roster;
   if (s) { const pl = parseRoster(e.target.value), n = pl.filter(p => p.starter).length; $(`[data-count="${s}"]`).textContent = `${n} titolari · ${pl.length - n} in panchina`; return; }
   if (e.target.matches('[data-convocati]')) { const preview = $('[data-convocati-preview]'); if (preview) preview.value = buildConvocatiText(); return; }
@@ -3097,7 +3111,7 @@ document.addEventListener('change', async e => {
   if(t.matches('[data-editor-scope]')){L.editorTemplate=t.value;saveL();renderMain();return;}
   if(t.matches('[data-event-template]')){L.editorEventTemplate=t.value;renderMain();return;}
 
-  if(t.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=ds.editor;target[k]=k==='sponsor'?t.checked:(k==='accent'?t.value:Number(t.value));commit(true);return;}
+  if(t.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=ds.editor;target[k]=k==='sponsor'?t.checked:(['accent','fontFamily'].includes(k)?t.value:(k==='fontScale'?Number(t.value)/100:Number(t.value)));commit(true);return;}
   try {
     if (ds.photo && t.files[0]) {
       const selected = t.files[0];
