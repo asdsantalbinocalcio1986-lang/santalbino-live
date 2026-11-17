@@ -1714,24 +1714,16 @@ function writeWrapped(ctx, text, cx, y, maxWidth, fontSize, maxLines, color = '#
   return { lines: lines.length, size, bottom: y + Math.max(0, lines.length - 1) * lh };
 }
 // Illustrazioni evento in Canvas: dettagli, volumi, luci e ombre coerenti.
-const GOAL_BALL_IMAGE_URL='https://images.weserv.nl/?url=www.gadget.it%2Fdata%2Fthumb_cache%2F_data_prod_img_soccer-pallone-da-calcio-21-5cm_jpg_r_950_950.jpg&output=png&w=700&h=700&fit=contain';
-let goalBallImagePromise=null;
-function loadGoalBallImage(){
-  if(!goalBallImagePromise)goalBallImagePromise=new Promise(resolve=>{
-    const sources=[
-      GOAL_BALL_IMAGE_URL,
-      'https://www.gadget.it/data/thumb_cache/_data_prod_img_soccer-pallone-da-calcio-21-5cm-7fmo9007_jpg_r_40_40.webp'
-    ];
-    const trySource=index=>{
-      if(index>=sources.length){resolve(null);return;}
-      const img=new Image();let done=false;
-      const finish=value=>{if(done)return;done=true;clearTimeout(timer);img.onload=null;img.onerror=null;if(value)resolve(value);else trySource(index+1);};
-      const timer=setTimeout(()=>finish(null),9000);
-      img.crossOrigin='anonymous';img.onload=()=>finish(img);img.onerror=()=>finish(null);img.src=sources[index];
-    };
-    trySource(0);
+const HYDRA_IMAGE_URL='https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/hydra-goal.svg';
+let hydraImagePromise=null;
+function loadHydraImage(){
+  if(!hydraImagePromise)hydraImagePromise=new Promise(resolve=>{
+    const img=new Image();let done=false;
+    const finish=value=>{if(done)return;done=true;clearTimeout(timer);img.onload=null;img.onerror=null;resolve(value);};
+    const timer=setTimeout(()=>finish(null),9000);
+    img.onload=()=>finish(img);img.onerror=()=>finish(null);img.src=HYDRA_IMAGE_URL;
   });
-  return goalBallImagePromise;
+  return hydraImagePromise;
 }
 function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
   const k=size/200;ctx.save();ctx.translate(cx,cy);ctx.scale(k,k);
@@ -1752,20 +1744,15 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
     ctx.save();ctx.strokeStyle='rgba(215,244,220,.20)';ctx.lineWidth=2;rr(-112,-105,224,210,8,null,'rgba(215,244,220,.18)');line([[0,-104],[0,104]]);circle(0,0,29,null,'rgba(215,244,220,.18)');ctx.restore();
   }
   if(type==='goal'){
-    // Fotografia del prodotto originale Soccer MO9007-33: nessun pallone sostitutivo disegnato.
-    const img=assets.goalBall,x=0,y=0,d=194;
+    // Hydra gialloverde ufficiale, isolata dallo stemma della libreria del club.
+    const img=assets.hydra;
     if(img){
-      ctx.save();ctx.shadowColor='rgba(0,0,0,.70)';ctx.shadowBlur=24;ctx.shadowOffsetX=8;ctx.shadowOffsetY=14;
-      ctx.beginPath();ctx.arc(x,y,94,0,Math.PI*2);ctx.clip();
-      // Ritaglio centrale: elimina il margine bianco della foto e porta il pallone a piena dimensione.
       const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
-      const crop=Math.min(iw,ih)*.64,sx=(iw-crop)/2,sy=(ih-crop)/2;
-      ctx.drawImage(img,sx,sy,crop,crop,x-d/2,y-d/2,d,d);
-      ctx.restore();
+      const scale=Math.min(246/iw,154/ih),dw=iw*scale,dh=ih*scale;
+      ctx.save();ctx.shadowColor='rgba(0,0,0,.48)';ctx.shadowBlur=18;ctx.shadowOffsetY=7;
+      ctx.drawImage(img,-dw/2,-dh/2,dw,dh);ctx.restore();
     }else{
-      ctx.save();ctx.fillStyle='#ffffff';ctx.strokeStyle='#d9e3dc';ctx.lineWidth=3;
-      circle(0,0,78,ctx.createRadialGradient(-24,-30,4,5,8,88),'#d9e3dc');
-      ctx.restore();
+      ctx.save();ctx.fillStyle=lime;ctx.font='900 34px sans-serif';ctx.textAlign='center';ctx.fillText('SANT’ALBINO',0,12);ctx.restore();
     }
   }else if(type==='shot'||type==='miss'||type==='crossbar'){
     goal(-78,-65,156,110);
@@ -1910,8 +1897,8 @@ async function renderMatchGraphic(ev) {
     }
   } else {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
-    const goalBall=ev.type==='goal'?await loadGoalBallImage():null;
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,890,125,{ev,goalBall});
+    const hydra=ev.type==='goal'?await loadHydraImage():null;
+    if(illustrated)drawEventArtwork(x,ev.type,W/2,890,125,{ev,hydra});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     x.textAlign='center';x.fillStyle=accent;x.font=`900 ${illustrated?40:58}px ${FD}`;x.fillText(minute,W/2,illustrated?1005:900);
     const player=ev.type==='sub'?'':(ev.player||'');
