@@ -2142,7 +2142,7 @@ async function renderMatchGraphic(ev) {
     const illustrated=['goal','red','yellow','sub','injury','shot','crossbar','corner','freekick','save','miss','mvp'].includes(ev.type);
     const hydra=ev.type==='goal'?await loadHydraImage():null;
     const injuryArtworkCenterY=(785+1006)/2; // centro esatto tra il bordo superiore del pannello evento e l'inizio della fascia informativa
-    if(illustrated)drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:(ev.type==='sub'?925:880)),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:(ev.type==='sub'?92:125)),{ev,hydra,editor:true});
+    if(illustrated&&ev.type!=='sub')drawEventArtwork(x,ev.type,W/2,ev.type==='goal'?960:(ev.type==='injury'?injuryArtworkCenterY:880),ev.type==='goal'?108:((ev.type==='yellow'||ev.type==='red')?150:125),{ev,hydra,editor:true});
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
@@ -2174,15 +2174,21 @@ async function renderMatchGraphic(ev) {
       if(player){x.textAlign='center';fitFont(x,player.toUpperCase(),790,29,900,FD);x.fillStyle='#fff';x.font=`900 29px ${FD}`;x.fillText(player.toUpperCase(),W/2,1116);}
       x.textAlign='center';fitFont(x,detail,790,17,700,FB);x.fillStyle='rgba(255,255,255,.92)';x.font=`700 17px ${FB}`;x.fillText(detail,W/2,1148);
     }else if(ev.type==='sub'){
-      x.save();x.textAlign='center';x.fillStyle='#fff';x.font=`900 76px ${FD}`;
-      x.shadowColor='rgba(0,0,0,.72)';x.shadowBlur=16;x.fillText('SOSTITUZIONE',W/2,858);x.shadowBlur=0;x.restore();
-      x.save();x.fillStyle='rgba(2,13,7,.96)';rrect(x,430,974,220,48,14);x.fill();
-      x.strokeStyle=accent;x.lineWidth=2.5;rrect(x,430,974,220,48,14);x.stroke();x.restore();
-      x.textAlign='center';x.textBaseline='middle';x.fillStyle=accent;x.font=`900 34px ${FD}`;x.fillText(minute,W/2,998);
       const side=ev.team||S.match.ourSide||'home',roster=parseRoster(S.rosters[side]||'');
-      const getSubPlayer=raw=>{const value=String(raw||'').trim();const found=/^\d{1,2}$/.test(value)?roster.find(p=>p.num===value):roster.find(p=>p.name.toLowerCase()===value.toLowerCase());return {name:found?.name||value||'—',num:found?.num||(/^\d{1,2}$/.test(value)?value:'—')};};
-      const entrants=[{label:'ENTRA',player:getSubPlayer(ev.inn)},{label:'ESCE',player:getSubPlayer(ev.out)}];
-      entrants.forEach((item,i)=>{const bx=92+i*458,by=1040,bw=438,bh=112;x.save();x.fillStyle='rgba(2,13,7,.94)';rrect(x,bx,by,bw,bh,17);x.fill();x.strokeStyle=i===0?'#b7f36b':'#72c5ff';x.lineWidth=2.5;rrect(x,bx,by,bw,bh,17);x.stroke();x.textAlign='left';x.textBaseline='alphabetic';x.fillStyle=i===0?'#b7f36b':'#72c5ff';x.font=`900 19px ${FB}`;x.fillText(item.label,bx+22,by+27);x.fillStyle='rgba(255,255,255,.10)';rrect(x,bx+18,by+38,70,62,10);x.fill();x.strokeStyle='rgba(255,255,255,.42)';x.lineWidth=1.5;rrect(x,bx+18,by+38,70,62,10);x.stroke();x.textAlign='center';x.textBaseline='middle';x.fillStyle='#fff';x.font=`900 38px ${FD}`;x.fillText(item.player.num,bx+53,by+69);x.textAlign='left';x.fillStyle='#fff';x.font=`800 24px ${FD}`;fitFont(x,item.player.name.toUpperCase(),bw-118,24,800,FD);x.fillText(item.player.name.toUpperCase(),bx+105,by+76);x.restore();});
+      const getSubName=raw=>{const value=String(raw||'').trim();const found=/^\d{1,2}$/.test(value)?roster.find(p=>p.num===value):roster.find(p=>p.name.toLowerCase()===value.toLowerCase());return (found?.name||value||'—').toUpperCase();};
+      const bubbles=[{label:'ENTRA',name:getSubName(ev.inn),color:'#b7f36b',x:92},{label:'ESCE',name:getSubName(ev.out),color:'#72c5ff',x:550}];
+      bubbles.forEach(item=>{
+        const bx=item.x,by=900,bw=438,bh=154;
+        x.save();
+        x.shadowColor='rgba(0,0,0,.38)';x.shadowBlur=22;x.shadowOffsetY=8;
+        x.fillStyle='rgba(2,13,7,.96)';rrect(x,bx,by,bw,bh,25);x.fill();
+        x.shadowBlur=0;x.shadowOffsetY=0;
+        x.beginPath();x.moveTo(bx+bw/2-17,by+bh-1);x.lineTo(bx+bw/2+17,by+bh-1);x.lineTo(bx+bw/2,by+bh+24);x.closePath();x.fill();
+        x.strokeStyle=item.color;x.lineWidth=3;rrect(x,bx,by,bw,bh,25);x.stroke();
+        x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=item.color;x.font=`900 23px ${FB}`;x.fillText(item.label,bx+bw/2,by+48);
+        x.fillStyle='#fff';fitFont(x,item.name,bw-44,39,900,FD);x.font=`900 39px ${FD}`;x.fillText(item.name,bx+bw/2,by+105);
+        x.restore();
+      });
     }else if(illustrated){
       const infoTop=ev.type==='injury'?1006:982;
       const minuteY=infoTop+34;
