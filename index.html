@@ -2013,6 +2013,7 @@ async function renderMatchGraphic(ev) {
   const goals=prior.filter(e=>e.type==='goal');
   const ownGoal=ev.type==='goal' && scoringSide(ev)===S.match.ourSide;
   const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  if(ev.graphicTitle)titleMap[ev.type]=ev.graphicTitle.toUpperCase();
   const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
   // Trama fibra di carbonio su tutta la superficie.
@@ -2138,6 +2139,7 @@ async function renderMatchGraphic(ev) {
     else if(ev.type==='yellow')detail+='  •  CARTELLINO GIALLO';
     else if(ev.type==='injury')detail+='  •  GIOCO FERMO';
     else if(ev.type==='save')detail+='  •  PARATA';
+    const eventOffset=ev.graphicOffset||{};x.save();x.translate(Number(eventOffset.x)||0,Number(eventOffset.y)||0);
     if(ev.type==='goal'){
       // La testata del titolo viene disegnata qui, sopra l'eventuale immagine di sfondo:
       // in questo modo GOOOAL resta visibile sia sul template Sant'Albino sia sulla grafica ospite.
@@ -2170,6 +2172,7 @@ async function renderMatchGraphic(ev) {
       writeWrapped(x,detail,W/2,player?1060:1000,790,23,2,'rgba(255,255,255,.82)',600,FB,30);
     }
   }
+  x.restore();
   // Footer isolato dal pannello contenuti.
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
   x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
@@ -2575,6 +2578,7 @@ let graphicId = null;
 async function openGraphic(id) {
   beginSponsorGraphic();
   const ev = S.events.find(e => e.id === id); if (!ev || !CARD_TYPES.includes(ev.type)) return;
+  L.editorEventId=id;
   graphicId = id;
   const dlg = $('#graphicDlg');
   dlg.innerHTML = '<div class="sheethead"><h2>Immagine evento</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione immagine…</p>';
@@ -2756,9 +2760,13 @@ function graphicEditorHtml() {
   const cfg=graphicEditorConfig(),key=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'global';
   const v=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{});
   const options=[['global','Stile globale'],['event','Grafiche eventi'],['phase','Kick off / intervallo / fine'],['matchday','Match Day'],['convocati','Convocati'],['formation','Formazioni']];
+  const selectedEvent=S.events.find(e=>e.id===(L.editorEventId||''))||S.events.find(e=>CARD_TYPES.includes(e.type));
+  const evFields=selectedEvent?{title:selectedEvent.graphicTitle||'',player:selectedEvent.player||'',minute:selectedEvent.min||'',note:selectedEvent.note||'',assist:selectedEvent.assist||'',inn:selectedEvent.inn||'',out:selectedEvent.out||'',x:Number(selectedEvent.graphicOffset?.x)||0,y:Number(selectedEvent.graphicOffset?.y)||0}:{};
   return `<div class="card"><h2>Editor grafiche</h2>
     <p class="small muted" style="margin-top:0">Modifica lo stile e sposta lo sponsor direttamente sull’anteprima. Le impostazioni possono essere globali o specifiche per ogni modello.</p>
     <label class="f"><span>Ambito da modificare</span><select data-editor-scope>${options.map(([k,n])=>`<option value="${k}" ${key===k?'selected':''}>${n}</option>`).join('')}</select></label>
+    ${key==='event'?`<hr><h3>Personalizzazione del singolo evento</h3><label class="f"><span>Evento da modificare</span><select data-event-select>${S.events.filter(e=>CARD_TYPES.includes(e.type)).map(e=>`<option value="${esc(e.id)}" ${selectedEvent?.id===e.id?'selected':''}>${esc(e.min||'LIVE')}′ · ${esc(describe(e,scoreAt(S.events.indexOf(e))).title)}</option>`).join('')}</select></label>
+    ${selectedEvent?`<div class="row2"><label class="f"><span>Titolo personalizzato</span><input data-event-edit="graphicTitle" value="${esc(evFields.title)}" placeholder="Titolo predefinito"></label><label class="f"><span>Giocatore</span><input data-event-edit="player" value="${esc(evFields.player)}"></label></div><div class="row2"><label class="f"><span>Minuto</span><input data-event-edit="min" value="${esc(evFields.minute)}"></label><label class="f"><span>Assist</span><input data-event-edit="assist" value="${esc(evFields.assist)}"></label></div><div class="row2"><label class="f"><span>Entra</span><input data-event-edit="inn" value="${esc(evFields.inn)}"></label><label class="f"><span>Esce</span><input data-event-edit="out" value="${esc(evFields.out)}"></label></div><label class="f"><span>Testo / nota</span><input data-event-edit="note" value="${esc(evFields.note)}"></label><div class="row2"><label class="f"><span>Sposta testi X · ${evFields.x}px</span><input type="range" min="-300" max="300" step="5" value="${evFields.x}" data-event-edit="x"></label><label class="f"><span>Sposta testi Y · ${evFields.y}px</span><input type="range" min="-300" max="300" step="5" value="${evFields.y}" data-event-edit="y"></label></div><p class="small muted">Queste modifiche riguardano solo l’evento selezionato. Lo spostamento agisce sul blocco centrale di contenuto.</p>`:'<p class="muted">Registra un evento per poterlo personalizzare.</p>'}`:''}
     <div class="row2"><label class="f"><span>Colore principale</span><input type="color" value="${esc(v.accent)}" data-editor="accent"></label>
     <label class="f"><span>Velatura scura · ${v.overlay}%</span><input type="range" min="0" max="35" value="${Number(v.overlay)||0}" data-editor="overlay"></label></div>
     <label class="f"><span>Spessore bordo · ${v.border}px</span><input type="range" min="0" max="12" value="${Number(v.border)||0}" data-editor="border"></label>
@@ -2780,7 +2788,7 @@ async function renderEditorCanvas(layout) {
     const ev=S.events.find(e=>['kickoff','halftime','fulltime'].includes(e.type))||{id:'editor-preview-phase',type:'kickoff',minute:''};
     return renderPhaseCard(ev);
   }
-  const ev=S.events.find(e=>CARD_TYPES.includes(e.type));
+  const ev=S.events.find(e=>e.id===(L.editorEventId||''))||S.events.find(e=>CARD_TYPES.includes(e.type));
   if(!ev)throw new Error('Per l’anteprima eventi registra prima almeno un evento.');
   return renderCard(ev);
 }
@@ -3054,6 +3062,7 @@ function saveMatch() {
 }
 /* campi e file */
 document.addEventListener('input', e => {
+  if(e.target.matches('[data-event-edit]')){const ev=S.events.find(v=>v.id===(L.editorEventId||''));if(ev){const k=e.target.dataset.eventEdit;if(k==='x'||k==='y'){ev.graphicOffset=Object.assign({},ev.graphicOffset||{},{[k]:Number(e.target.value)});const lab=e.target.closest('label')?.querySelector('span');if(lab)lab.textContent=(k==='x'?'Sposta testi X · ':'Sposta testi Y · ')+e.target.value+'px';}else ev[k]=e.target.value;commit(true);}return;}
   if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(k==='accent'?e.target.value:Number(e.target.value));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
   const s = e.target.dataset && e.target.dataset.roster;
   if (s) { const pl = parseRoster(e.target.value), n = pl.filter(p => p.starter).length; $(`[data-count="${s}"]`).textContent = `${n} titolari · ${pl.length - n} in panchina`; return; }
@@ -3065,6 +3074,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
+  if(t.matches('[data-event-select]')){L.editorEventId=t.value;renderMain();return;}
+  if(t.matches('[data-event-edit]')){const ev=S.events.find(v=>v.id===(L.editorEventId||''));if(ev){const k=ds.eventEdit;if(k==='x'||k==='y')ev.graphicOffset=Object.assign({},ev.graphicOffset||{},{[k]:Number(t.value)});else ev[k]=t.value;commit(true);}return;}
   if(t.matches('[data-editor]')){const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=ds.editor;target[k]=k==='sponsor'?t.checked:(k==='accent'?t.value:Number(t.value));commit(true);return;}
   try {
     if (ds.photo && t.files[0]) {
