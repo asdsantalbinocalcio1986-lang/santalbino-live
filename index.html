@@ -2516,9 +2516,9 @@ function regiaHtml() {
   else if (t === 'lineup') body = ['home', 'away'].map(s => {
     const pl = parseRoster(S.rosters[s]), ns = pl.filter(p => p.starter).length;
     return `<div class="card"><h2>${esc(teamName(s))}</h2>
-      <label class="f"><span>Foto o PDF della lista di presentazione</span><input type="file" accept="image/*,.pdf,application/pdf" data-photo="${s}"><div class="small muted">Per i PDF viene letta la prima pagina.</div></label>
-      ${photos[s] ? `<img class="thumb" src="${photos[s].url}" alt="Lista di presentazione"><button class="btn sm" data-a="readlist" data-s="${s}">Leggi e prepara la formazione</button><div class="small muted" data-ocrstat="${s}" style="margin:6px 0 0"></div>` : ''}
-      <label class="f" style="margin-top:10px"><span>Giocatori, uno per riga: numero e cognome</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
+      <label class="f"><span>Immagine di sfondo per la grafica (facoltativa)</span><input type="file" accept="image/*,.pdf,application/pdf" data-photo="${s}"><div class="small muted">Puoi caricare una foto o un PDF da usare come sfondo. La distinta viene inserita esclusivamente a mano qui sotto.</div></label>
+      ${photos[s] ? `<img class="thumb" src="${photos[s].url}" alt="Sfondo grafica formazione">` : ''}
+      <label class="f" style="margin-top:10px"><span>Inserimento manuale della distinta: numero e cognome, uno per riga</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('');
