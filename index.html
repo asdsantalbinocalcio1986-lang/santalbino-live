@@ -36,6 +36,34 @@
   transform: none !important;
 }
 
+/* Classifica Tuttocampo: contenitore fluido e usabile anche su smartphone */
+.standings-frame{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  border-radius:12px;
+  background:#fff;
+}
+.standings-frame iframe{
+  display:block;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  height:800px;
+  border:0;
+  background:#fff;
+}
+@media (max-width:600px){
+  .standings-frame{margin-inline:-2px;width:calc(100% + 4px)}
+  .standings-frame iframe{height:900px}
+}
+@media (max-width:360px){
+  .standings-frame iframe{height:940px}
+}
 </style><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script></head><body><title>Santa Live</title><meta name="claude:viewport-fit-sides" content="cover"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
@@ -2209,16 +2237,14 @@ function standingsHtml() {
         Classifica ufficiale aggiornata da Tuttocampo.
       </p>
 
-      <div style="width:100%;overflow:hidden;border-radius:12px;background:#fff">
+      <div class="standings-frame">
         <iframe
           src="https://www.tuttocampo.it/WidgetV2/Classifica/55ced0b7-d0f2-47cc-807a-7629b56fc26e"
           title="Classifica Girone A Terza Categoria Siena - Tuttocampo"
           width="100%"
           height="800"
-          style="width:100%;max-width:100%;border:0;display:block;background:#fff"
-          scrolling="no"
-          frameborder="0"
-          loading="lazy">
+          loading="lazy"
+          scrolling="auto">
         </iframe>
       </div>
 
