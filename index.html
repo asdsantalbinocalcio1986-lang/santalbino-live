@@ -2180,7 +2180,7 @@ async function renderMatchGraphic(ev) {
       const subTeam=teamName(side).toUpperCase();
       x.save();
       x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle='#fff';
-      fitFont(x,subTeam,850,29,900,FD);x.font=`900 29px ${FD}`;
+      fitFont(x,subTeam,850,29,900,FD);
       x.shadowColor='rgba(0,0,0,.65)';x.shadowBlur=12;x.fillText(subTeam,W/2,828);x.shadowBlur=0;
       const subMinute=ev.min?String(ev.min)+"′":'LIVE';
       x.fillStyle='rgba(2,13,7,.96)';rrect(x,430,846,220,42,14);x.fill();
@@ -2196,8 +2196,12 @@ async function renderMatchGraphic(ev) {
         x.shadowBlur=0;x.shadowOffsetY=0;
         x.beginPath();x.moveTo(bx+bw/2-17,by+bh-1);x.lineTo(bx+bw/2+17,by+bh-1);x.lineTo(bx+bw/2,by+bh+24);x.closePath();x.fill();
         x.strokeStyle=item.color;x.lineWidth=3;rrect(x,bx,by,bw,bh,25);x.stroke();
-        x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=item.color;x.font=`900 23px ${FB}`;x.fillText(item.label,bx+bw/2,by+48);
-        x.fillStyle='#fff';fitFont(x,item.name,bw-44,39,900,FD);x.fillText(item.name,bx+bw/2,by+105);
+        x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=item.color;x.font=`900 23px ${FB}`;x.fillText(item.label,bx+bw/2,by+44);
+        x.fillStyle='#fff';
+        let nameSize=36;x.font=`900 ${nameSize}px ${FD}`;
+        while(x.measureText(item.name).width>bw-64&&nameSize>14){nameSize-=2;x.font=`900 ${nameSize}px ${FD}`;}
+        // Limite Canvas esplicito: anche nomi eccezionalmente lunghi restano nel fumetto.
+        x.fillText(item.name,bx+bw/2,by+112,bw-64);
         x.restore();
       });
     }else if(illustrated){
