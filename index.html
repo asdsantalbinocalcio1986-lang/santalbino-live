@@ -1279,7 +1279,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
@@ -1438,35 +1438,43 @@ function parseRoster(raw) {
   });
   return out;
 }
-function buildConvocatiText(raw = S.convocati) {
-  const players = parseRoster(raw).map(p => p.name);
-  const m = S.match, club = teamName(m.ourSide), opponent = teamName(other(m.ourSide));
-  const details = [m.comp, fmtDate(m.date), m.venue].filter(Boolean).join(' · ');
+function matchDateTime() {
+  const date = fmtDate(S.match.date);
+  const time = String(S.match.time || '').trim();
+  return [date, time].filter(Boolean).join(' · ');
+}
+function buildConvocatiText() {
+  const m = S.match, opponent = teamName(other(m.ourSide));
   return [
-    '📋 I CONVOCATI',
-    club.toUpperCase(),
-    opponent ? '🏟️ ' + (m.ourSide === 'home' ? 'vs ' : 'vs ') + opponent : '',
-    details,
+    '📋 CONVOCATI · MATCH DAY',
+    teamName(m.ourSide).toUpperCase() + ' vs ' + opponent.toUpperCase(),
     '',
-    'Questi i giocatori convocati per il prossimo impegno:',
+    '⚽ Si avvicina il prossimo appuntamento: siamo pronti a scendere in campo!',
     '',
-    ...players,
+    '📅 ' + (matchDateTime() || 'Data e ora da definire'),
+    '🏆 ' + (m.comp || 'Girone da definire'),
+    '🏟️ ' + (m.venue || 'Stadio da definire'),
     '',
+    'Forza Sant’Albino! 💚💛',
     m.hashtag || ''
-  ].filter((line, i, arr) => line !== '' || (i > 0 && arr[i - 1] !== '')).join('\n').trim();
+  ].filter(Boolean).join('\n');
 }
 function convocatiRegiaHtml() {
   const generated = buildConvocatiText();
   const count = parseRoster(S.convocati).length;
   return `<div class="card"><h2>Lista convocati</h2>
-    <p class="small muted" style="margin-top:0">Inserisci esclusivamente i cognomi, uno per riga. Il comunicato viene composto automaticamente usando i dati della partita.</p>
+    <p class="small muted" style="margin-top:0">Inserisci i convocati, uno per riga. I nominativi saranno riportati nella grafica MATCH DAY, ma non nel testo del post.</p>
     <label class="f"><span>Giocatori convocati · uno per riga</span><textarea data-convocati rows="14" placeholder="Rossi&#10;Bianchi&#10;Verdi&#10;...">${esc(S.convocati)}</textarea></label>
     <div class="small muted" style="margin:-6px 0 12px">${count} giocatori inseriti</div>
     <button class="btn primary block" data-a="saveconvocati">Salva lista convocati</button></div>
-    <div class="card"><h2>Comunicazione pronta per i social</h2>
-      <p class="small muted" style="margin-top:0">Anteprima generata automaticamente. Per aggiornare avversario, campionato, data e campo, modifica la scheda Impostazioni → Partita.</p>
-      <textarea data-convocati-preview rows="16" readonly>${esc(generated)}</textarea>
-      <button class="btn primary block" data-a="copyconvocati">Salva e copia comunicato</button></div>`;
+    <div class="card"><h2>Grafica MATCH DAY</h2>
+      <p class="small muted" style="margin-top:0">Immagine pre-partita con i loghi delle due società, data e ora, girone, stadio e tutti i convocati.</p>
+      <button class="btn primary block" data-a="viewMatchDayGraphic">Genera grafica MATCH DAY</button>
+      <button class="btn block" style="margin-top:8px" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button></div>
+    <div class="card"><h2>Post pre-partita</h2>
+      <p class="small muted" style="margin-top:0">Il testo riepiloga le informazioni della partita e non contiene i nomi dei convocati.</p>
+      <textarea data-convocati-preview rows="10" readonly>${esc(generated)}</textarea>
+      <button class="btn primary block" data-a="copyconvocati">Salva e copia testo del post</button></div>`;
 }
 function resolvePlayer(side, str) {
   str = (str || '').trim();
@@ -2260,6 +2268,62 @@ async function openLineupGraphic() {
   }
 }
 
+async function renderMatchDayGraphic() {
+  const players = parseRoster(S.convocati);
+  if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
+  const m = S.match, W = 1600, H = 1000, canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const x = canvas.getContext('2d');
+  const [homeLogo, awayLogo] = await Promise.all([loadGraphicImage(S.logos.home), loadGraphicImage(S.logos.away)]);
+  const bg = x.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#17633d'); bg.addColorStop(.52, '#0b3424'); bg.addColorStop(1, '#071d16');
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 2;
+  for (let i=0;i<9;i++){ x.beginPath(); x.moveTo(i*W/8,0); x.lineTo(i*W/8,H); x.stroke(); }
+  x.fillStyle = 'rgba(2,13,9,.74)'; x.fillRect(0,0,W,310);
+  const logo = (img,name,cx) => {
+    x.fillStyle='#fff'; rrect(x,cx-92,38,184,184,24); x.fill();
+    if(img){ const k=Math.min(164/img.width,164/img.height),w=img.width*k,h=img.height*k; x.drawImage(img,cx-w/2,48+(164-h)/2,w,h); }
+    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,130); }
+    x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),420,30,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,260);
+  };
+  logo(homeLogo,teamName('home'),330); logo(awayLogo,teamName('away'),1270);
+  x.fillStyle='#d7f1df'; x.font='900 64px Arial,sans-serif'; x.textAlign='center'; x.fillText('VS',800,125);
+  x.fillStyle='#e3c66c'; x.font='900 88px Arial,sans-serif'; x.fillText('MATCH DAY',800,350);
+  const info = [matchDateTime() || 'DATA E ORA DA DEFINIRE', (m.comp || 'GIRONE DA DEFINIRE').toUpperCase(), (m.venue || 'STADIO DA DEFINIRE').toUpperCase()];
+  const labels=['DATA · ORA','GIRONE','STADIO'];
+  const bx=[70,550,1030], bw=450;
+  for(let i=0;i<3;i++){
+    x.fillStyle='rgba(0,0,0,.48)'; rrect(x,bx[i],390,bw,100,18); x.fill();
+    x.fillStyle='#9fdbb5'; x.font='800 19px Arial'; x.textAlign='center'; x.fillText(labels[i],bx[i]+bw/2,420);
+    x.fillStyle='#fff'; fitFont(x,info[i],bw-28,28,800,'Arial,sans-serif'); x.fillText(info[i],bx[i]+bw/2,460);
+  }
+  x.fillStyle='rgba(0,0,0,.68)'; rrect(x,70,525,1460,405,24); x.fill();
+  x.fillStyle='#e3c66c'; x.font='900 34px Arial'; x.textAlign='left'; x.fillText('I CONVOCATI',110,580);
+  x.fillStyle='rgba(255,255,255,.65)'; x.font='700 19px Arial'; x.textAlign='right'; x.fillText(players.length+' GIOCATORI',1490,580);
+  const cols=2, rows=Math.ceil(players.length/cols), rowH=Math.min(48,Math.floor(285/Math.max(1,rows)));
+  const colW=690;
+  players.forEach((p,i)=>{
+    const col=Math.floor(i/rows), row=i%rows, xx=115+col*720, yy=635+row*rowH;
+    x.fillStyle=col===0?'#b8e7c8':'#e3c66c'; x.beginPath(); x.arc(xx+18,yy-5,15,0,Math.PI*2); x.fill();
+    x.fillStyle='#08291d'; x.font='800 16px Arial'; x.textAlign='center'; x.fillText(p.num||'•',xx+18,yy);
+    x.fillStyle='#fff'; x.textAlign='left'; fitFont(x,p.name,colW-65,25,800,'Arial,sans-serif'); x.fillText(p.name,xx+48,yy);
+  });
+  x.fillStyle='rgba(255,255,255,.72)'; x.font='700 18px Arial'; x.textAlign='center'; x.fillText('ASD SANT’ALBINO TERME  ·  FORZA GIALLOVERDI',800,970);
+  return canvas;
+}
+async function openMatchDayGraphic() {
+  const dlg=$('#graphicDlg');
+  dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
+  if(!dlg.open) dlg.showModal();
+  try {
+    const canvas=await renderMatchDayGraphic(),url=canvas.toDataURL('image/jpeg',.92);
+    if(!dlg.open)return;
+    dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica MATCH DAY con convocati"><button class="btn primary block" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button>';
+  } catch(err) {
+    dlg.innerHTML='<div class="sheethead"><h2>Grafica non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">'+esc(err.message||'Errore nella generazione')+'</p>';
+  }
+}
 function resizeImage(file, max, type = 'image/jpeg', q = .82) {
   return new Promise((res, rej) => {
     const img = new Image(), u = URL.createObjectURL(file);
@@ -2595,7 +2659,7 @@ function settingsHtml() {
   const m = S.match;
   return `<div class="card"><h2>Partita</h2>${I('s-home', 'Squadra di casa', m.home)}${I('s-away', 'Squadra ospite', m.away, 'Nome della squadra avversaria')}
     <label class="f"><span>La nostra squadra</span><select id="s-our"><option value="home" ${m.ourSide === 'home' ? 'selected' : ''}>Gioca in casa</option><option value="away" ${m.ourSide === 'away' ? 'selected' : ''}>Gioca in trasferta</option></select></label>
-    ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
+    ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-time', 'Ora', m.time || '', '', 'time')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
     ${I('s-standings', 'Link esterno alla classifica in tempo reale', m.standingsUrl || '', 'https://...') }<p class="small muted" style="margin-top:-5px">Il collegamento viene salvato online e resta disponibile nella pagina pubblica anche dopo l’azzeramento della partita. Puoi modificarlo o cancellarlo in qualsiasi momento.</p>
     <button class="btn primary block" data-a="savematch">Salva e aggiorna la pagina live</button></div>
   <div class="card"><h2>Loghi</h2><p class="small muted" style="margin-top:0">Compaiono nella pagina live e nelle immagini degli eventi. Meglio un logo quadrato o con sfondo trasparente.</p>
@@ -2721,6 +2785,8 @@ document.addEventListener('click', async e => {
     case 'post': if (ev) openPost(ev.id); break;
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
     case 'viewlineupgraphic': await openLineupGraphic(); break;
+    case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
+    case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
     case 'saveLineupGraphic': { const cv = await renderFormationGraphic(); cv.toBlob(blob => { if (blob) saveBlob(blob, 'formazioni-entrambe-le-squadre.jpg'); }, 'image/jpeg', .92); break; }
     case 'graphicclose': $('#graphicDlg').close(); break;
     case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
@@ -2768,7 +2834,7 @@ document.addEventListener('click', async e => {
     case 'readlist': await readLineup(a.dataset.s, document.querySelector('[data-ocrstat="' + a.dataset.s + '"]')); break;
     case 'savelineup': { const s = a.dataset.s; S.rosters[s] = $(`[data-roster="${s}"]`).value; commit(true); toast('Formazione salvata: compare nella pagina live'); break; }
     case 'saveconvocati': S.convocati = $('[data-convocati]').value; commit(true); toast('Lista convocati salvata'); break;
-    case 'copyconvocati': { const raw = $('[data-convocati]').value; S.convocati = raw; commit(true); copyText(buildConvocatiText(raw)); break; }
+    case 'copyconvocati': { S.convocati = $('[data-convocati]').value; commit(true); copyText(buildConvocatiText()); break; }
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
     case 'libraryUseGoal': { const url = S.media?.library?.goal || ''; if (!url) { toast('Carica prima un modello GOAL'); break; } L.evImg.goal = url; L.evImgRaw.goal = false; commit(true); renderMain(); toast('Modello GOAL collegato agli eventi'); break; }
@@ -2788,7 +2854,7 @@ document.addEventListener('click', async e => {
     case 'newmatch': if (armedNew) { armedNew = false; resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
 });
-function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
@@ -2804,6 +2870,7 @@ function saveMatch() {
   S.match.comp = g('#s-comp');
   S.match.venue = g('#s-venue');
   S.match.date = $('#s-date').value;
+  S.match.time = $('#s-time').value;
   S.match.hashtag = g('#s-tag');
   S.match.standingsUrl = validExternalUrl(standings);
 
@@ -2814,7 +2881,7 @@ function saveMatch() {
 document.addEventListener('input', e => {
   const s = e.target.dataset && e.target.dataset.roster;
   if (s) { const pl = parseRoster(e.target.value), n = pl.filter(p => p.starter).length; $(`[data-count="${s}"]`).textContent = `${n} titolari · ${pl.length - n} in panchina`; return; }
-  if (e.target.matches('[data-convocati]')) { const preview = $('[data-convocati-preview]'); if (preview) preview.value = buildConvocatiText(e.target.value); return; }
+  if (e.target.matches('[data-convocati]')) { const preview = $('[data-convocati-preview]'); if (preview) preview.value = buildConvocatiText(); return; }
   if (e.target.closest('#sheet')) {
     if (e.target.id === 'fText') { textManual = true; return; }
     const k = e.target.dataset.d; if (!k) return; draft[k] = e.target.value; if (k === 'kind') renderSheet(); else refreshPreview();
