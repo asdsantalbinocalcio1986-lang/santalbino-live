@@ -2188,6 +2188,8 @@ async function renderMatchGraphic(ev) {
       x.fillStyle=accent;x.font=`900 27px ${FD}`;x.fillText(subMinute,W/2,876);
       x.restore();
       const bubbles=[{label:'ENTRA',player:getSubPlayer(ev.inn),color:'#b7f36b',x:92},{label:'ESCE',player:getSubPlayer(ev.out),color:'#72c5ff',x:550}];
+      // Coordinate identiche per ogni riga dei due fumetti: ignora vecchi offset personalizzati.
+      const graphicFillText=x.fillText;x.fillText=nativeFillText;
       bubbles.forEach(item=>{
         const bx=item.x,by=914,bw=438,bh=154;
         x.save();
@@ -2206,6 +2208,7 @@ async function renderMatchGraphic(ev) {
         x.fillText(item.player.name,bx+bw/2,by+119,bw-64);
         x.restore();
       });
+      x.fillText=graphicFillText;
     }else if(illustrated){
       const infoTop=ev.type==='injury'?1006:982;
       const minuteY=infoTop+34;
