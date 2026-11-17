@@ -2324,7 +2324,7 @@ async function openPost(id) {
   try {
     postUrl = isCard ? await cardUrl(ev) : '';
     const so = socialOf(id);
-    d.innerHTML = `<div class="sheethead"><h2>Pubblica su Facebook</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div>
+    d.innerHTML = `<div class="sheethead"><h2>Condividi evento</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div>
       ${isCard ? `<img class="thumb" style="max-height:44dvh;margin:0 auto 10px" src="${postUrl}" alt="Immagine dell'evento"><p class="small muted" style="margin-top:0;text-align:center">Su telefono puoi anche tenere premuto sull’immagine per salvarla.</p>` : ''}
       <label class="f"><span>Testo del post</span><textarea id="postText" rows="5">${esc(evText(ev))}</textarea></label>
       <div class="row2 stack">${isCard ? '<button class="btn" data-a="saveimg">Salva immagine</button>' : ''}<button class="btn" data-a="copypost">Copia testo</button></div>
