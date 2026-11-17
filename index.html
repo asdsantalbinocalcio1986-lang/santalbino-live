@@ -1910,7 +1910,24 @@ function drawEventArtwork(ctx,type,cx,cy,size,assets={}) {
     rr(-52,-82,104,164,10,c,'rgba(255,255,255,.92)');
     ctx.restore();
   }else if(type==='sub'){
-    player(-58,5,red,'stand');player(58,5,'#69d79a','run');arrow([[-25,-48],[25,-48]],'#69d79a',6);arrow([[25,66],[-25,66]],red,5);
+    // Due riquadri laterali con i numeri di maglia; frecce verticali nel corridoio centrale.
+    const ev=assets.ev||{},side=ev.team||S.match.ourSide,roster=parseRoster(S.rosters[side]||[]);
+    const shirt=value=>{
+      const raw=String(value||'').trim();
+      if(/^\\d{1,2}$/.test(raw))return raw;
+      const found=roster.find(p=>p.name.toLowerCase()===raw.toLowerCase()||p.name.toLowerCase().includes(raw.toLowerCase()));
+      return found&&found.num?found.num:'—';
+    };
+    const outNum=shirt(ev.out),inNum=shirt(ev.inn);
+    const panel=(x0,label,num,color)=>{
+      rr(x0,-82,108,164,16,'#10271b',color);
+      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.font='800 15px ' + (ctx.font.match(/^[^ ]+/)||['Arial'])[0];ctx.fillText(label,x0+54,-48);
+      ctx.fillStyle='#fff';ctx.font="900 64px 'Barlow Condensed',sans-serif";ctx.fillText(num,x0+54,18);
+    };
+    panel(-140,'ESCE',outNum,red);panel(32,'ENTRA',inNum,'#69d79a');
+    // ENTRA: freccia verde verso l'alto. ESCE: freccia rossa verso il basso.
+    arrow([[-3,8],[-3,-37]],'#69d79a',7);
+    arrow([[-3,35],[-3,80]],red,7);
   }else if(type==='injury'){
     // Solo croce medica rossa tridimensionale su fondo bianco.
     ctx.save();
