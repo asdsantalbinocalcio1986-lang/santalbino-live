@@ -2126,7 +2126,7 @@ async function renderFormationGraphic(side) {
   const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
   const drawRows = (list, heading, y, maxRows) => {
     x.textAlign = 'left'; x.fillStyle = '#b7f36b'; x.font = '800 27px Arial,sans-serif'; x.fillText(heading, 112, y);
-    const shown = list.slice(0, maxRows), cols = shown.length > 8 ? 2 : 1, rows = Math.ceil(shown.length / cols), colW = cols === 2 ? 410 : 820;
+    const shown = list.slice(0, maxRows), cols = shown.length > 5 ? 2 : 1, rows = Math.ceil(shown.length / cols), colW = cols === 2 ? 410 : 820;
     shown.forEach((p, i) => {
       const col = Math.floor(i / rows), row = i % rows, xx = 112 + col * 440, yy = y + 30 + row * 58;
       x.fillStyle = 'rgba(255,255,255,.10)'; rrect(x, xx, yy, colW, 46, 10); x.fill();
@@ -2135,7 +2135,7 @@ async function renderFormationGraphic(side) {
     });
   };
   drawRows(starters, 'TITOLARI  •  ' + starters.length, 355, 22);
-  if (bench.length) drawRows(bench, 'PANCHINA  •  ' + bench.length, Math.min(1040, 390 + Math.ceil(starters.length / (starters.length > 8 ? 2 : 1)) * 58), 10);
+  if (bench.length) drawRows(bench, 'PANCHINA  •  ' + bench.length, Math.min(1040, 390 + Math.ceil(starters.length / (starters.length > 5 ? 2 : 1)) * 58), 10);
   x.fillStyle = '#b7f36b'; x.fillRect(70, 1245, 940, 3);
   x.textAlign = 'left'; x.fillStyle = '#fff'; x.font = '700 20px Arial,sans-serif'; x.fillText('ASD SANT’ALBINO TERME', 78, 1285);
   x.textAlign = 'right'; x.fillStyle = 'rgba(255,255,255,.8)'; x.fillText(S.match.hashtag || '#SantAlbinoTerme', 1002, 1285);
