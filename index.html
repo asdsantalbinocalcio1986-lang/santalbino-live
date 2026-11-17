@@ -2197,7 +2197,7 @@ async function renderMatchGraphic(ev) {
         x.beginPath();x.moveTo(bx+bw/2-17,by+bh-1);x.lineTo(bx+bw/2+17,by+bh-1);x.lineTo(bx+bw/2,by+bh+24);x.closePath();x.fill();
         x.strokeStyle=item.color;x.lineWidth=3;rrect(x,bx,by,bw,bh,25);x.stroke();
         x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=item.color;x.font=`900 23px ${FB}`;x.fillText(item.label,bx+bw/2,by+48);
-        x.fillStyle='#fff';fitFont(x,item.name,bw-44,39,900,FD);x.font=`900 39px ${FD}`;x.fillText(item.name,bx+bw/2,by+105);
+        x.fillStyle='#fff';fitFont(x,item.name,bw-44,39,900,FD);x.fillText(item.name,bx+bw/2,by+105);
         x.restore();
       });
     }else if(illustrated){
