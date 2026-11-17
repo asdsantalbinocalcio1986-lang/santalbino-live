@@ -1434,7 +1434,7 @@ function parseRoster(raw) {
   return out;
 }
 function buildConvocatiText(raw = S.convocati) {
-  const players = parseRoster(raw).map(p => (p.num ? p.num + ' ' : '') + p.name);
+  const players = parseRoster(raw).map(p => p.name);
   const m = S.match, club = teamName(m.ourSide), opponent = teamName(other(m.ourSide));
   const details = [m.comp, fmtDate(m.date), m.venue].filter(Boolean).join(' · ');
   return [
@@ -1445,7 +1445,7 @@ function buildConvocatiText(raw = S.convocati) {
     '',
     'Questi i giocatori convocati per il prossimo impegno:',
     '',
-    ...players.map((p, i) => (i + 1) + '. ' + p),
+    ...players,
     '',
     m.hashtag || ''
   ].filter((line, i, arr) => line !== '' || (i > 0 && arr[i - 1] !== '')).join('\n').trim();
@@ -1454,8 +1454,8 @@ function convocatiRegiaHtml() {
   const generated = buildConvocatiText();
   const count = parseRoster(S.convocati).length;
   return `<div class="card"><h2>Lista convocati</h2>
-    <p class="small muted" style="margin-top:0">Inserisci un giocatore per riga. Puoi indicare il numero di maglia prima del nome (es. 7 Rossi). Il comunicato viene composto automaticamente usando i dati della partita.</p>
-    <label class="f"><span>Giocatori convocati · uno per riga</span><textarea data-convocati rows="14" placeholder="1 Rossi&#10;2 Bianchi&#10;3 Verdi&#10;...">${esc(S.convocati)}</textarea></label>
+    <p class="small muted" style="margin-top:0">Inserisci esclusivamente i cognomi, uno per riga. Il comunicato viene composto automaticamente usando i dati della partita.</p>
+    <label class="f"><span>Giocatori convocati · uno per riga</span><textarea data-convocati rows="14" placeholder="Rossi&#10;Bianchi&#10;Verdi&#10;...">${esc(S.convocati)}</textarea></label>
     <div class="small muted" style="margin:-6px 0 12px">${count} giocatori inseriti</div>
     <button class="btn primary block" data-a="saveconvocati">Salva lista convocati</button></div>
     <div class="card"><h2>Comunicazione pronta per i social</h2>
