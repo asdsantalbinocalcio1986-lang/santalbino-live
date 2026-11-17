@@ -60,3 +60,19 @@ Sant'Albino Live è una pagina pubblica per seguire la partita e una regia priva
 - Le immagini caricate sono ridimensionate prima dell'invio; il bucket accetta JPEG, PNG e WebP fino a 8 MB.
 - Se il database non è configurato o la connessione manca, la pagina non deve essere considerata una regia online affidabile. Verifica sempre l'indicatore di sincronizzazione prima di proseguire.
 - Prima di usare il sistema in una gara ufficiale, esegui un test completo con due dispositivi e una partita di prova.
+
+
+## 6. Proprietà intellettuale e protezione
+
+Sant'Albino Live è pubblicato con **tutti i diritti riservati**. Il codice originale, la struttura applicativa, l'interfaccia e le grafiche originali non possono essere copiati, modificati, ridistribuiti o riutilizzati senza autorizzazione scritta dei rispettivi titolari. Consulta [COPYRIGHT.md](./COPYRIGHT.md) e [LICENSE](./LICENSE).
+
+Il diritto d'autore non impedisce tecnicamente che un repository pubblico venga visualizzato o scaricato. Il repository è attualmente pubblico per consentire la pubblicazione tramite GitHub Pages: chiunque può quindi leggere il codice. L'avviso di copyright riserva i diritti di riutilizzo, ma non nasconde il sorgente. Per rendere privato anche il codice occorre valutare un repository privato e un piano GitHub che supporti GitHub Pages da repository privati, prima di cambiare la visibilità.
+
+**Misure di sicurezza operative:**
+- non inserire mai password, token amministrativi o chiavi segrete di servizio nel repository o nel browser;
+- la chiave anon/publishable presente in config.js è pubblica per progettazione: la protezione effettiva dipende da autenticazione, autorizzazioni e policy RLS di Supabase;
+- mantenere disabilitate le registrazioni pubbliche e limitare le scritture al solo amministratore autorizzato;
+- conservare copie di backup periodiche del repository e del database/archivio Supabase;
+- verificare periodicamente le policy RLS, gli utenti autorizzati e i log di accesso.
+
+L'avviso di copyright non sostituisce gli accordi scritti con gli eventuali autori o collaboratori e non attribuisce all'associazione diritti su componenti, loghi o materiali di terzi.
