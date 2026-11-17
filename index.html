@@ -2175,7 +2175,7 @@ async function renderMatchGraphic(ev) {
       x.textAlign='center';fitFont(x,detail,790,17,700,FB);x.fillStyle='rgba(255,255,255,.92)';x.font=`700 17px ${FB}`;x.fillText(detail,W/2,1148);
     }else if(ev.type==='sub'){
       const side=ev.team||S.match.ourSide||'home',roster=parseRoster(S.rosters[side]||'');
-      const getSubName=raw=>{const value=String(raw||'').trim();const found=/^\d{1,2}$/.test(value)?roster.find(p=>p.num===value):roster.find(p=>p.name.toLowerCase()===value.toLowerCase());return (found?.name||value||'—').toUpperCase();};
+      const getSubPlayer=raw=>{const value=String(raw||'').trim();const found=/^\d{1,2}$/.test(value)?roster.find(p=>String(p.num)===value):roster.find(p=>p.name.toLowerCase()===value.toLowerCase()||p.name.toLowerCase().includes(value.toLowerCase()));return {name:(found?.name||value||'—').toUpperCase(),num:found?.num?String(found.num):(/^\d{1,2}$/.test(value)?value:'—')};};
       // Metadati essenziali della sostituzione: squadra e minuto, senza illustrazioni o frecce.
       const subTeam=teamName(side).toUpperCase();
       x.save();
@@ -2187,7 +2187,7 @@ async function renderMatchGraphic(ev) {
       x.strokeStyle=accent;x.lineWidth=2;rrect(x,430,846,220,42,14);x.stroke();
       x.fillStyle=accent;x.font=`900 27px ${FD}`;x.fillText(subMinute,W/2,876);
       x.restore();
-      const bubbles=[{label:'ENTRA',name:getSubName(ev.inn),color:'#b7f36b',x:92},{label:'ESCE',name:getSubName(ev.out),color:'#72c5ff',x:550}];
+      const bubbles=[{label:'ENTRA',player:getSubPlayer(ev.inn),color:'#b7f36b',x:92},{label:'ESCE',player:getSubPlayer(ev.out),color:'#72c5ff',x:550}];
       bubbles.forEach(item=>{
         const bx=item.x,by=914,bw=438,bh=154;
         x.save();
@@ -2197,11 +2197,13 @@ async function renderMatchGraphic(ev) {
         x.beginPath();x.moveTo(bx+bw/2-17,by+bh-1);x.lineTo(bx+bw/2+17,by+bh-1);x.lineTo(bx+bw/2,by+bh+24);x.closePath();x.fill();
         x.strokeStyle=item.color;x.lineWidth=3;rrect(x,bx,by,bw,bh,25);x.stroke();
         x.textAlign='center';x.textBaseline='alphabetic';x.fillStyle=item.color;x.font=`900 23px ${FB}`;x.fillText(item.label,bx+bw/2,by+44);
+        // Numero di maglia ben distinto, seguito dal nome; i due elementi restano nel fumetto.
+        x.fillStyle=item.color;x.font=`900 24px ${FD}`;x.fillText(item.player.num,bx+bw/2,by+79);
         x.fillStyle='#fff';
-        let nameSize=36;x.font=`900 ${nameSize}px ${FD}`;
-        while(x.measureText(item.name).width>bw-64&&nameSize>14){nameSize-=2;x.font=`900 ${nameSize}px ${FD}`;}
+        let nameSize=34;x.font=`900 ${nameSize}px ${FD}`;
+        while(x.measureText(item.player.name).width>bw-64&&nameSize>14){nameSize-=2;x.font=`900 ${nameSize}px ${FD}`;}
         // Limite Canvas esplicito: anche nomi eccezionalmente lunghi restano nel fumetto.
-        x.fillText(item.name,bx+bw/2,by+112,bw-64);
+        x.fillText(item.player.name,bx+bw/2,by+119,bw-64);
         x.restore();
       });
     }else if(illustrated){
