@@ -2854,9 +2854,12 @@ function prepareLineupImage(blob) {
           return c;
         };
         const numberCrop = crop(.105, .18);
+        // Zona esterna a sinistra: alcune distinte riportano qui i numeri maglia
+        // quando la colonna N° del Ruolo è lasciata vuota.
+        const leftMarginNumberCrop = crop(.075, .205);
         const nameCrop = crop(.265, .59);
         URL.revokeObjectURL(url);
-        resolve({ numberCrop, nameCrop });
+        resolve({ numberCrop, leftMarginNumberCrop, nameCrop });
       } catch (err) {
         URL.revokeObjectURL(url); reject(err);
       }
@@ -2941,15 +2944,29 @@ async function readLineup(side, stat) {
     namePasses.sort((a,b) => (b.parsed.length * 10 + b.confidence * .02) - (a.parsed.length * 10 + a.confidence * .02));
     const names = namePasses[0]?.parsed || [];
 
-    const numberPasses = [];
-    for (const mode of ['6','11','12']) {
-      await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789Il|.' });
-      const result = await worker.recognize(prepared.numberCrop);
-      const nums = parseOcrNumbers(result.data.text || '');
-      numberPasses.push({ nums, confidence: Number(result.data.confidence || 0) });
+    const readNumberZone = async (canvas) => {
+      const passes = [];
+      for (const mode of ['6','11','12']) {
+        await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789Il|.' });
+        const result = await worker.recognize(canvas);
+        passes.push({ nums: parseOcrNumbers(result.data.text || ''), confidence: Number(result.data.confidence || 0) });
+      }
+      passes.sort((a,b) => (b.nums.length * 10 + b.confidence * .02) - (a.nums.length * 10 + a.confidence * .02));
+      return passes[0] || { nums: [], confidence: 0 };
+    };
+    const insideNumbers = await readNumberZone(prepared.numberCrop);
+    let numberSource = 'colonna N° del Ruolo';
+    let bestNumbers = insideNumbers;
+    // Se la colonna ufficiale è vuota/parzialmente compilata, prova i numeri
+    // manoscritti immediatamente a sinistra della tabella.
+    if (insideNumbers.nums.length < names.length) {
+      const marginNumbers = await readNumberZone(prepared.leftMarginNumberCrop);
+      if (marginNumbers.nums.length > bestNumbers.nums.length) {
+        bestNumbers = marginNumbers;
+        numberSource = 'numeri manoscritti a sinistra della tabella';
+      }
     }
-    numberPasses.sort((a,b) => (b.nums.length * 10 + b.confidence * .02) - (a.nums.length * 10 + a.confidence * .02));
-    const numbers = numberPasses[0]?.nums || [];
+    const numbers = bestNumbers.nums;
 
     if (!names.length) {
       stat.textContent = 'Non riesco a leggere i nominativi. La foto non è stata importata: prova a ritagliare la tabella e fotografarla più frontalmente.';
@@ -2969,11 +2986,11 @@ async function readLineup(side, stat) {
     field.value = output.join('\n');
     field.dispatchEvent(new Event('input', { bubbles: true }));
     const warnings = [];
-    if (numbers.length !== names.length) warnings.push('numeri letti ' + numbers.length + ' su ' + names.length + ': completa i numeri mancanti');
+    if (numbers.length !== names.length) warnings.push('numeri letti ' + numbers.length + ' su ' + names.length + ' da ' + numberSource + ': completa i numeri mancanti');
     if (starters.length !== 11) warnings.push(starters.length + ' titolari rilevati');
     stat.textContent = 'Importati ' + players.length + ' nominativi (' + starters.length + ' titolari, ' + bench.length + ' riserve). ' +
       (warnings.length ? 'Da verificare: ' + warnings.join(' · ') + '. ' : '') +
-      'Controlla soprattutto i numeri di maglia e correggi eventuali errori prima di salvare.';
+      'Fonte numeri: ' + numberSource + '. Controlla i numeri di maglia e correggi eventuali errori prima di salvare.';
   } catch (error) {
     console.error(error);
     stat.textContent = 'Lettura non riuscita: ' + (error.message || 'controlla la foto e riprova.');
