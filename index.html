@@ -1775,13 +1775,6 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  if (!activeSponsorGraphicUrl) {
-    const list = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors.filter(Boolean) : [];
-    if (!list.length) return canvas;
-    activeSponsorGraphicUrl = list[Math.floor(Math.random() * list.length)];
-  }
-  const img = await loadGraphicImage(activeSponsorGraphicUrl);
-  if (!img) return canvas;
   const slots = {
     event: {x: canvas.width-220, y: canvas.height-210, w: 170, h: 72},
     phase: {x: canvas.width-220, y: canvas.height-195, w: 170, h: 72},
@@ -1796,15 +1789,17 @@ async function addSponsorToGraphic(canvas, layout) {
   if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
   if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
   if(style.sponsor===false)return canvas;
+  if(!activeSponsorGraphicUrl){
+    const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];
+    if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];
+  }
+  if(!activeSponsorGraphicUrl)return canvas;
+  const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
   x.save();
-  x.fillStyle = 'rgba(255,255,255,.96)';
-  rrect(x,p.x,p.y,p.w,p.h,12); x.fill();
-  x.strokeStyle = 'rgba(10,35,23,.22)'; x.lineWidth = 1.5;
-  rrect(x,p.x,p.y,p.w,p.h,12); x.stroke();
-  const pad = 7, scale = Math.min((p.w-pad*2)/img.width,(p.h-pad*2)/img.height);
-  const w=img.width*scale,h=img.height*scale;
-  x.drawImage(img,p.x+(p.w-w)/2,p.y+(p.h-h)/2,w,h);
-  x.restore();
+  x.fillStyle='rgba(255,255,255,.96)';rrect(x,p.x,p.y,p.w,p.h,12);x.fill();
+  x.strokeStyle='rgba(10,35,23,.22)';x.lineWidth=1.5;rrect(x,p.x,p.y,p.w,p.h,12);x.stroke();
+  const pad=7,scale=Math.min((p.w-pad*2)/img.width,(p.h-pad*2)/img.height),w=img.width*scale,h=img.height*scale;
+  x.drawImage(img,p.x+(p.w-w)/2,p.y+(p.h-h)/2,w,h);x.restore();
   return canvas;
 }
 
@@ -2791,7 +2786,7 @@ async function renderEditorCanvas(layout) {
 }
 async function openGraphicEditorPreview() {
   const host=$('#graphicEditorPreview');if(!host)return;
-  const layout=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'event';
+  const layout=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:(S.events.some(e=>CARD_TYPES.includes(e.type))?'event':'matchday');
   host.innerHTML='<p class="small muted">Genero l’anteprima…</p>';
   try{
     beginSponsorGraphic();
