@@ -149,15 +149,15 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .tab[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 
 /* timeline orizzontale sintetica della regia */
-.match-timeline{display:grid;grid-template-columns:68px minmax(0,1fr);gap:4px 10px;align-items:center;padding:26px 4px 30px;overflow:visible}
-.match-tl-lane{font:700 12px/1.1 var(--fd);letter-spacing:.04em;text-transform:uppercase}
+.match-timeline{display:grid;grid-template-columns:68px minmax(0,1fr);grid-template-rows:1fr 1px 1fr;gap:0 10px;min-height:104px;padding:8px 4px;overflow:visible}
+.match-tl-lane{font:700 12px/1.1 var(--fd);letter-spacing:.04em;text-transform:uppercase;align-self:center}
 .santa-label{grid-column:1;grid-row:1;color:var(--accent)}
-.opponent-label{grid-column:1;grid-row:1;align-self:end;color:var(--c-sub)}
-.match-tl-track{grid-column:2;grid-row:1;position:relative;height:1px;background:var(--line);margin:0 4px}
+.opponent-label{grid-column:1;grid-row:3;color:var(--c-sub)}
+.match-tl-track{grid-column:2;grid-row:2;position:relative;height:1px;background:var(--line);margin:0 4px}
 .match-tl-axis{position:absolute;inset:0;height:3px;top:-1px;background:var(--line);border-radius:3px}
 .match-tl-tick{position:absolute;left:var(--x);top:50%;height:1px;transform:translateX(-50%);pointer-events:none}
 .match-tl-tick i{position:absolute;left:0;top:-5px;width:1px;height:11px;background:var(--muted)}
-.match-tl-tick b{position:absolute;left:0;top:11px;transform:translateX(-50%);font:600 10px/1 var(--fb);color:var(--muted);white-space:nowrap}
+.match-tl-tick b{position:absolute;left:0;top:27px;transform:translateX(-50%);font:600 10px/1 var(--fb);color:var(--muted);white-space:nowrap}
 .match-tl-tick.half i{width:2px;height:17px;top:-8px;background:var(--ink)}
 .match-tl-marker{position:absolute;left:var(--x);top:50%;width:0;height:0;z-index:2}
 .match-tl-marker i{position:absolute;left:-1px;width:2px;height:9px;background:currentColor}
@@ -168,7 +168,7 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .match-tl-marker.opponent{color:var(--c-sub)}
 .match-tl-marker.opponent i{top:0;transform:translateY(1px)}
 .match-tl-marker.opponent b{top:calc(10px + var(--stack)*15px)}
-@media(max-width:420px){.match-timeline{grid-template-columns:56px minmax(0,1fr);gap:4px 7px;padding-inline:0}.match-tl-lane{font-size:11px}.match-tl-marker b{font-size:11px}.match-tl-tick b{font-size:9px}}
+@media(max-width:420px){.match-timeline{grid-template-columns:56px minmax(0,1fr);gap:0 7px;padding-inline:0}.match-tl-lane{font-size:11px}.match-tl-marker b{font-size:11px}.match-tl-tick b{font-size:9px}}
 /* timeline pubblica */
 .tl-list{list-style:none;margin:0;padding:0;position:relative}
 .tl-list::before{content:"";position:absolute;left:62px;top:6px;bottom:6px;width:2px;background:var(--line)}
