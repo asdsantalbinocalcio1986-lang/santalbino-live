@@ -3826,7 +3826,6 @@ document.addEventListener('click', async e => {
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
       const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
-      const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
       const shareText = so.text + '\n\nSegui la partita su SANTA Live: ' + matchUrl;
       window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
       break;
