@@ -1607,7 +1607,24 @@ async function initCaps() {
   offerDraftRecovery();
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
     if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); if (CAN_EDIT) refreshMvpVotes(); }
-   }).subscribe();
+   }).subscribe((status, err) => {
+    if (status === 'SUBSCRIBED') {
+      if (realtimeNeedsResync) void refreshRemoteState('realtime-reconnected');
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      realtimeNeedsResync = true;
+      console.warn('Connessione Realtime Sant\'Albino Live:', status, err || '');
+    }
+  });
+  window.addEventListener('online', () => {
+    realtimeNeedsResync = true;
+    void refreshRemoteState('network-online');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      realtimeNeedsResync = true;
+      void refreshRemoteState('page-visible');
+    }
+  });
   db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
@@ -1682,6 +1699,7 @@ async function signOutAdmin() { if (db) await db.auth.signOut(); CAN_EDIT = fals
 
 /* ================= sincronizzazione online ================= */
 let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publishPending = false, remoteRev = 0;
+let realtimeNeedsResync = false, remoteRefreshBusy = false;
 function setSync(st, detail = '') { syncState = st; syncDetail = detail; const el = $('#sync'); if (el) el.outerHTML = syncHtml(); }
 function syncHtml() {
   const txt = { ok: 'Pagina live aggiornata', dirty: 'Modifiche da sincronizzare…', sending: 'Sincronizzazione in corso…', error: 'Sincronizzazione non disponibile' + (syncDetail ? ` (${esc(syncDetail)})` : ''), local: 'Modalità locale: configura il database' }[LOCAL_ONLY ? 'local' : syncState];
@@ -1778,8 +1796,35 @@ async function publishNow() {
     return;
   }
   setSync('ok'); flushStash();
+  if (realtimeNeedsResync) void refreshRemoteState('post-save');
 }
 function flushStash() { const id = stash.get('open-post'); if (id) { stash.del('open-post'); openPost(id); } }
+async function refreshRemoteState(reason = 'reconnect') {
+  if (!db || !dbReady || remoteRefreshBusy || publishing || syncState !== 'ok') return false;
+  remoteRefreshBusy = true;
+  try {
+    const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    if (!data?.state) return false;
+    const nextRev = Number(data.state.rev || 0);
+    if (nextRev > Number(S.rev || 0)) {
+      remoteRev = nextRev;
+      S = mergeState(data.state);
+      L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+      L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+      L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+      updDatalists(); renderHero(); renderMain();
+      if (CAN_EDIT) await refreshMvpVotes();
+    }
+    realtimeNeedsResync = false;
+    return true;
+  } catch (err) {
+    console.warn('Riallineamento Sant\'Albino Live (' + reason + '):', err);
+    return false;
+  } finally {
+    remoteRefreshBusy = false;
+  }
+}
 
 /* ================= eventi ================= */
 function setEvOne(id, img, raw) {
