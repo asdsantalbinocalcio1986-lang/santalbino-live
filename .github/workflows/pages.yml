@@ -1,7 +1,9 @@
-name: Deploy Santa Live to GitHub Pages
+name: Validate and deploy Sant'Albino Live
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -15,10 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  validate:
+    name: Validate application
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,6 +29,18 @@ jobs:
           node-version: 22
       - name: Validate application and security migration
         run: node scripts/validate-project.mjs
+
+  deploy:
+    name: Deploy GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: validate
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
