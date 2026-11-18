@@ -5,6 +5,23 @@ import assert from 'node:assert/strict';
 const html = fs.readFileSync('index.html', 'utf8');
 const sql = fs.readFileSync('supabase-phase1-security.sql', 'utf8');
 
+for (const file of ['home.html', 'preview.html']) {
+  const page = fs.readFileSync(file, 'utf8');
+  const pageScripts = [...page.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+  let pageChecked = 0;
+  for (const [index, attrs, body] of pageScripts) {
+    if (/\\bsrc\\s*=/.test(attrs) || !body.trim()) continue;
+    new vm.Script(body, { filename: file + ':inline-script-' + index });
+    pageChecked++;
+  }
+  assert.ok(pageChecked >= 1, 'Script inline mancante o non verificabile in ' + file);
+}
+new vm.Script(fs.readFileSync('sw.js', 'utf8'), { filename: 'sw.js' });
+JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
+assert.match(html, /rel="manifest" href="\\.\\/manifest\\.webmanifest"/);
+assert.match(html, /if \\(!S\\.match\\.pollId\\) S\\.match\\.pollId = uid\\(\\);/);
+
+
 const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 let checked = 0;
 for (const [index, attrs, body] of scripts) {
