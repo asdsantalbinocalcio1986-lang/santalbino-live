@@ -76,3 +76,16 @@ Il diritto d'autore non impedisce tecnicamente che un repository pubblico venga 
 - verificare periodicamente le policy RLS, gli utenti autorizzati e i log di accesso.
 
 L'avviso di copyright non sostituisce gli accordi scritti con gli eventuali autori o collaboratori e non attribuisce all'associazione diritti su componenti, loghi o materiali di terzi.
+
+## 7. Migrazione sicurezza e affidabilità — Fase 1
+
+La migrazione `supabase-phase1-security.sql` introduce:
+- voto MVP anonimo tramite funzione server-side, con verifica di partita, finestra temporale e rosa;
+- lettura pubblica dei soli conteggi aggregati, senza accesso alle singole righe;
+- salvataggio dello stato partita con controllo atomico della revisione remota.
+
+**Ordine obbligatorio di attivazione:** la migrazione SQL va eseguita nel Supabase SQL Editor prima di pubblicare la versione applicativa che usa le nuove funzioni RPC. Non eseguire questa migrazione mentre il sito attivo sta ancora usando l'inserimento/lettura diretti della tabella MVP: in quel breve intervallo la votazione legacy non funzionerebbe. La migrazione non cancella i voti già presenti.
+
+La nuova versione applicativa recupera le bozze locali più recenti, offre esportazione JSON e valida i file importati. Se viene rilevato un conflitto di revisione, non sovrascrive lo stato remoto.
+
+La votazione resta anonima e il limite di un voto è applicato all'identificativo pseudonimo conservato nel browser: non equivale a un'identificazione certa della persona e può essere aggirato cambiando browser o dispositivo.
