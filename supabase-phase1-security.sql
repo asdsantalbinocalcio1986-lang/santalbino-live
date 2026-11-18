@@ -63,7 +63,7 @@ begin
   v_match_key := nullif(v_state #>> '{match,pollId}','');
   if v_match_key is null then
     v_match_key := lower(
-      coalesce(v_state #>> '{match,date}','senza-data') || '|' ||
+      coalesce(nullif(v_state #>> '{match,date}',''),'senza-data') || '|' ||
       coalesce(v_state #>> '{match,home}','') || '|' ||
       coalesce(v_state #>> '{match,away}','')
     );
@@ -146,7 +146,7 @@ begin
   v_current_key := nullif(v_state #>> '{match,pollId}','');
   if v_current_key is null then
     v_current_key := lower(
-      coalesce(v_state #>> '{match,date}','senza-data') || '|' ||
+      coalesce(nullif(v_state #>> '{match,date}',''),'senza-data') || '|' ||
       coalesce(v_state #>> '{match,home}','') || '|' ||
       coalesce(v_state #>> '{match,away}','')
     );
