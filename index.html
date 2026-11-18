@@ -3742,11 +3742,11 @@ async function openPost(id) {
 let ROOT;
 function topHtml() {
   const controls = CAN_EDIT
-    ? `<button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
-    : `<button class="pill" data-a="login">Accesso regia</button>`;
+    ? `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
+    : `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="login">Accesso regia</button>`;
   const mobileControls = CAN_EDIT
-    ? `<button class="pill mobile-primary" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Torna in regia'}</button><details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
-    : `<button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
+    ? `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Torna in regia'}</button><details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
+    : `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
   return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div><div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
@@ -3810,7 +3810,7 @@ document.addEventListener('click', async e => {
     case 'viewMatchResult': if (S.clock.phase !== 'ft') { toast('Il MATCH RESULT è disponibile dopo il fischio finale'); break; } await openMatchResult(); break;
     case 'saveMatchResultGraphic': { const cv=await renderMatchResultGraphic(); cv.toBlob(blob=>{if(blob)saveBlob(blob,'match-result.jpg');},'image/jpeg',.94); break; }
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
-    case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); window.open('https://wa.me/?text='+encodeURIComponent(txt+'\\n\\nSegui SANTA Live: https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/'),'_blank','noopener'); break; }
+    case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); window.open('https://wa.me/?text='+encodeURIComponent(txt+'\\n\\nSegui SANTA Live: ' + (S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html')),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.94); break; }
     case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
@@ -4353,6 +4353,7 @@ async function readLineup(side, stat) {
 
 /* ================= avvio ================= */
 (async function start() {
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service worker SANTA Live:', err)));
   ROOT = $('#root');
   const mk = (tag, id) => { const d = document.createElement(tag); d.id = id; document.body.appendChild(d); return d; };
   mk('dialog', 'sheet').setAttribute('aria-label', 'Nuovo evento'); mk('dialog', 'postDlg').setAttribute('aria-label', 'Pubblica su Facebook'); mk('dialog', 'graphicDlg').setAttribute('aria-label', 'Immagine evento');
