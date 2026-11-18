@@ -1334,7 +1334,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
@@ -1398,6 +1398,8 @@ function curMinute() {
 }
 const PHASE = { pre: 'Prima del via', p1: '1° tempo', ht: 'Intervallo', p2: '2° tempo', ft: 'Finale' };
 const PHASEBTN = { pre: "Fischio d'inizio", p1: 'Fine 1° tempo', ht: 'Inizio 2° tempo', p2: 'Fine partita', ft: 'Nuova partita' };
+const oppositeAttackDirection = direction => direction === 'right' ? 'left' : direction === 'left' ? 'right' : '';
+const attackDirectionLabel = direction => direction === 'right' ? 'destra' : direction === 'left' ? 'sinistra' : '';
 function statusHtml() {
   const p = S.clock.phase;
   if (p === 'p1' || p === 'p2') return `<span class="dot"></span>LIVE · ${esc(curMinute())}′`;
@@ -1475,9 +1477,9 @@ function buildText(ev, sc) {
     case 'injury': x = `🚑 ${m}INFORTUNIO\nGioco fermo per soccorrere ${p || 'un giocatore'} (${t}).`; break;
     case 'note': x = `📣 ${m}AGGIORNAMENTO\n${ev.note || ''}`; break;
     case 'mvp': x = `⭐ MIGLIORE IN CAMPO\n${p} (${t})${ev.votes ? ` · ${ev.votes} voti` : ''}. Grazie a tutti per aver votato!`; break;
-    case 'kickoff': x = `▶️ FISCHIO D'INIZIO\n${teamName('home')} vs ${teamName('away')}\n${[S.match.comp, S.match.venue].filter(Boolean).join(' · ')}`.trim(); break;
+    case 'kickoff': x = `▶️ FISCHIO D'INIZIO\n${teamName('home')} vs ${teamName('away')}\n${[S.match.comp, S.match.venue].filter(Boolean).join(' · ')}${ev.attackDirection ? `\n${teamName(S.match.ourSide)} attacca verso ${attackDirectionLabel(ev.attackDirection)} nel primo tempo.` : ''}`.trim(); break;
     case 'halftime': x = `⏸️ FINE PRIMO TEMPO\n${line}`; break;
-    case 'secondhalf': x = `▶️ SECONDO TEMPO\nAl via. ${line}`; break;
+    case 'secondhalf': x = `▶️ SECONDO TEMPO\nAl via. ${line}${ev.attackDirection ? `\n${teamName(S.match.ourSide)} attacca verso ${attackDirectionLabel(ev.attackDirection)}.` : ''}`; break;
     case 'fulltime': x = `🏁 FINE PARTITA\n${line}`; break;
   }
   return x + (S.match.hashtag ? `\n\n${S.match.hashtag}` : '');
@@ -2170,7 +2172,7 @@ function addEvent(ev, opts = {}) {
   commit(true); renderMain();
   return ev;
 }
-function addPhase(type, min) { addEvent({ type, team: S.match.ourSide, min: min ?? curMinute() }, { post: true }); }
+function addPhase(type, min, extra = {}) { addEvent(Object.assign({ type, team: S.match.ourSide, min: min ?? curMinute() }, extra), { post: true }); }
 function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; saveL(); commit(true); renderMain(); }
 
 /* ================= immagini degli eventi ================= */
@@ -3102,7 +3104,7 @@ function renderHero() { const el = $('#hero'); if (el) el.innerHTML = heroHtml()
 function timelineHtml() {
   if (!S.events.length) return `<div class="empty"><h3>La partita non è ancora iniziata</h3>La cronaca si aggiorna da sola: tieni aperta questa pagina.</div>`;
   const items = S.events.map((e, i) => ({ e, sc: scoreAt(i) })).reverse().map(({ e, sc }) => {
-    if (PHASE_EV[e.type]) return `<li class="tl-phase"><span></span><span class="tl-ic">${IC.clock}</span><span class="tl-ph">${PHASE_EV[e.type]}${e.type !== 'kickoff' ? ` · ${sc[0]}-${sc[1]}` : ''}</span></li>`;
+    if (PHASE_EV[e.type]) return `<li class="tl-phase"><span></span><span class="tl-ic">${IC.clock}</span><span class="tl-ph">${PHASE_EV[e.type]}${e.type !== 'kickoff' ? ` · ${sc[0]}-${sc[1]}` : ''}${e.attackDirection ? ` · ${esc(teamName(S.match.ourSide))} attacca verso ${attackDirectionLabel(e.attackDirection)}` : ''}</span></li>`;
     const d = describe(e, sc), side = e.team;
     return `<li class="tl ${e.type}" style="--col:${COL[e.type]}">
       <div class="tl-min">${esc(e.min || '')}${e.min ? '′' : ''}</div><div class="tl-ic">${IC[e.type] || ''}</div>
@@ -3336,15 +3338,26 @@ function feedHtml(list) {
   }).join('');
 }
 let editId = null, armedDel = null;
+function regiaTimelineHtml() {
+  if (!S.events.length) return '<div class="empty">Le azioni registrate appariranno qui in ordine cronologico.</div>';
+  const items = S.events.map((e, i) => ({ e, sc: scoreAt(i) })).map(({ e, sc }) => {
+    if (PHASE_EV[e.type]) return `<li class="tl-phase"><span></span><span class="tl-ic">${IC.clock}</span><span class="tl-ph">${PHASE_EV[e.type]}${e.type !== 'kickoff' ? ` · ${sc[0]}-${sc[1]}` : ''}${e.attackDirection ? ` · ${esc(teamName(S.match.ourSide))} attacca verso ${attackDirectionLabel(e.attackDirection)}` : ''}</span></li>`;
+    const d = describe(e, sc);
+    return `<li class="tl ${e.type}" style="--col:${COL[e.type] || 'var(--c-note)'}"><div class="tl-min">${esc(e.min || '')}${e.min ? '′' : ''}</div><div class="tl-ic">${IC[e.type] || ''}</div><div class="tl-card"><div class="tl-top"><span class="tl-title">${esc(d.title)}</span>${e.type === 'note' ? '' : `<span class="tl-team">${badge(e.team)}<span>${esc(teamName(e.team))}</span></span>`}</div>${d.main ? `<div class="tl-main">${esc(d.main)}</div>` : ''}<div class="tl-sub">${d.sub}</div></div></li>`;
+  }).join('');
+  return `<ul class="tl-list">${items}</ul>`;
+}
 function regiaHtml() {
   const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
-    <button class="btn primary block phasebtn" data-a="phase" ${S.clock.phase === 'ft' ? 'disabled' : ''}>${S.clock.phase === 'ft' ? 'Partita terminata' : PHASEBTN[S.clock.phase]}</button>
+    ${S.clock.phase === 'pre' ? `<div class="card"><h2>Direzione d'attacco · obbligatoria</h2><p class="small muted" style="margin-top:0">Indica verso quale lato del campo attacca il Sant'Albino nel primo tempo. All'inizio della ripresa la direzione verrà invertita automaticamente.</p><label class="f"><span>Nel primo tempo il Sant'Albino attacca verso</span><select data-attack-direction required><option value="">Seleziona la direzione</option><option value="left" ${S.match.attackDirectionFirst === 'left' ? 'selected' : ''}>Sinistra</option><option value="right" ${S.match.attackDirectionFirst === 'right' ? 'selected' : ''}>Destra</option></select></label></div>` : `<div class="card"><b>Direzione d'attacco Sant'Albino</b><p class="small muted" style="margin:6px 0 0">${S.clock.phase === 'ft' ? 'Ultima direzione registrata' : S.clock.phase === 'ht' ? 'Primo tempo concluso · cambio automatico alla ripresa' : S.clock.phase === 'p2' ? 'Secondo tempo · ' : 'Primo tempo · '} ${attackDirectionLabel(S.match.attackDirectionCurrent || (S.clock.phase === 'p2' ? oppositeAttackDirection(S.match.attackDirectionFirst) : S.match.attackDirectionFirst)) ? 'verso ' + attackDirectionLabel(S.match.attackDirectionCurrent || (S.clock.phase === 'p2' ? oppositeAttackDirection(S.match.attackDirectionFirst) : S.match.attackDirectionFirst)) : 'non disponibile'}</p></div>`}
+    <button class="btn primary block phasebtn" data-a="phase" ${S.clock.phase === 'ft' || (S.clock.phase === 'pre' && !S.match.attackDirectionFirst) ? 'disabled' : ''}>${S.clock.phase === 'ft' ? 'Partita terminata' : PHASEBTN[S.clock.phase]}</button>
     ${S.clock.phase === 'ft' ? `<div class="card"><h2>${currentArchived ? 'Partita salvata' : 'Partita terminata: cosa vuoi fare?'}</h2><p class="small muted">${currentArchived ? 'La partita è stata conservata nell’archivio storico con risultato, cronaca e formazioni.' : 'Scegli se conservare questa partita nello storico oppure scartarla. Nessuna partita viene archiviata automaticamente.'} I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Presente nell’archivio storico</p><button class="btn primary block" data-a="startNewMatch">Avvia una nuova partita</button>' : '<div class="row2 stack"><button class="btn primary" data-a="archiveMatch">Salva nell’archivio</button><button class="btn danger" data-a="discardMatch">Scarta partita</button></div>'}</div>` : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
-    <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>`;
+    <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>
+    <h2>Timeline della partita</h2><div class="card"><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine.</p>${regiaTimelineHtml()}</div>`;
   else if (t === 'archive') body = archiveHtml();
   else if (t === 'convocati') body = convocatiRegiaHtml();
   else if (t === 'lineup') body = ['home', 'away'].map(s => {
@@ -3644,9 +3657,16 @@ document.addEventListener('click', async e => {
     case 'reloadArchive': await loadMatchArchive(true); break;
     case 'phase': { const c = S.clock;
       if (c.phase === 'ft') break;
-      if (c.phase === 'pre') { c.phase = 'p1'; c.t0 = Date.now(); addPhase('kickoff', ''); }
+      if (c.phase === 'pre') {
+        if (!['left', 'right'].includes(S.match.attackDirectionFirst)) { toast('Seleziona prima la direzione d\'attacco del Sant\'Albino'); break; }
+        S.match.attackDirectionCurrent = S.match.attackDirectionFirst;
+        c.phase = 'p1'; c.t0 = Date.now(); addPhase('kickoff', '', { attackDirection: S.match.attackDirectionCurrent });
+      }
       else if (c.phase === 'p1') { c.phase = 'ht'; addPhase('halftime', '45'); }
-      else if (c.phase === 'ht') { c.phase = 'p2'; c.t0 = Date.now(); addPhase('secondhalf', '45'); }
+      else if (c.phase === 'ht') {
+        S.match.attackDirectionCurrent = oppositeAttackDirection(S.match.attackDirectionFirst);
+        c.phase = 'p2'; c.t0 = Date.now(); addPhase('secondhalf', '45', { attackDirection: S.match.attackDirectionCurrent });
+      }
       else if (c.phase === 'p2') { c.phase = 'ft'; addPhase('fulltime', '90'); }
       break; }
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
@@ -3765,7 +3785,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
@@ -3801,6 +3821,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
+  if (t.matches('[data-attack-direction]')) { if (S.clock.phase !== 'pre') return; S.match.attackDirectionFirst = ['left','right'].includes(t.value) ? t.value : ''; commit(true); renderMain(); return; }
   if(t.matches('[data-editor-scope]')){L.editorTemplate=t.value;saveL();renderMain();return;}
   if(t.matches('[data-event-template]')){L.editorEventTemplate=t.value;renderMain();return;}
 
