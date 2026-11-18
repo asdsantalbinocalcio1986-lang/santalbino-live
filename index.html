@@ -108,6 +108,13 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .brand span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pill{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 14px;border-radius:99px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14px;white-space:nowrap}
 .pill.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.top-actions-desktop{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.mobile-actions{display:none;position:relative;flex:none}
+.mobile-actions>summary{list-style:none;display:flex;align-items:center;gap:8px;min-height:40px;padding:7px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-weight:700;cursor:pointer}
+.mobile-actions>summary::-webkit-details-marker{display:none}
+.mobile-actions[open]>summary{border-color:var(--accent)}
+.mobile-actions-menu{position:absolute;z-index:30;right:0;top:calc(100% + 7px);display:grid;gap:7px;width:min(250px,calc(100vw - 32px));padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.mobile-actions-menu .pill{width:100%;justify-content:flex-start;white-space:normal;text-align:left;border-radius:10px;min-height:42px}
 
 /* tabellone */
 .hero{position:relative;overflow:hidden;border-radius:24px;color:#fff;background:linear-gradient(165deg,var(--hero2),var(--hero1) 70%);padding:18px 14px 16px;margin-bottom:16px}
@@ -132,6 +139,7 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .scorers{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;font-size:13px;opacity:.88;min-height:4px}
 .scorers div{min-width:0;overflow-wrap:anywhere;line-height:1.5}
 .scorers div:last-child{text-align:right}
+@media (max-width:600px){.top{align-items:center;flex-wrap:nowrap}.top-actions-desktop{display:none}.mobile-actions{display:block}.brand{flex:1 1 auto}.brand span{max-width:48vw}}
 @media (max-width:380px){.score{font-size:52px}.badge{width:62px;height:62px}.tname{font-size:15px}}
 
 /* schede */
@@ -3582,8 +3590,13 @@ async function openPost(id) {
 /* ================= disegno pagina ================= */
 let ROOT;
 function topHtml() {
-  const control = CAN_EDIT ? `<button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>` : `<button class="pill" data-a="login">Accesso regia</button>`;
-  return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div>${control}</div>`;
+  const controls = CAN_EDIT
+    ? `<button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
+    : `<button class="pill" data-a="login">Accesso regia</button>`;
+  const mobileControls = CAN_EDIT
+    ? `<details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
+    : '';
+  return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div><div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
 let lastVote = 'none';
