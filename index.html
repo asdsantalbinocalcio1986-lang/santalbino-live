@@ -1729,9 +1729,9 @@ function recoverDraftManually() {
   const relation = draftRev > remoteRev ? 'più recente' : draftRev < remoteRev ? 'più vecchia' : 'allineata';
   const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('it-IT') : 'data non disponibile';
   const warning = draftRev < remoteRev
-    ? '\\n\\nATTENZIONE: la bozza è più vecchia dello stato online. Recuperandola potresti sostituire dati più recenti.'
+    ? '\n\nATTENZIONE: la bozza è più vecchia dello stato online. Recuperandola potresti sostituire dati più recenti.'
     : '';
-  const message = 'Bozza locale trovata.\\nSalvata: '+when+'\\nRevisione locale: '+draftRev+'\\nRevisione online: '+remoteRev+'\\nLa bozza è '+relation+'.'+warning+'\\n\\nVuoi confrontare e ripristinare la bozza? L’operazione aggiornerà lo stato online.';
+  const message = 'Bozza locale trovata.\nSalvata: '+when+'\nRevisione locale: '+draftRev+'\nRevisione online: '+remoteRev+'\nLa bozza è '+relation+'.'+warning+'\n\nVuoi confrontare e ripristinare la bozza? L’operazione aggiornerà lo stato online.';
   if (!confirm(message)) return;
   S = mergeState(draft.state);
   S.rev = remoteRev;
@@ -3519,7 +3519,7 @@ function parseOcrNumbers(text) {
   // La colonna è una sequenza verticale: PSM 11 può restituire più numeri
   // sulla stessa riga o separarli da rumore. Estraiamo solo valori 1..24.
   const found = [];
-  for (const raw of (text || '').split(/\\r?\\n/)) {
+  for (const raw of (text || '').split(/\\r?\n/)) {
     const matches = raw.match(/[0-9]{1,2}|[Il|]{1,2}/g) || [];
     for (const token of matches) {
       const n = Number(token.replace(/[Il|]/g, '1'));
