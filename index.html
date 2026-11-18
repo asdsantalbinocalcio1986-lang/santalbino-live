@@ -1526,7 +1526,7 @@ function voterId() {
   return id;
 }
 let mvpVoteCounts = {}, mvpVoteBusy = false;
-let archiveRows = [], archiveLoaded = false, archiveLoading = false, currentArchived = false;
+let archiveRows = [], archiveLoaded = false, archiveLoading = false, archiveError = '', currentArchived = false;
 
 async function loadMatchArchive(force = false) {
   if (!db || archiveLoading || (archiveLoaded && !force)) return;
@@ -1539,9 +1539,11 @@ async function loadMatchArchive(force = false) {
     if (error) throw error;
     archiveRows = data || [];
     archiveLoaded = true;
+    archiveError = '';
   } catch (error) {
     console.warn('Caricamento archivio partite:', error);
     archiveLoaded = false;
+    archiveError = error?.message || 'Errore di connessione';
   } finally {
     archiveLoading = false;
     if ($('#main') && L.tab === 'archive' && !(CAN_EDIT && L.mode === 'regia')) renderMain();
@@ -1550,7 +1552,8 @@ async function loadMatchArchive(force = false) {
 
 function archiveHtml() {
   if (!db) return '<div class="empty"><h3>Archivio non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
-  if (archiveLoading || !archiveLoaded) return '<div class="empty">Caricamento archivio partite…</div>';
+  if (archiveLoading) return '<div class="empty">Caricamento archivio partite…</div>';
+  if (!archiveLoaded) return `<div class="card"><h3>Archivio non caricato</h3><p class="small muted">${esc(archiveError || 'Controlla la connessione e riprova.')}</p><button class="btn" data-a="reloadArchive">Riprova</button></div>`;
   if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
   const typeLabels = { kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
   return archiveRows.map(row => {
@@ -1576,7 +1579,7 @@ function archiveHtml() {
 async function refreshCurrentArchiveStatus() {
   if (!db || !S.match?.pollId) { currentArchived = false; return false; }
   const { data, error } = await db.from('match_archive').select('id').eq('poll_id', S.match.pollId).maybeSingle();
-  if (error) { console.warn('Verifica archiviazione partita:', error.message); return false; }
+  if (error) { currentArchived = false; console.warn('Verifica archiviazione partita:', error.message); return false; }
   currentArchived = !!data;
   return currentArchived;
 }
@@ -1691,7 +1694,7 @@ async function initCaps() {
   await refreshCurrentArchiveStatus();
   offerDraftRecovery();
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); if (CAN_EDIT) refreshMvpVotes(); }
+    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); void refreshCurrentArchiveStatus().then(() => renderMain()); if (CAN_EDIT) refreshMvpVotes(); }
    }).subscribe((status, err) => {
     if (status === 'SUBSCRIBED') {
       if (realtimeNeedsResync) void refreshRemoteState('realtime-reconnected');
@@ -1895,6 +1898,7 @@ async function refreshRemoteState(reason = 'reconnect') {
     if (nextRev > Number(S.rev || 0)) {
       remoteRev = nextRev;
       S = mergeState(data.state);
+      await refreshCurrentArchiveStatus();
       L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
       L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
       L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
@@ -3333,6 +3337,7 @@ document.addEventListener('click', async e => {
     case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
     case 'retry': publishNow(); break;
     case 'archiveMatch': await archiveCurrentMatch(); break;
+    case 'reloadArchive': await loadMatchArchive(true); break;
     case 'phase': { const c = S.clock;
       if (c.phase === 'ft') { if (!armedNew) { armedNew = true; a.textContent = 'Tocca ancora: nuova partita'; setTimeout(() => { armedNew = false; renderMain(); }, 3500); } else { armedNew = false; if (await ensureArchivedBeforeReset()) resetMatch(); } break; }
       if (c.phase === 'pre') { c.phase = 'p1'; c.t0 = Date.now(); addPhase('kickoff', ''); }
