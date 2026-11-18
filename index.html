@@ -1556,7 +1556,7 @@ function archiveHtml() {
   return archiveRows.map(row => {
     const state = row.state || {}, events = Array.isArray(state.events) ? state.events : [];
     const match = state.match || {}, rosters = state.rosters || {};
-    const date = row.match_date && /^\\d{4}-\\d{2}-\\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
+    const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
     const eventHtml = events.map(ev => {
       const label = typeLabels[ev.type] || 'Evento';
       const side = ev.team === 'home' ? row.home_team : ev.team === 'away' ? row.away_team : '';
@@ -1584,6 +1584,7 @@ async function refreshCurrentArchiveStatus() {
 async function archiveCurrentMatch() {
   if (!db || !CAN_EDIT) { toast('Accedi alla regia per archiviare la partita'); return; }
   if (S.clock.phase !== 'ft') { toast('L’archiviazione è disponibile solo dopo il fischio finale'); return; }
+  if (syncState !== 'ok') { toast('Attendi la conferma “Pagina live aggiornata” prima di archiviare'); return; }
   if (!S.match.pollId) { toast('Identificativo partita mancante: salva la partita e riprova'); return; }
   try {
     const { data, error } = await db.rpc('archive_santalbino_match');
@@ -3316,7 +3317,7 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
-  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); return; }
+  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (L.tab === 'archive') void loadMatchArchive(); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
