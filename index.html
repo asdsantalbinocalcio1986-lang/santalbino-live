@@ -1707,6 +1707,7 @@ function offerDraftRecovery() {
   const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('it-IT') : 'data non disponibile';
   if (confirm('È stata trovata una bozza locale più recente dello stato online (revisione '+draftRev+' contro '+remoteRev+', salvata: '+when+'). Vuoi recuperarla?')) {
     S = mergeState(draft.state);
+    S.rev = remoteRev;
     L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
     L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
     L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
@@ -3046,7 +3047,9 @@ function settingsHtml() {
       ${L.evImg[k] ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-evraw="${k}" ${L.evImgRaw[k] ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>`).join('')}</div>
   <div class="card"><h2>Facebook</h2>${I('s-fb', 'Link o nome della pagina Facebook', L.fbUrl, 'https://www.facebook.com/nomepagina')}
     <p class="small muted" style="margin-top:-4px">Non serve nessun token: ogni evento si pubblica con “Pubblica”, che copia il testo, salva l’immagine e apre la tua pagina.</p><button class="btn" data-a="savefb">Salva link</button></div>
-  <div class="card"><h2>Dati</h2><div class="row2 stack"><label class="btn" style="cursor:pointer">Carica copia dati<input type="file" id="impJson" accept="application/json" hidden></label><button class="btn danger" data-a="newmatch">${armedNew ? 'Tocca ancora per azzerare' : 'Azzera partita'}</button></div>
+  <div class="card"><h2>Dati e backup</h2><div class="row2 stack"><button class="btn" data-a="exportbackup">Esporta copia dati</button><label class="btn" style="cursor:pointer">Carica copia dati<input type="file" id="impJson" accept="application/json" hidden></label></div>
+    <p class="small muted">La copia contiene lo stato completo della partita e le impostazioni grafiche. Prima di importare viene conservata una bozza locale di sicurezza.</p>
+    <div class="row2 stack" style="margin-top:10px"><button class="btn danger" data-a="newmatch">${armedNew ? 'Tocca ancora per azzerare' : 'Azzera partita'}</button></div>
     <p class="small muted">“Azzera partita” cancella eventi, orologio e formazioni; nomi, loghi e immagini restano.</p></div>`;
 }
 let armedNew = false;
@@ -3233,9 +3236,26 @@ document.addEventListener('click', async e => {
       if (vi.state === 'open' && !armedMvp) { armedMvp = true; renderMain(); setTimeout(() => { armedMvp = false; renderMain(); }, 4000); break; }
       armedMvp = false; proclaim(); break; }
     case 'savefb': L.fbUrl = $('#s-fb').value.trim(); saveL(); toast('Link salvato'); break;
+    case 'exportbackup': downloadStateBackup(); break;
     case 'newmatch': if (armedNew) { armedNew = false; resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
 });
+function downloadStateBackup() {
+  const payload = { app: 'SantAlbinoLive', version: 1, exportedAt: new Date().toISOString(), state: S };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const date = new Date().toISOString().slice(0,10);
+  saveBlob(blob, 'santalbino-live-backup-' + date + '.json');
+}
+function validateImportedState(payload) {
+  const d = payload?.state && payload.app === 'SantAlbinoLive' ? payload.state : payload;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('Il file non contiene uno stato Sant’Albino Live valido.');
+  if (d.match != null && (typeof d.match !== 'object' || Array.isArray(d.match))) throw new Error('Sezione partita non valida.');
+  if (d.events != null && !Array.isArray(d.events)) throw new Error('Elenco eventi non valido.');
+  if (d.rosters != null && (typeof d.rosters !== 'object' || Array.isArray(d.rosters))) throw new Error('Formazioni non valide.');
+  if (d.clock != null && (typeof d.clock !== 'object' || Array.isArray(d.clock))) throw new Error('Orologio non valido.');
+  if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
+  return d;
+}
 function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
@@ -3314,7 +3334,18 @@ document.addEventListener('change', async e => {
     else if (ds.evraw) { L.evImgRaw[ds.evraw] = t.checked; saveL(); }
     else if (t.matches && t.matches('[data-evimg-one]') && t.files[0]) { toast('Caricamento immagine evento…'); draft.img = await uploadSharedImage(t.files[0], 'eventi-singoli', 1080); renderSheet(); toast('Immagine caricata'); }
     else if (t.matches && t.matches('[data-d-raw]')) draft.raw = t.checked;
-    else if (t.id === 'impJson' && t.files[0]) { const d = JSON.parse(await t.files[0].text()); const b = defaults(); S = Object.assign(b, d, { match: Object.assign(b.match, d.match), logos: Object.assign(b.logos, d.logos), rosters: Object.assign(b.rosters, d.rosters), convocati: d.convocati || '', clock: Object.assign(b.clock, d.clock), mvp: Object.assign(b.mvp, d.mvp), events: d.events || [] }); commit(true); renderAll(); toast('Dati caricati'); }
+    else if (t.id === 'impJson' && t.files[0]) {
+      const parsed = JSON.parse(await t.files[0].text());
+      const d = validateImportedState(parsed);
+      saveDraft();
+      S = mergeState(d);
+      S.rev = remoteRev;
+      L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+      L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+      L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+      commit(true); renderAll(); toast('Dati importati e inviati alla sincronizzazione');
+      t.value = '';
+    }
   } catch (err) { toast(err.message || 'Operazione non riuscita'); }
 });
 function wireSheet() {
