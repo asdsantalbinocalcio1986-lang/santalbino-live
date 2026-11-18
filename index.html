@@ -1511,8 +1511,16 @@ function mvpPollKey() {
 function voterId() {
   let id = '';
   try { id = localStorage.getItem(MVP_VOTER_KEY) || ''; } catch (e) {}
-  if (!id) {
-    id = (crypto.randomUUID ? crypto.randomUUID() : uid() + uid());
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    if (crypto.randomUUID) id = crypto.randomUUID();
+    else {
+      const b = new Uint8Array(16);
+      if (crypto.getRandomValues) crypto.getRandomValues(b);
+      else for (let i=0;i<16;i++) b[i] = Math.floor(Math.random()*256);
+      b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+      const h = [...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+      id = h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+    }
     try { localStorage.setItem(MVP_VOTER_KEY, id); } catch (e) {}
   }
   return id;
@@ -1520,27 +1528,24 @@ function voterId() {
 let mvpVoteCounts = {}, mvpVoteBusy = false;
 async function refreshMvpVotes() {
   if (!db) return;
-  const { data, error } = await db.from('mvp_votes').select('candidate_key').eq('match_key', mvpPollKey());
-  if (error) { console.warn('Lettura voti MVP:', error.message); return; }
+  const { data, error } = await db.rpc('get_santalbino_mvp_vote_counts', { p_match_key: mvpPollKey() });
+  if (error) { console.warn('Lettura conteggi MVP:', error.message); return; }
   mvpVoteCounts = {};
-  (data || []).forEach(row => { mvpVoteCounts[row.candidate_key] = (mvpVoteCounts[row.candidate_key] || 0) + 1; });
+  (data || []).forEach(row => { mvpVoteCounts[row.candidate_key] = Number(row.votes || 0); });
   if ($('#main') && L.tab === 'mvp') renderMain();
 }
 async function castMvpVote(candidateKey) {
   if (mvpVoteBusy || !db) return;
-  const vi = voteInfo();
-  if (vi.state !== 'open') { toast('La votazione non è aperta'); return; }
   mvpVoteBusy = true;
   try {
-    const candidate = candidates().find(c => c.key === candidateKey);
-    if (!candidate) throw new Error('Candidato non valido');
-    const { error } = await db.from('mvp_votes').insert({
-      match_key: mvpPollKey(), voter_hash: voterId(), candidate_key: candidate.key,
-      candidate_name: candidate.name, team: candidate.side, shirt_number: candidate.num
+    if (!candidates().some(c => c.key === candidateKey)) throw new Error('Candidato non valido');
+    const { error } = await db.rpc('cast_santalbino_mvp_vote', {
+      p_candidate_key: candidateKey, p_voter_hash: voterId()
     });
     if (error) {
       if (error.code === '23505') throw new Error('Hai già espresso il tuo voto per questa partita.');
-      throw new Error('Voto non registrato. Verifica la configurazione del sondaggio.');
+      if (error.code === 'P0001' || error.code === '22023') throw new Error(error.message || 'Votazione non disponibile.');
+      throw new Error('Voto non registrato. Verifica che la migrazione di sicurezza MVP sia stata applicata.');
     }
     try { localStorage.setItem('santalbino-mvp-vote:' + mvpPollKey(), candidateKey); } catch (e) {}
     await refreshMvpVotes();
@@ -1590,11 +1595,18 @@ async function initCaps() {
   await verifyAdminAccess();
   const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
   let legacyLogoMigration = false;
-  if (!error && data?.state) { S = mergeState(data.state); legacyLogoMigration = migrateBundledLogos(S); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); }
-  else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
+  if (!error && data?.state) {
+    S = mergeState(data.state);
+    remoteRev = Number(S.rev || 0);
+    legacyLogoMigration = migrateBundledLogos(S);
+    L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+    L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+    L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+  } else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
   dbReady = true;
+  offerDraftRecovery();
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); refreshMvpVotes(); }
+    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); refreshMvpVotes(); }
    }).subscribe();
   db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
@@ -1668,14 +1680,39 @@ async function saveNewPassword() {
 async function signOutAdmin() { if (db) await db.auth.signOut(); CAN_EDIT = false; authUser = null; L.mode = 'public'; }
 
 /* ================= sincronizzazione online ================= */
-let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publishPending = false;
+let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publishPending = false, remoteRev = 0;
 function setSync(st, detail = '') { syncState = st; syncDetail = detail; const el = $('#sync'); if (el) el.outerHTML = syncHtml(); }
 function syncHtml() {
   const txt = { ok: 'Pagina live aggiornata', dirty: 'Modifiche da sincronizzare…', sending: 'Sincronizzazione in corso…', error: 'Sincronizzazione non disponibile' + (syncDetail ? ` (${esc(syncDetail)})` : ''), local: 'Modalità locale: configura il database' }[LOCAL_ONLY ? 'local' : syncState];
   return `<div class="sync ${LOCAL_ONLY ? 'local' : syncState}" id="sync"><b>${txt}</b>${syncState === 'error' && !LOCAL_ONLY ? '<button class="btn sm" data-a="retry">Riprova</button>' : ''}</div>`;
 }
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
-function saveDraft() { try { localStorage.setItem(DK, JSON.stringify(S)); } catch (e) {} }
+function saveDraft() {
+  try { localStorage.setItem(DK, JSON.stringify({ __santalbinoDraft: 1, savedAt: Date.now(), state: S })); }
+  catch (e) { toast('Bozza locale non salvata: memoria del browser esaurita'); }
+}
+function readDraft() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DK) || 'null');
+    if (!raw) return null;
+    return raw.__santalbinoDraft === 1 && raw.state ? { state: raw.state, savedAt: Number(raw.savedAt || 0) } : { state: raw, savedAt: 0 };
+  } catch (e) { return null; }
+}
+function offerDraftRecovery() {
+  if (!CAN_EDIT) return;
+  const draft = readDraft();
+  if (!draft || !draft.state || !Number.isFinite(Number(draft.state.rev))) return;
+  const draftRev = Number(draft.state.rev || 0);
+  if (draftRev <= remoteRev) return;
+  const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('it-IT') : 'data non disponibile';
+  if (confirm('È stata trovata una bozza locale più recente dello stato online (revisione '+draftRev+' contro '+remoteRev+', salvata: '+when+'). Vuoi recuperarla?')) {
+    S = mergeState(draft.state);
+    L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+    L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+    L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+    renderHero(); renderMain(); updDatalists(); commit(true);
+  }
+}
 function commit(now) {
   S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {}), graphicEditor:Object.assign({global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}},S.media?.graphicEditor||{})};
   S.rev = (S.rev || 0) + 1; saveDraft(); renderHero(); updDatalists();
@@ -1691,13 +1728,17 @@ async function publishNow() {
   setSync('sending'); window.__santalbinoSaving = true;
   let error = null;
   try {
-    const result = await db.from('live_state').upsert({id:1,state:snapshot,updated_at:new Date().toISOString()});
+    const result = await db.rpc('save_santalbino_live_state', {
+      p_expected_rev: remoteRev,
+      p_state: snapshot
+    });
     error = result.error;
+    if (!error) remoteRev = snapshotRev;
   } catch (err) { error = err; }
   window.__santalbinoSaving = false; publishing = false;
   if (error) {
     publishPending = false;
-    setSync('error', 'controlla connessione, tabella e autorizzazioni');
+    setSync('error', error.code === '40001' ? 'conflitto: versione online aggiornata altrove; conserva la bozza prima di ricaricare' : 'controlla connessione, migrazione Fase 1 e autorizzazioni');
     console.error('Pubblicazione Sant\'Albino Live:', error);
     return;
   }
