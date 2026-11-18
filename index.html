@@ -1558,6 +1558,66 @@ function seasonKeyForDate(value) {
   return String(month >= 7 ? year : year - 1);
 }
 function seasonLabel(key) { return key + '/' + String(Number(key) + 1).slice(-2); }
+
+function archiveOurSide(row, state) {
+  const match = state?.match || {};
+  if (match.ourSide === 'home' || match.ourSide === 'away') return match.ourSide;
+  const norm = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+  const home = norm(row.home_team), away = norm(row.away_team);
+  if (home.includes("sant'albino") || home.includes('sant albino')) return 'home';
+  if (away.includes("sant'albino") || away.includes('sant albino')) return 'away';
+  return '';
+}
+function scorersHtml() {
+  if (!db) return '<div class="empty"><h3>Storico marcatori non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
+  if (!archiveLoaded) return '<div class="empty">Caricamento storico marcatori…</div>';
+  if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>I marcatori compariranno dopo l’archiviazione delle prime partite concluse.</p></div>';
+  const currentKey = seasonKeyForDate(new Date().toISOString().slice(0, 10));
+  const seasons = [...new Set([currentKey, ...archiveRows.map(r => seasonKeyForDate(r.match_date)).filter(Boolean)])].sort((a,b) => Number(b)-Number(a));
+  const selected = seasons.includes(String(L.season || '')) ? String(L.season) : seasons[0];
+  const rows = archiveRows.filter(r => seasonKeyForDate(r.match_date) === selected);
+  const players = new Map();
+  let ownGoalsFor = 0, goalsWithoutName = 0, teamGoals = 0;
+  const normalize = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLocaleLowerCase('it').replace(/[^a-z0-9]/g, '');
+  rows.forEach(row => {
+    const state = row.state || {}, side = archiveOurSide(row, state);
+    if (!side) return;
+    (Array.isArray(state.events) ? state.events : []).forEach(ev => {
+      if (ev.type !== 'goal') return;
+      const creditedSide = ev.kind === 'autogol' ? other(ev.team) : ev.team;
+      if (creditedSide !== side) return;
+      teamGoals++;
+      if (ev.kind === 'autogol') { ownGoalsFor++; return; }
+      const name = String(ev.player || '').trim();
+      if (!name) { goalsWithoutName++; return; }
+      const key = normalize(name);
+      if (!key) { goalsWithoutName++; return; }
+      const item = players.get(key) || { name, goals:0, assists:0 };
+      item.goals++;
+      if (name.length > item.name.length) item.name = name;
+      players.set(key, item);
+      const assist = String(ev.assist || '').trim(), assistKey = normalize(assist);
+      if (assistKey) {
+        const helper = players.get(assistKey) || { name:assist, goals:0, assists:0 };
+        helper.assists++;
+        if (assist.length > helper.name.length) helper.name = assist;
+        players.set(assistKey, helper);
+      }
+    });
+  });
+  const ranking = [...players.values()].filter(p => p.goals > 0).sort((a,b) => b.goals-a.goals || b.assists-a.assists || a.name.localeCompare(b.name,'it'));
+  const assists = [...players.values()].filter(p => p.assists > 0).sort((a,b) => b.assists-a.assists || b.goals-a.goals || a.name.localeCompare(b.name,'it'));
+  const seasonButtons = seasons.map(key => '<button class="btn sm ' + (key === selected ? 'primary' : '') + '" data-season="' + key + '">' + esc(seasonLabel(key)) + '</button>').join('');
+  const table = list => list.map((p,i) => '<div class="stat-h" style="grid-template-columns:32px minmax(0,1fr) auto;gap:8px;margin:8px 0"><b>' + (i+1) + '</b><span style="text-align:left;overflow-wrap:anywhere">' + esc(p.name) + (p.assists ? '<span class="small muted"> · ' + p.assists + ' assist</span>' : '') + '</span><b style="font-size:20px">' + p.goals + '</b></div>').join('');
+  return '<div class="card"><h2>Marcatori · ' + esc(seasonLabel(selected)) + '</h2><p class="small muted">Classifica basata sui gol attribuiti ai giocatori nelle cronache delle partite archiviate. Gli autogol non vengono assegnati al giocatore che li ha commessi.</p><div class="row2" style="display:flex;flex-wrap:wrap;gap:7px;margin:12px 0">' + seasonButtons + '</div>' +
+    (rows.length ? '<div class="grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0"><div class="card" style="margin:0;padding:12px"><div class="small muted">Gol Sant’Albino</div><div style="font:800 28px/1.1 var(--fd);margin-top:4px">' + teamGoals + '</div></div><div class="card" style="margin:0;padding:12px"><div class="small muted">Marcatori</div><div style="font:800 28px/1.1 var(--fd);margin-top:4px">' + ranking.length + '</div></div></div>' +
+      (ranking.length ? '<h3>Classifica marcatori</h3><div class="stat-h" style="grid-template-columns:32px minmax(0,1fr) auto"><b>#</b><b style="text-align:left">Giocatore</b><b>Gol</b></div>' + table(ranking) : '<p class="small muted">Nessun gol individuale registrato per questa stagione.</p>') +
+      (assists.length ? '<h3 style="margin-top:18px">Assist</h3><div class="stat-h" style="grid-template-columns:32px minmax(0,1fr) auto"><b>#</b><b style="text-align:left">Giocatore</b><b>Assist</b></div>' + assists.map((p,i) => '<div class="stat-h" style="grid-template-columns:32px minmax(0,1fr) auto;gap:8px;margin:8px 0"><b>' + (i+1) + '</b><span style="text-align:left;overflow-wrap:anywhere">' + esc(p.name) + '</span><b style="font-size:20px">' + p.assists + '</b></div>').join('') : '') +
+      '<p class="small muted" style="margin-top:14px">Autogol a favore: ' + ownGoalsFor + ' · Gol senza marcatore indicato: ' + goalsWithoutName + '. Le classifiche considerano solo le gare in cui è identificabile il Sant’Albino.</p>' :
+      '<div class="empty"><h3>Nessuna partita in questa stagione</h3><p>Non risultano partite archiviate nel periodo selezionato.</p></div>') +
+    '</div>';
+}
+
 function seasonalStatsHtml() {
   if (!db) return '<div class="empty"><h3>Statistiche stagionali non disponibili</h3><p>La connessione al database non è attiva.</p></div>';
   if (!archiveLoaded) return '<div class="empty">Caricamento dati stagionali…</div>';
@@ -3072,10 +3132,10 @@ function validExternalUrl(value) {
 }
 
 function publicHtml() {
-  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['season', 'Stagione'], ['archive', 'Archivio']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['season', 'Stagione'], ['scorers', 'Marcatori'], ['archive', 'Archivio']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'season' ? seasonalStatsHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -3369,7 +3429,7 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
-  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (L.tab === 'archive' || L.tab === 'season') void loadMatchArchive(true); return; }
+  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (L.tab === 'archive' || L.tab === 'season' || L.tab === 'scorers') void loadMatchArchive(true); return; }
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
