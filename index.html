@@ -3556,7 +3556,7 @@ function selectOcrNameConsensus(passes) {
       const candidate = pass.parsed[index];
       if (!candidate) continue;
       const key = candidate.name.normalize('NFD')
-        .replace(/[\\u0300-\\u036f]/g, '')
+        .replace(/[\u0300-\u036f]/g, '')
         .toLocaleUpperCase('it')
         .replace(/[^A-Z]/g, '');
       if (!key) continue;
