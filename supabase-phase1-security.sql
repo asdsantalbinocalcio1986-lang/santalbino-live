@@ -5,6 +5,40 @@
 
 begin;
 
+-- 0) L'amministratore legge esclusivamente il proprio record.
+-- La verifica passa a SECURITY INVOKER: nessuna funzione helper privilegiata esposta.
+alter table public.santalbino_admins enable row level security;
+do $
+declare p record;
+begin
+  for p in
+    select policyname from pg_policies
+    where schemaname='public' and tablename='santalbino_admins'
+  loop
+    execute format('drop policy if exists %I on public.santalbino_admins',p.policyname);
+  end loop;
+end $;
+revoke all on table public.santalbino_admins from public, anon, authenticated;
+grant select on table public.santalbino_admins to authenticated;
+create policy "Admin can read own admin record"
+  on public.santalbino_admins for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+create or replace function public.is_santalbino_admin()
+returns boolean
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $
+  select exists (
+    select 1 from public.santalbino_admins
+    where user_id = (select auth.uid())
+  );
+$;
+revoke all on function public.is_santalbino_admin() from public, anon, authenticated;
+grant execute on function public.is_santalbino_admin() to authenticated;
+
 -- 1) La tabella dei voti non è più leggibile né scrivibile direttamente dal pubblico.
 alter table public.mvp_votes enable row level security;
 do $$
@@ -20,7 +54,7 @@ end $$;
 create policy "Only SantAlbino admin can read MVP votes"
   on public.mvp_votes for select to authenticated
   using (public.is_santalbino_admin());
-revoke all on table public.mvp_votes from anon, authenticated;
+revoke all on table public.mvp_votes from public, anon, authenticated;
 grant select on table public.mvp_votes to authenticated;
 
 -- 2) Voto anonimo: il server ricava partita, scadenza, candidato e dati del giocatore
@@ -32,7 +66,7 @@ create or replace function public.cast_santalbino_mvp_vote(
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 declare
   v_state jsonb;
   v_match_key text;
@@ -134,7 +168,7 @@ create or replace function public.get_santalbino_mvp_vote_counts(p_match_key tex
 returns table(candidate_key text, votes bigint)
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = public, pg_temp
 as $$
 declare
@@ -161,8 +195,8 @@ begin
     group by v.candidate_key;
 end;
 $$;
-revoke all on function public.get_santalbino_mvp_vote_counts(text) from public;
-grant execute on function public.get_santalbino_mvp_vote_counts(text) to anon, authenticated;
+revoke all on function public.get_santalbino_mvp_vote_counts(text) from public, anon, authenticated;
+grant execute on function public.get_santalbino_mvp_vote_counts(text) to authenticated;
 
 -- 4) Salvataggio condizionale: una revisione obsoleta non può sovrascrivere quella remota.
 create or replace function public.save_santalbino_live_state(
@@ -170,7 +204,7 @@ create or replace function public.save_santalbino_live_state(
   p_state jsonb
 ) returns bigint
 language plpgsql
-security definer
+security invoker
 set search_path = public, pg_temp
 as $$
 declare
@@ -197,7 +231,7 @@ begin
   return v_new_rev;
 end;
 $$;
-revoke all on function public.save_santalbino_live_state(bigint,jsonb) from public;
+revoke all on function public.save_santalbino_live_state(bigint,jsonb) from public, anon, authenticated;
 grant execute on function public.save_santalbino_live_state(bigint,jsonb) to authenticated;
 
 commit;
