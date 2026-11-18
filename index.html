@@ -3534,6 +3534,7 @@ let tesseractWorker = null;
 let tesseractWorkerPromise = null;
 let activeOcrStatus = null;
 let ocrQueue = Promise.resolve();
+let ocrBusy = false;
 
 async function ensureTesseract() {
   if (window.Tesseract && window.Tesseract.createWorker) return window.Tesseract;
@@ -3590,10 +3591,12 @@ async function readLineup(side, stat) {
   if (button) { button.disabled = true; button.textContent = 'Lettura in corso…'; }
   let releaseQueue;
   const previousRead = ocrQueue;
+  const waitingForRead = ocrBusy;
+  ocrBusy = true;
   ocrQueue = new Promise(resolve => { releaseQueue = resolve; });
   let worker;
   try {
-    if (previousRead !== Promise.resolve()) stat.textContent = 'In attesa dell’altra lettura OCR…';
+    if (waitingForRead) stat.textContent = 'In attesa dell’altra lettura OCR…';
     await previousRead;
     activeOcrStatus = stat;
     stat.textContent = 'Caricamento del riconoscimento…';
@@ -3663,6 +3666,7 @@ async function readLineup(side, stat) {
     stat.textContent = 'Lettura non riuscita: ' + (error.message || 'controlla la foto e riprova.');
   } finally {
     if (activeOcrStatus === stat) activeOcrStatus = null;
+    ocrBusy = false;
     releaseQueue();
     if (button) { button.disabled = false; button.textContent = 'Leggi e prepara la formazione'; }
   }
