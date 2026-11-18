@@ -3825,7 +3825,8 @@ document.addEventListener('click', async e => {
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
-      const shareText = so.text + '\n\nSegui la partita in diretta: https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/';
+      const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
+      const shareText = so.text + '\\n\\nSegui la partita su SANTA Live: ' + matchUrl;
       window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
       break;
     }
@@ -3932,6 +3933,7 @@ function saveMatch() {
     return;
   }
 
+  if (!S.match.pollId) S.match.pollId = uid();
   S.match.home = g('#s-home') || defaults().match.home;
   S.match.away = g('#s-away');
   S.match.ourSide = $('#s-our').value;
