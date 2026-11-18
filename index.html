@@ -1546,7 +1546,7 @@ async function loadMatchArchive(force = false) {
     archiveError = error?.message || 'Errore di connessione';
   } finally {
     archiveLoading = false;
-    if ($('#main') && L.tab === 'archive' && !(CAN_EDIT && L.mode === 'regia')) renderMain();
+    if ($('#main') && ['archive','season','scorers'].includes(L.tab) && !(CAN_EDIT && L.mode === 'regia')) renderMain();
   }
 }
 
