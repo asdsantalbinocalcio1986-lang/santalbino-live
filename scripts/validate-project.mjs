@@ -20,6 +20,7 @@ JSON.parse(stateMatch[1]);
 
 assert.match(html, /rpc\(['"]cast_santalbino_mvp_vote['"]/);
 assert.match(html, /rpc\(['"]get_santalbino_mvp_vote_counts['"]/);
+assert.match(html, /async function refreshMvpVotes\(\)\s*\{\s*if \(!db \|\| !CAN_EDIT\) return;/, 'I conteggi MVP non devono essere richiesti dai visitatori anonimi');
 assert.match(html, /rpc\(['"]save_santalbino_live_state['"]/);
 assert.doesNotMatch(html, /from\(['"]mvp_votes['"]\)\.(?:select|insert)/, 'L’app non deve leggere o inserire voti direttamente');
 assert.doesNotMatch(html, /from\(['"]live_state['"]\)\.upsert/, 'L’app deve usare il salvataggio con controllo revisione');
