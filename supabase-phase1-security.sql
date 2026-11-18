@@ -66,7 +66,7 @@ create or replace function public.cast_santalbino_mvp_vote(
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $vote$
 declare
   v_state jsonb;
   v_match_key text;
@@ -159,7 +159,7 @@ exception
   when unique_violation then
     raise exception using errcode='23505', message='Hai già espresso il tuo voto per questa partita';
 end;
-$$;
+$vote$;
 revoke all on function public.cast_santalbino_mvp_vote(text,text) from public;
 grant execute on function public.cast_santalbino_mvp_vote(text,text) to anon, authenticated;
 
