@@ -3295,6 +3295,93 @@ function buildMatchReport() {
   const lineups = `FORMAZIONI\n\n${lineupSections.join('\n\n')}`;
   return `RESOCONTO FINALE\n${title}\n${meta}\n\n${paragraphs.join('\n\n')}\n\n${lineups}\n\n${S.match.hashtag || ''}`.trim();
 }
+function buildMatchSummary() {
+  const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
+  const goals = S.events.filter(e => e.type === 'goal').slice().sort((x,y) => {
+    const minute = e => { const m = String(e.min || '').match(/^(\d+)(?:\s*\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
+    return minute(x) - minute(y);
+  });
+  const goalText = goals.length ? goals.map(e => {
+    const scorer = e.player || 'Un giocatore';
+    const minute = e.min ? ` al ${e.min}′` : '';
+    const own = e.kind === 'autogol' ? ' (autogol)' : '';
+    return `${scorer} (${teamName(scoringSide(e))})${minute}${own}`;
+  }) : [];
+  const ourGoals = goals.filter(e => scoringSide(e) === S.match.ourSide).length;
+  const ourName = teamName(S.match.ourSide);
+  let outcome = h === a ? 'pareggio' : (S.match.ourSide === 'home' ? h > a : a > h) ? 'vittoria' : 'sconfitta';
+  const sentences = [`Si chiude ${outcome} per ${ourName}: ${home} ${h}-${a} ${away}.`];
+  if (goalText.length) sentences.push(`A segno: ${goalText.join('; ')}.`);
+  else sentences.push(`Una partita senza reti: il risultato finale è ${h}-${a}.`);
+  const reds = S.events.filter(e => e.type === 'red');
+  if (reds.length) sentences.push('Nel corso della gara: ' + reds.map(e => `espulsione di ${e.player || 'un giocatore'} (${teamName(e.team)})${e.min ? ' al ' + e.min + '′' : ''}`).join('; ') + '.');
+  const meta = [S.match.comp, fmtDate(S.match.date)].filter(Boolean);
+  const footer = [meta.join(' · '), S.match.hashtag].filter(Boolean).join('\n\n');
+  return [sentences.join(' '), footer].filter(Boolean).join('\n\n');
+}
+async function renderMatchResultGraphic() {
+  const [h, a] = scoreOf(S.events), W = 1600, H = 1200, canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const x = canvas.getContext('2d'); applyGraphicTypography(x, 'matchday', W, H);
+  const [homeLogo, awayLogo] = await Promise.all([loadGraphicImage(S.logos.home), loadGraphicImage(S.logos.away)]);
+  const bg = x.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#17633d'); bg.addColorStop(.52, '#0b3424'); bg.addColorStop(1, '#071d16');
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(255,255,255,.09)'; x.lineWidth = 2;
+  for (let i=0;i<9;i++){ x.beginPath(); x.moveTo(i*W/8,0); x.lineTo(i*W/8,H); x.stroke(); }
+  x.fillStyle = 'rgba(2,13,9,.78)'; x.fillRect(0,0,W,360);
+  const drawTeam = (img,name,cx) => {
+    x.fillStyle='#fff'; rrect(x,cx-92,30,184,184,24); x.fill();
+    if(img){ const k=Math.min(164/img.width,164/img.height),w=img.width*k,hh=img.height*k; x.drawImage(img,cx-w/2,40+(164-hh)/2,w,hh); }
+    else { x.fillStyle='#17633d'; x.font='900 46px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\s+/).map(v=>v[0]).join('').slice(0,3).toUpperCase(),cx,122); }
+    x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),490,31,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,258);
+  };
+  drawTeam(homeLogo,teamName('home'),330); drawTeam(awayLogo,teamName('away'),1270);
+  x.textAlign='center'; x.textBaseline='middle'; x.fillStyle='#d7f1df'; x.font='900 34px Arial,sans-serif'; x.fillText('MATCH',800,82);
+  x.fillStyle='#e3c66d'; x.font='900 112px Arial,sans-serif'; x.fillText(`${h}  –  ${a}`,800,205);
+  x.fillStyle='#fff'; x.font='900 70px Arial,sans-serif'; x.fillText('MATCH RESULT',800,430);
+  const meta=[S.match.comp,fmtDate(S.match.date),S.match.venue].filter(Boolean).join('  ·  ');
+  if(meta){ x.fillStyle='rgba(255,255,255,.72)'; x.font='700 21px Arial,sans-serif'; fitFont(x,meta,1400,21,700,'Arial,sans-serif'); x.fillText(meta,800,480); }
+  const goals=S.events.filter(e=>e.type==='goal').slice().sort((a,b)=>{
+    const minute=e=>{const m=String(e.min||'').match(/^(\d+)(?:\s*\+\s*(\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
+    return minute(a)-minute(b);
+  });
+  const panelY=535,panelH=565;
+  x.fillStyle='rgba(3,15,8,.84)'; rrect(x,70,panelY,1460,panelH,26); x.fill();
+  x.fillStyle='#e3c66d'; x.textAlign='center'; x.font='900 31px Arial,sans-serif'; x.fillText('MARCATORI',800,panelY+55);
+  if(!goals.length){
+    x.fillStyle='rgba(255,255,255,.82)'; x.font='700 30px Arial,sans-serif'; x.fillText('NESSUNA RETE',800,panelY+280);
+  } else {
+    const cols=2, rows=Math.ceil(goals.length/cols), rowH=Math.min(78,Math.max(36,440/rows));
+    const colW=690, left=105, top=panelY+105;
+    goals.forEach((g,i)=>{
+      const col=i%2,row=Math.floor(i/2),xx=left+col*700,yy=top+row*rowH;
+      x.fillStyle='rgba(255,255,255,.075)'; rrect(x,xx,yy,colW,rowH-8,12); x.fill();
+      const scorer=(g.player||'Autore del gol')+(g.kind==='autogol'?' (aut.)':'');
+      const detail=`${teamName(scoringSide(g))}  ·  ${g.min ? g.min+'′' : 'minuto n.d.'}`;
+      x.textAlign='left'; x.textBaseline='middle'; x.fillStyle='#fff';
+      fitFont(x,scorer,colW-34,Math.min(25,rowH*.34),700,'Arial,sans-serif'); x.fillText(scorer,xx+18,yy+(rowH-8)*.38);
+      x.fillStyle='#e3c66d'; fitFont(x,detail,colW-34,Math.min(19,rowH*.27),700,'Arial,sans-serif'); x.fillText(detail,xx+18,yy+(rowH-8)*.72);
+    });
+  }
+  x.textAlign='center'; x.fillStyle='rgba(255,255,255,.75)'; x.font='800 19px Arial,sans-serif';
+  x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1150);
+  await addSponsorToGraphic(canvas,'matchday');
+  return canvas;
+}
+async function openMatchResult() {
+  const dlg=$('#graphicDlg');
+  dlg.innerHTML='<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica e riepilogo…</p>';
+  if(!dlg.open)dlg.showModal();
+  try {
+    const [canvas] = await Promise.all([renderMatchResultGraphic()]);
+    const url=canvas.toDataURL('image/jpeg',.93);
+    if(!dlg.open)return;
+    dlg.innerHTML='<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica MATCH RESULT"><button class="btn primary block" data-a="saveMatchResultGraphic">Salva immagine MATCH RESULT</button><label class="f"><span>Post con mini riassunto · modificabile</span><textarea id="matchResultPost" rows="7">'+esc(buildMatchSummary())+'</textarea></label><div class="row2 stack"><button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost">Condividi su WhatsApp</button></div>';
+  } catch(err) {
+    dlg.innerHTML='<div class="sheethead"><h2>Grafica non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">'+esc(err?.message||'Errore nella generazione')+'</p>';
+  }
+}
 function reportHtml() {
   return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita, con le formazioni di entrambe le squadre. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="22" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
 }
@@ -3400,6 +3487,7 @@ function regiaHtml() {
     ${S.clock.phase === 'pre' ? `<div class="card"><h2>Direzione d'attacco · obbligatoria</h2><p class="small muted" style="margin-top:0">Indica verso quale lato del campo attacca il Sant'Albino nel primo tempo. All'inizio della ripresa la direzione verrà invertita automaticamente.</p><label class="f"><span>Nel primo tempo il Sant'Albino attacca verso</span><select data-attack-direction required><option value="">Seleziona la direzione</option><option value="left" ${S.match.attackDirectionFirst === 'left' ? 'selected' : ''}>Sinistra</option><option value="right" ${S.match.attackDirectionFirst === 'right' ? 'selected' : ''}>Destra</option></select></label></div>` : `<div class="card"><b>Direzione d'attacco Sant'Albino</b><p class="small muted" style="margin:6px 0 0">${S.clock.phase === 'ft' ? 'Ultima direzione registrata' : S.clock.phase === 'ht' ? 'Primo tempo concluso · cambio automatico alla ripresa' : S.clock.phase === 'p2' ? 'Secondo tempo · ' : 'Primo tempo · '} ${attackDirectionLabel(S.match.attackDirectionCurrent || (S.clock.phase === 'p2' ? oppositeAttackDirection(S.match.attackDirectionFirst) : S.match.attackDirectionFirst)) ? 'verso ' + attackDirectionLabel(S.match.attackDirectionCurrent || (S.clock.phase === 'p2' ? oppositeAttackDirection(S.match.attackDirectionFirst) : S.match.attackDirectionFirst)) : 'non disponibile'}</p></div>`}
     <button class="btn primary block phasebtn" data-a="phase" ${S.clock.phase === 'ft' || (S.clock.phase === 'pre' && !S.match.attackDirectionFirst) ? 'disabled' : ''}>${S.clock.phase === 'ft' ? 'Partita terminata' : PHASEBTN[S.clock.phase]}</button>
     ${S.clock.phase === 'ft' ? `<div class="card"><h2>${currentArchived ? 'Partita salvata' : 'Partita terminata: cosa vuoi fare?'}</h2><p class="small muted">${currentArchived ? 'La partita è stata conservata nell’archivio storico con risultato, cronaca e formazioni.' : 'Scegli se conservare questa partita nello storico oppure scartarla. Nessuna partita viene archiviata automaticamente.'} I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Presente nell’archivio storico</p><button class="btn primary block" data-a="startNewMatch">Avvia una nuova partita</button>' : '<div class="row2 stack"><button class="btn primary" data-a="archiveMatch">Salva nell’archivio</button><button class="btn danger" data-a="discardMatch">Scarta partita</button></div>'}</div>` : ''}
+    ${S.clock.phase === 'ft' ? '<div class="card"><h2>MATCH RESULT</h2><p class="small muted" style="margin-top:0">Crea la grafica finale con loghi, risultato e marcatori. Il testo social viene preparato automaticamente dagli eventi registrati e resta modificabile prima della condivisione.</p><button class="btn primary block" data-a="viewMatchResult">Genera MATCH RESULT e post</button></div>' : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
     <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>
     <h2>Timeline della partita</h2><div class="card"><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine.</p>${matchTimelineHtml() || '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>'}</div>`;
@@ -3719,6 +3807,10 @@ document.addEventListener('click', async e => {
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
     case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s || 'both'); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
+    case 'viewMatchResult': if (S.clock.phase !== 'ft') { toast('Il MATCH RESULT è disponibile dopo il fischio finale'); break; } await openMatchResult(); break;
+    case 'saveMatchResultGraphic': { const cv=await renderMatchResultGraphic(); cv.toBlob(blob=>{if(blob)saveBlob(blob,'match-result.jpg');},'image/jpeg',.94); break; }
+    case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
+    case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); window.open('https://wa.me/?text='+encodeURIComponent(txt+'\\n\\nSegui SANTA Live: https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/'),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.94); break; }
     case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
