@@ -1244,7 +1244,52 @@ input:focus,select:focus,textarea:focus {
 @media (prefers-reduced-motion: reduce) {
   .status.live { animation: none; }
 }
-</style></head><body><div id="root"></div>
+</style>
+<style id="mobile-regia-toolbar-fix">
+/* Regia: evita sovrapposizioni dei comandi e delle schede su smartphone */
+@media (max-width: 600px) {
+  .top {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .top .brand {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .top > .pill {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding-inline: 10px;
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tabs .tab {
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: 0;
+    min-height: 40px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    line-height: 1.15;
+    padding: 8px 5px;
+  }
+}
+@media (max-width: 360px) {
+  .tabs .tab {
+    flex-basis: calc(50% - 6px);
+  }
+}
+</style>
+</head><body><div id="root"></div>
 <footer id="copyright-footer" style="max-width:720px;margin:22px auto 0;padding:14px 10px 8px;text-align:center;color:#69766e;font:12px/1.6 system-ui,sans-serif;border-top:1px solid #d3dcd1">
   <strong>© 2026 ASD Sant'Albino Terme — SANTA Live.</strong> Tutti i diritti riservati.<br>
   Software, interfaccia e grafiche originali protetti dal diritto d'autore. Riproduzione, modifica e redistribuzione non autorizzate.<br>
