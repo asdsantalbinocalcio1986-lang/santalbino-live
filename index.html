@@ -2259,7 +2259,7 @@ async function renderPhaseCard(ev) {
 
 // Unico template grafico per ogni contenuto condiviso: griglia fissa, aree separate e testi contenuti.
 function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
-  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const words = String(text || '').split(/\\s+/).filter(Boolean);
   const lines = []; let line = '';
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
@@ -2732,7 +2732,7 @@ async function renderFormationGraphic(side = 'both') {
       const w = img.width * scale, h = img.height * scale;
       x.drawImage(img, cx - w / 2, cy - h / 2, w, h);
     } else {
-      const initials = name.replace(/^ASD\\s+/i, '').split(/\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
+      const initials = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
       x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.font = '900 42px Arial,sans-serif'; x.fillText(initials, cx, cy);
     }
