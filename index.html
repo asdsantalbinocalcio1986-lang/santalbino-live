@@ -3298,7 +3298,7 @@ function buildMatchReport() {
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
   const goals = S.events.filter(e => e.type === 'goal').slice().sort((x,y) => {
-    const minute = e => { const m = String(e.min || '').match(/^(\d+)(?:\s*\\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
+    const minute = e => { const m = String(e.min || '').match(/^(\d+)(?:\s*\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
     return minute(x) - minute(y);
   });
   const goalText = goals.length ? goals.map(e => {
@@ -3343,7 +3343,7 @@ async function renderMatchResultGraphic() {
   const meta=[S.match.comp,fmtDate(S.match.date),S.match.venue].filter(Boolean).join('  ·  ');
   if(meta){ x.fillStyle='rgba(255,255,255,.72)'; x.font='700 21px Arial,sans-serif'; fitFont(x,meta,1400,21,700,'Arial,sans-serif'); x.fillText(meta,800,480); }
   const goals=S.events.filter(e=>e.type==='goal').slice().sort((a,b)=>{
-    const minute=e=>{const m=String(e.min||'').match(/^(\d+)(?:\s*\\+\s*(\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
+    const minute=e=>{const m=String(e.min||'').match(/^(\d+)(?:\s*\+\s*(\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
     return minute(a)-minute(b);
   });
   const panelY=535,panelH=565;
