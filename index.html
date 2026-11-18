@@ -1718,6 +1718,29 @@ function offerDraftRecovery() {
     renderHero(); renderMain(); updDatalists(); commit(true);
   }
 }
+function recoverDraftManually() {
+  if (!CAN_EDIT) return;
+  const draft = readDraft();
+  if (!draft || !draft.state || !Number.isFinite(Number(draft.state.rev))) {
+    toast('Nessuna bozza locale valida trovata su questo dispositivo');
+    return;
+  }
+  const draftRev = Number(draft.state.rev || 0);
+  const relation = draftRev > remoteRev ? 'più recente' : draftRev < remoteRev ? 'più vecchia' : 'allineata';
+  const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('it-IT') : 'data non disponibile';
+  const warning = draftRev < remoteRev
+    ? '\n\nATTENZIONE: la bozza è più vecchia dello stato online. Recuperandola potresti sostituire dati più recenti.'
+    : '';
+  const message = 'Bozza locale trovata.\nSalvata: '+when+'\nRevisione locale: '+draftRev+'\nRevisione online: '+remoteRev+'\nLa bozza è '+relation+'.'+warning+'\n\nVuoi confrontare e ripristinare la bozza? L’operazione aggiornerà lo stato online.';
+  if (!confirm(message)) return;
+  S = mergeState(draft.state);
+  S.rev = remoteRev;
+  L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+  L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+  L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+  renderHero(); renderMain(); updDatalists(); commit(true);
+  toast('Bozza locale ripristinata: sincronizzazione avviata');
+}
 function commit(now) {
   S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {}), graphicEditor:Object.assign({global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}},S.media?.graphicEditor||{})};
   S.rev = (S.rev || 0) + 1; saveDraft(); renderHero(); updDatalists();
@@ -3126,7 +3149,7 @@ async function openPost(id) {
 /* ================= disegno pagina ================= */
 let ROOT;
 function topHtml() {
-  const control = CAN_EDIT ? `<button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>` : `<button class="pill" data-a="login">Accesso regia</button>`;
+  const control = CAN_EDIT ? `<button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>` : `<button class="pill" data-a="login">Accesso regia</button>`;
   return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div>${control}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
@@ -3154,6 +3177,7 @@ document.addEventListener('click', async e => {
   switch (act) {
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
+    case 'draftRecovery': recoverDraftManually(); break;
     case 'mode': L.mode = L.mode === 'regia' ? 'public' : 'regia'; saveL(); $('#top').innerHTML = topHtml(); renderMain(); break;
     case 'editorSave': commit(true); toast('Impostazioni grafiche salvate'); break;
      case 'editorBack': L.rtab='live'; saveL(); renderMain(); break;
@@ -3495,7 +3519,7 @@ function parseOcrNumbers(text) {
   // La colonna è una sequenza verticale: PSM 11 può restituire più numeri
   // sulla stessa riga o separarli da rumore. Estraiamo solo valori 1..24.
   const found = [];
-  for (const raw of (text || '').split(/\\r?\\n/)) {
+  for (const raw of (text || '').split(/\\r?\n/)) {
     const matches = raw.match(/[0-9]{1,2}|[Il|]{1,2}/g) || [];
     for (const token of matches) {
       const n = Number(token.replace(/[Il|]/g, '1'));
