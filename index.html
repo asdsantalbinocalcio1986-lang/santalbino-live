@@ -3298,7 +3298,7 @@ function buildMatchReport() {
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
   const goals = S.events.filter(e => e.type === 'goal').slice().sort((x,y) => {
-    const minute = e => { const m = String(e.min || '').match(/^(\\d+)(?:\\s*\\+\\s*(\\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
+    const minute = e => { const m = String(e.min || '').match(/^(\d+)(?:\s*\\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
     return minute(x) - minute(y);
   });
   const goalText = goals.length ? goals.map(e => {
@@ -3308,17 +3308,16 @@ function buildMatchSummary() {
     return `${scorer} (${teamName(scoringSide(e))})${minute}${own}`;
   }) : [];
   const ourGoals = goals.filter(e => scoringSide(e) === S.match.ourSide).length;
-  const opponentGoals = goals.length - ourGoals;
-  const ourName = teamName(S.match.ourSide), opponentName = teamName(other(S.match.ourSide));
+  const ourName = teamName(S.match.ourSide);
   let outcome = h === a ? 'pareggio' : (S.match.ourSide === 'home' ? h > a : a > h) ? 'vittoria' : 'sconfitta';
   const sentences = [`Si chiude ${outcome} per ${ourName}: ${home} ${h}-${a} ${away}.`];
   if (goalText.length) sentences.push(`A segno: ${goalText.join('; ')}.`);
-  else sentences.push('Una partita senza reti: il risultato finale è ${h}-${a}.');
+  else sentences.push(`Una partita senza reti: il risultato finale è ${h}-${a}.`);
   const reds = S.events.filter(e => e.type === 'red');
   if (reds.length) sentences.push('Nel corso della gara: ' + reds.map(e => `espulsione di ${e.player || 'un giocatore'} (${teamName(e.team)})${e.min ? ' al ' + e.min + '′' : ''}`).join('; ') + '.');
   const meta = [S.match.comp, fmtDate(S.match.date)].filter(Boolean);
-  const footer = [meta.join(' · '), S.match.hashtag].filter(Boolean).join('\\n\\n');
-  return [sentences.join(' '), footer].filter(Boolean).join('\\n\\n');
+  const footer = [meta.join(' · '), S.match.hashtag].filter(Boolean).join('\n\n');
+  return [sentences.join(' '), footer].filter(Boolean).join('\n\n');
 }
 async function renderMatchResultGraphic() {
   const [h, a] = scoreOf(S.events), W = 1600, H = 1200, canvas = document.createElement('canvas');
@@ -3334,7 +3333,7 @@ async function renderMatchResultGraphic() {
   const drawTeam = (img,name,cx) => {
     x.fillStyle='#fff'; rrect(x,cx-92,30,184,184,24); x.fill();
     if(img){ const k=Math.min(164/img.width,164/img.height),w=img.width*k,hh=img.height*k; x.drawImage(img,cx-w/2,40+(164-hh)/2,w,hh); }
-    else { x.fillStyle='#17633d'; x.font='900 46px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(v=>v[0]).join('').slice(0,3).toUpperCase(),cx,122); }
+    else { x.fillStyle='#17633d'; x.font='900 46px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\s+/).map(v=>v[0]).join('').slice(0,3).toUpperCase(),cx,122); }
     x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),490,31,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,258);
   };
   drawTeam(homeLogo,teamName('home'),330); drawTeam(awayLogo,teamName('away'),1270);
@@ -3344,7 +3343,7 @@ async function renderMatchResultGraphic() {
   const meta=[S.match.comp,fmtDate(S.match.date),S.match.venue].filter(Boolean).join('  ·  ');
   if(meta){ x.fillStyle='rgba(255,255,255,.72)'; x.font='700 21px Arial,sans-serif'; fitFont(x,meta,1400,21,700,'Arial,sans-serif'); x.fillText(meta,800,480); }
   const goals=S.events.filter(e=>e.type==='goal').slice().sort((a,b)=>{
-    const minute=e=>{const m=String(e.min||'').match(/^(\\d+)(?:\\s*\\+\\s*(\\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
+    const minute=e=>{const m=String(e.min||'').match(/^(\d+)(?:\s*\\+\s*(\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
     return minute(a)-minute(b);
   });
   const panelY=535,panelH=565;
