@@ -1410,6 +1410,7 @@ const IC = {
   crossbar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V5h18v15M3 9h18M7 9v11m10-11v11"/><circle cx="12" cy="5" r="2.4" fill="currentColor" stroke="none"/><path d="m9.5 2.5 2.5-1 2.5 1"/></svg>',
   corner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V3m0 2h15l-4 4 4 4H4"/><path d="M4 16a5 5 0 0 0 5 5"/></svg>',
   freekick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="18" r="2.2"/><path d="M8 18h13M11 14v-3m5 3v-3m-7 0h9M8 7c3-4 8-4 11-1m-3-3 3 3-4 1"/></svg>',
+  offside: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22V3m0 1h13l-4 4 4 4H5"/><path d="M2 22h6"/></svg>',
   goal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V5h18v15M3 9h18M7 9v11m5-11v11m5-11v11"/><circle cx="13" cy="14" r="3.1" fill="currentColor" stroke="none"/><path d="m11.7 12.2 1.3.8 1.5-.5m-2.8 3 .9-1.2 1.8.1" stroke="#fff" stroke-width=".8"/></svg>',
   yellow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.2" fill="currentColor" stroke="none"/><path d="M9 5h6" stroke="#fff" stroke-opacity=".75"/></svg>',
   red: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.2" fill="currentColor" stroke="none"/><path d="M9 5h6" stroke="#fff" stroke-opacity=".75"/></svg>',
@@ -1421,7 +1422,7 @@ const IC = {
   mvp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2.5 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.1l6.3-.9z"/><path d="M8 20.5v2h8v-2"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><path d="M12 6.5V12l3.8 2.2"/></svg>'
 };
-const COL = { shot: 'var(--c-miss)', crossbar: 'var(--c-miss)', corner: 'var(--c-note)', freekick: 'var(--c-note)', mvp: 'var(--c-mvp)', goal: 'var(--c-goal)', yellow: 'var(--c-yellow)', red: 'var(--c-red)', sub: 'var(--c-sub)', injury: 'var(--c-injury)', save: 'var(--c-save)', miss: 'var(--c-miss)', note: 'var(--c-note)' };
+const COL = { offside: 'var(--c-note)', shot: 'var(--c-miss)', crossbar: 'var(--c-miss)', corner: 'var(--c-note)', freekick: 'var(--c-note)', mvp: 'var(--c-mvp)', goal: 'var(--c-goal)', yellow: 'var(--c-yellow)', red: 'var(--c-red)', sub: 'var(--c-sub)', injury: 'var(--c-injury)', save: 'var(--c-save)', miss: 'var(--c-miss)', note: 'var(--c-note)' };
 const PHASE_EV = { kickoff: "Fischio d'inizio", halftime: 'Fine primo tempo', secondhalf: 'Inizio secondo tempo', fulltime: 'Fine partita' };
 
 /* ================= testi ================= */
@@ -1441,6 +1442,7 @@ function describe(e, sc) {
     case 'crossbar': return { title: 'Traversa', main: p || t, sub: esc(t) };
     case 'corner': return { title: 'Calcio d’angolo', main: '', sub: esc(t) };
     case 'freekick': return { title: 'Calcio di punizione', main: p || t, sub: esc(t) };
+    case 'offside': return { title: 'Fuorigioco', main: p || t, sub: esc(t) };
     case 'miss': return { title: e.kind || 'Occasione', main: p || t, sub: esc(t) };
     case 'injury': return { title: 'Infortunio', main: p || t, sub: 'Gioco fermo · ' + esc(t) };
     case 'note': return { title: 'Dal campo', main: '', sub: esc(e.note || '') };
@@ -1468,6 +1470,7 @@ function buildText(ev, sc) {
     case 'crossbar': x = `🥅 ${m}TRAVERSA!\n${p ? 'Colpita da ' + p + ' (' + t + ')' : t}.`; break;
     case 'corner': x = `🚩 ${m}CALCIO D’ANGOLO\nPer ${t}.`; break;
     case 'freekick': x = `🎯 ${m}CALCIO DI PUNIZIONE\nPer ${t}${p ? ', battuto da ' + p : ''}.`; break;
+    case 'offside': x = `🚩 ${m}FUORIGIOCO\n${p ? p + ' (' + t + ')' : t}.`; break;
     case 'miss': x = `😮 ${m}${String(ev.kind || 'OCCASIONE').toUpperCase()}\n${p ? 'Per ' + p + ' (' + t + ')' : t + '!'}`; break;
     case 'injury': x = `🚑 ${m}INFORTUNIO\nGioco fermo per soccorrere ${p || 'un giocatore'} (${t}).`; break;
     case 'note': x = `📣 ${m}AGGIORNAMENTO\n${ev.note || ''}`; break;
@@ -3320,7 +3323,7 @@ function publicHtml() {
 }
 
 /* ================= regia ================= */
-const QUICK = [['goal', 'Gol'], ['yellow', 'Giallo'], ['red', 'Rosso'], ['sub', 'Cambio'], ['save', 'Parata'], ['miss', 'Occasione'], ['shot', 'Tiro'], ['crossbar', 'Traversa'], ['corner', 'Calcio d’angolo'], ['freekick', 'Calcio di punizione'], ['injury', 'Infortunio'], ['note', 'Nota']];
+const QUICK = [['goal', 'Gol'], ['yellow', 'Giallo'], ['red', 'Rosso'], ['sub', 'Cambio'], ['save', 'Parata'], ['miss', 'Occasione'], ['shot', 'Tiro'], ['crossbar', 'Traversa'], ['corner', 'Calcio d’angolo'], ['freekick', 'Calcio di punizione'], ['offside', 'Fuorigioco'], ['injury', 'Infortunio'], ['note', 'Nota']];
 function feedHtml(list) {
   if (!list.length) return '<div class="empty">Nessun evento. Premi “Fischio d’inizio” o aggiungi un evento.</div>';
   return list.map(e => {
@@ -3545,6 +3548,7 @@ function renderSheet() {
     case 'yellow': case 'injury': case 'save': fields = P('player', d.type === 'save' ? 'Portiere' : 'Giocatore'); break;
     case 'shot': case 'crossbar': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'freekick': fields = P('player', 'Battitore (facoltativo)'); break;
+    case 'offside': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'red': fields = P('player', 'Giocatore') + SEL('kind', 'Motivo', [['diretto', 'Rosso diretto'], ['doppio', 'Doppio giallo']]); break;
     case 'miss': fields = P('player', 'Giocatore') + SEL('kind', 'Cosa è successo', MISS_KINDS); break;
     case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra'); break;
