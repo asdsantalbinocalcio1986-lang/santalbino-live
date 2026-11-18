@@ -141,6 +141,8 @@ declare
   v_state jsonb;
   v_current_key text;
 begin
+  -- I conteggi sono riservati all'unico amministratore autenticato.
+  if not public.is_santalbino_admin() then return; end if;
   select state into v_state from public.live_state where id=1;
   if v_state is null then return; end if;
   v_current_key := nullif(v_state #>> '{match,pollId}','');
