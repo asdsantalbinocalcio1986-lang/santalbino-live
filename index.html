@@ -1691,9 +1691,9 @@ async function deleteArchivedMatch(id) {
   if (!db || !id) { toast('Partita non identificata'); return; }
   const row = archiveRows.find(item => String(item.id) === String(id));
   if (!row) { toast('La gara non è più presente nell’archivio. Aggiorno l’elenco.'); await loadMatchArchive(true); return; }
-  const date = row.match_date && /^\\d{4}-\\d{2}-\\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'data non indicata');
+  const date = row.match_date && /^\d{4}-\d{2}-\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'data non indicata');
   const description = `${date}: ${row.home_team || 'Casa'} ${Number(row.home_score || 0)}–${Number(row.away_score || 0)} ${row.away_team || 'Ospiti'}`;
-  if (!confirm(`Vuoi eliminare definitivamente questa gara dall’archivio?\\n\\n${description}\\n\\nL’operazione non è reversibile. Le altre gare resteranno invariate.`)) return;
+  if (!confirm(`Vuoi eliminare definitivamente questa gara dall’archivio?\n\n${description}\n\nL’operazione non è reversibile. Le altre gare resteranno invariate.`)) return;
   try {
     const { data, error } = await db.from('match_archive').delete().eq('id', id).select('id');
     if (error) throw error;
