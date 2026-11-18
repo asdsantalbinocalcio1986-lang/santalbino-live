@@ -2847,8 +2847,8 @@ async function renderMatchDayGraphic() {
   x.fillStyle='rgba(255,255,255,.78)'; x.font='700 22px Arial,sans-serif'; x.fillText('IL PROSSIMO APPUNTAMENTO GIALLOVERDE',800,425);
   const info = [
     {label:'DATA',value:fmtDate(m.date)||'DA DEFINIRE',sub:'CALENDARIO'},
-    {label:'ORA',value:m.time||'DA DEFINIRE',sub:'FISCHIO D’INIZIO'},
-    {label:'GIRONE',value:(m.comp||'DA DEFINIRE').toUpperCase(),sub:'CAMPIONATO'},
+    {label:'ORARIO',value:m.time||'DA DEFINIRE',sub:'FISCHIO D’INIZIO'},
+    {label:'CAMPIONATO',value:(m.comp||'DA DEFINIRE').toUpperCase(),sub:'GIRONE DI APPARTENENZA'},
     {label:'STADIO',value:(m.venue||'DA DEFINIRE').toUpperCase(),sub:'SEDE DELLA GARA'}
   ];
   const positions=[{x:85,y:510,w:690,h:170},{x:825,y:510,w:690,h:170},{x:85,y:715,w:690,h:170},{x:825,y:715,w:690,h:170}];
@@ -2856,32 +2856,44 @@ async function renderMatchDayGraphic() {
     const p=positions[i];
     x.fillStyle='rgba(0,0,0,.66)'; rrect(x,p.x,p.y,p.w,p.h,24); x.fill();
     x.strokeStyle=i%2===0?'rgba(184,231,200,.7)':'rgba(227,198,109,.7)'; x.lineWidth=3; rrect(x,p.x,p.y,p.w,p.h,24); x.stroke();
-    x.fillStyle=i%2===0?'#b8e7c8':'#e3c66d'; x.font='700 15px Arial,sans-serif'; x.textAlign='left'; x.textBaseline='middle'; x.fillText(item.label,p.x+34,p.y+43);
+
+    // Titolo ben visibile; il dato descrittivo resta più piccolo e può andare su due righe.
+    x.fillStyle=i%2===0?'#b8e7c8':'#e3c66d';
+    x.font='800 27px Arial,sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+    fitFont(x,item.label,p.w-68,27,800,'Arial,sans-serif');
+    x.fillText(item.label,p.x+p.w/2,p.y+39,p.w-68);
+
     x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle';
-    // Le informazioni lunghe (in particolare il nome dello stadio) vanno
-    // su due righe e restano sempre nell'area interna della scheda.
-    const valueMaxWidth=p.w-68;
-    let valueFont=i===3?15:19,valueLines=[];
+    const valueMaxWidth=p.w-76;
+    let valueFont=21;
     const wrapValue=()=>{
       x.font=`600 ${valueFont}px Arial,sans-serif`;
-      const lines=[''];
-      item.value.split(/\s+/).forEach(word=>{
+      const words=item.value.split(/\s+/),lines=[''];
+      words.forEach(word=>{
         const current=lines[lines.length-1],candidate=current?current+' '+word:word;
         if(current&&x.measureText(candidate).width>valueMaxWidth) lines.push(word);
         else lines[lines.length-1]=candidate;
       });
+      if(lines.length>2){
+        const first=lines.shift();
+        lines[0]=first+' '+lines[0];
+      }
       return lines;
     };
-    valueLines=wrapValue();
-    while(valueLines.length>2&&valueFont>20){valueFont--;valueLines=wrapValue();}
-    const valueLineHeight=Math.min(30,valueFont+2);
-    const valueStartY=p.y+105-((valueLines.length-1)*valueLineHeight/2);
+    let valueLines=wrapValue();
+    while(valueLines.some(line=>x.measureText(line).width>valueMaxWidth)&&valueFont>15){
+      valueFont--; valueLines=wrapValue();
+    }
+    const lineHeight=Math.min(27,valueFont+4);
+    const valueStartY=p.y+99-((valueLines.length-1)*lineHeight/2);
     valueLines.forEach((line,index)=>{
+      x.font=`600 ${valueFont}px Arial,sans-serif`;
       fitFont(x,line,valueMaxWidth,valueFont,600,'Arial,sans-serif');
       x.textAlign='center';x.textBaseline='middle';
-      x.fillText(line,p.x+p.w/2,valueStartY+index*valueLineHeight,valueMaxWidth);
+      x.fillText(line,p.x+p.w/2,valueStartY+index*lineHeight,valueMaxWidth);
     });
-    x.fillStyle='rgba(255,255,255,.58)'; x.font='600 13px Arial,sans-serif'; x.textBaseline='middle'; x.fillText(item.sub,p.x+p.w/2,p.y+150);
+    x.fillStyle='rgba(255,255,255,.58)'; x.font='600 12px Arial,sans-serif';
+    x.textAlign='center'; x.textBaseline='middle'; x.fillText(item.sub,p.x+p.w/2,p.y+148);
   });
   x.fillStyle='rgba(255,255,255,.82)'; x.font='800 20px Arial,sans-serif'; x.textAlign='center'; x.fillText('ASD SANT’ALBINO TERME  ·  FORZA GIALLOVERDI',800,950);
   await addSponsorToGraphic(canvas,'matchday');
