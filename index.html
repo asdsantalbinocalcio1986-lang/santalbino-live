@@ -3132,7 +3132,8 @@ function timelineHtml() {
       <div class="tl-card"><div class="tl-top"><span class="tl-title">${esc(d.title)}</span>${e.type === 'note' ? '' : `<span class="tl-team">${badge(side)}<span>${esc(teamName(side))}</span></span>`}</div>
         ${d.main ? `<div class="tl-main">${esc(d.main)}</div>` : ''}<div class="tl-sub">${d.sub}</div>${CARD_TYPES.includes(e.type) ? `<button class="btn sm tl-image-btn" type="button" data-a="viewgraphic" data-id="${esc(e.id)}">Apri immagine</button>` : ''}</div></li>`;
   }).join('');
-  return `<ul class="tl-list">${items}</ul>`;
+  const graphic = matchTimelineHtml();
+  return `${graphic ? `<section class="match-timeline-public"><h2>Andamento della partita</h2>${graphic}</section><h2>Cronaca</h2>` : ''}<ul class="tl-list">${items}</ul>`;
 }
 function statsHtml() {
   const cnt = (t, s) => S.events.filter(e => e.type === t && e.team === s).length;
@@ -3359,7 +3360,7 @@ function feedHtml(list) {
   }).join('');
 }
 let editId = null, armedDel = null;
-function regiaTimelineHtml() {
+function matchTimelineHtml() {
   const actions = S.events
     .filter(e => !PHASE_EV[e.type] && e.type !== 'mvp' && ['home', 'away'].includes(e.team) && e.min !== '' && e.min != null)
     .map(e => {
@@ -3372,7 +3373,7 @@ function regiaTimelineHtml() {
     })
     .filter(Boolean)
     .sort((a, b) => a.minute - b.minute);
-  if (!actions.length) return '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>';
+  if (!actions.length) return '';
   const maxMinute = Math.max(90, ...actions.map(x => x.minute));
   const ticks = [0, 15, 30, 45, 60, 75, 90, ...(maxMinute > 90 ? [105, 120].filter(x => x < maxMinute || x === 120) : [])]
     .filter(x => x <= maxMinute);
@@ -3401,7 +3402,7 @@ function regiaHtml() {
     ${S.clock.phase === 'ft' ? `<div class="card"><h2>${currentArchived ? 'Partita salvata' : 'Partita terminata: cosa vuoi fare?'}</h2><p class="small muted">${currentArchived ? 'La partita è stata conservata nell’archivio storico con risultato, cronaca e formazioni.' : 'Scegli se conservare questa partita nello storico oppure scartarla. Nessuna partita viene archiviata automaticamente.'} I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Presente nell’archivio storico</p><button class="btn primary block" data-a="startNewMatch">Avvia una nuova partita</button>' : '<div class="row2 stack"><button class="btn primary" data-a="archiveMatch">Salva nell’archivio</button><button class="btn danger" data-a="discardMatch">Scarta partita</button></div>'}</div>` : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
     <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>
-    <h2>Timeline della partita</h2><div class="card"><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine.</p>${regiaTimelineHtml()}</div>`;
+    <h2>Timeline della partita</h2><div class="card"><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine.</p>${matchTimelineHtml() || '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>'}</div>`;
   else if (t === 'archive') body = archiveHtml();
   else if (t === 'convocati') body = convocatiRegiaHtml();
   else if (t === 'lineup') body = ['home', 'away'].map(s => {
