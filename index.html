@@ -139,7 +139,8 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .scorers{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;font-size:13px;opacity:.88;min-height:4px}
 .scorers div{min-width:0;overflow-wrap:anywhere;line-height:1.5}
 .scorers div:last-child{text-align:right}
-@media (max-width:600px){.top{align-items:center;flex-wrap:nowrap}.top-actions-desktop{display:none}.mobile-actions{display:block}.brand{flex:1 1 auto}.brand span{max-width:48vw}}
+.mobile-login{display:none}
+@media (max-width:600px){.top{align-items:center;flex-wrap:nowrap}.top-actions-desktop{display:none}.mobile-actions{display:block}.mobile-login{display:inline-flex}.brand{flex:1 1 auto}.brand span{max-width:48vw}}
 @media (max-width:380px){.score{font-size:52px}.badge{width:62px;height:62px}.tname{font-size:15px}}
 
 /* schede */
@@ -3595,7 +3596,7 @@ function topHtml() {
     : `<button class="pill" data-a="login">Accesso regia</button>`;
   const mobileControls = CAN_EDIT
     ? `<details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
-    : '';
+    : `<button class="pill mobile-login" data-a="login">Accesso regia</button>`;
   return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div><div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
