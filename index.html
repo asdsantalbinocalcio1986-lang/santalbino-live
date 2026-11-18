@@ -1550,6 +1550,54 @@ async function loadMatchArchive(force = false) {
   }
 }
 
+
+function seasonKeyForDate(value) {
+  const m = String(value || '').match(/^(\\d{4})-(\\d{2})-\\d{2}$/);
+  if (!m) return '';
+  const year = Number(m[1]), month = Number(m[2]);
+  return String(month >= 7 ? year : year - 1);
+}
+function seasonLabel(key) { return key + '/' + String(Number(key) + 1).slice(-2); }
+function seasonalStatsHtml() {
+  if (!db) return '<div class="empty"><h3>Statistiche stagionali non disponibili</h3><p>La connessione al database non è attiva.</p></div>';
+  if (!archiveLoaded) return '<div class="empty">Caricamento dati stagionali…</div>';
+  if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le statistiche stagionali si aggiorneranno automaticamente dopo l’archiviazione delle partite concluse.</p></div>';
+  const currentKey = seasonKeyForDate(new Date().toISOString().slice(0, 10));
+  const seasons = [...new Set([currentKey, ...archiveRows.map(r => seasonKeyForDate(r.match_date)).filter(Boolean)])].sort((a,b) => Number(b)-Number(a));
+  const selected = seasons.includes(String(L.season || '')) ? String(L.season) : seasons[0];
+  const rows = archiveRows.filter(r => seasonKeyForDate(r.match_date) === selected);
+  const totals = { played:0, wins:0, draws:0, losses:0, gf:0, ga:0, clean:0, yellow:0, red:0 };
+  rows.forEach(row => {
+    const state = row.state || {}, match = state.match || {};
+    let side = match.ourSide === 'home' || match.ourSide === 'away' ? match.ourSide : '';
+    if (!side) {
+      const home = String(row.home_team || '').toLowerCase(), away = String(row.away_team || '').toLowerCase();
+      if (home.includes("sant'albino") || home.includes('sant’albino')) side = 'home';
+      else if (away.includes("sant'albino") || away.includes('sant’albino')) side = 'away';
+    }
+    if (!side) return;
+    const gf = Math.max(0, Number(row[side + '_score']) || 0);
+    const ga = Math.max(0, Number(row[other(side) + '_score']) || 0);
+    totals.played++; totals.gf += gf; totals.ga += ga;
+    if (gf > ga) totals.wins++; else if (gf === ga) totals.draws++; else totals.losses++;
+    if (ga === 0) totals.clean++;
+    (Array.isArray(state.events) ? state.events : []).forEach(ev => {
+      if (ev.team === side && ev.type === 'yellow') totals.yellow++;
+      if (ev.team === side && ev.type === 'red') totals.red++;
+    });
+  });
+  const pct = n => totals.played ? Math.round(n / totals.played * 100) : 0;
+  const metric = (label, value) => '<div class="stat-h" style="grid-template-columns:minmax(0,1fr) auto;margin:8px 0"><span style="text-align:left">' + label + '</span><b>' + value + '</b></div>';
+  return '<div class="card"><h2>Stagione ' + esc(seasonLabel(selected)) + '</h2><p class="small muted">Dati ricavati esclusivamente dalle partite archiviate. La stagione sportiva è calcolata dal 1° luglio al 30 giugno.</p><div class="row2" style="grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:7px;margin:12px 0">' +
+    seasons.map(key => '<button class="btn sm ' + (key === selected ? 'primary' : '') + '" data-season="' + key + '">' + esc(seasonLabel(key)) + '</button>').join('') +
+    '</div>' +
+    (rows.length ? '<div class="grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0">' +
+      [['Partite',totals.played],['Vittorie',totals.wins],['Pareggi',totals.draws],['Sconfitte',totals.losses],['Gol fatti',totals.gf],['Gol subiti',totals.ga],['Clean sheet',totals.clean],['Media gol fatti', (totals.gf/totals.played).toFixed(2)],['Ammonizioni',totals.yellow],['Espulsioni',totals.red]].map(([label,value]) => '<div class="card" style="margin:0;padding:12px"><div class="small muted">' + label + '</div><div style="font:800 28px/1.1 var(--fd);margin-top:4px">' + value + '</div></div>').join('') +
+      '</div><h3>Bilancio risultati</h3><div class="stat-h"><b>' + totals.wins + '</b><span>Vittorie · ' + pct(totals.wins) + '%</span><b>' + totals.losses + '</b></div><div class="bars"><div class="bar l"><i style="width:' + pct(totals.wins) + '%"></i></div><div class="bar r"><i style="width:' + pct(totals.losses) + '%"></i></div></div><p class="small muted" style="margin-top:10px">Pareggi: ' + totals.draws + ' (' + pct(totals.draws) + '%). I dati non comprendono partite non ancora archiviate o prive dell’indicazione della nostra squadra.</p>' :
+      '<div class="empty"><h3>Nessun dato per questa stagione</h3><p>Non risultano partite archiviate nel periodo selezionato.</p></div>') +
+    '</div>';
+}
+
 function archiveHtml() {
   if (!db) return '<div class="empty"><h3>Archivio non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
   if (archiveLoading) return '<div class="empty">Caricamento archivio partite…</div>';
@@ -3024,10 +3072,10 @@ function validExternalUrl(value) {
 }
 
 function publicHtml() {
-  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['archive', 'Archivio']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['season', 'Stagione'], ['archive', 'Archivio']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'season' ? seasonalStatsHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -3321,7 +3369,8 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
-  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (L.tab === 'archive') void loadMatchArchive(true); return; }
+  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (L.tab === 'archive' || L.tab === 'season') void loadMatchArchive(true); return; }
+  const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
