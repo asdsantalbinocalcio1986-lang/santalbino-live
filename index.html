@@ -1684,7 +1684,10 @@ let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publ
 function setSync(st, detail = '') { syncState = st; syncDetail = detail; const el = $('#sync'); if (el) el.outerHTML = syncHtml(); }
 function syncHtml() {
   const txt = { ok: 'Pagina live aggiornata', dirty: 'Modifiche da sincronizzare…', sending: 'Sincronizzazione in corso…', error: 'Sincronizzazione non disponibile' + (syncDetail ? ` (${esc(syncDetail)})` : ''), local: 'Modalità locale: configura il database' }[LOCAL_ONLY ? 'local' : syncState];
-  return `<div class="sync ${LOCAL_ONLY ? 'local' : syncState}" id="sync"><b>${txt}</b>${syncState === 'error' && !LOCAL_ONLY ? '<button class="btn sm" data-a="retry">Riprova</button>' : ''}</div>`;
+  const recovery = syncState === 'error' && syncDetail.startsWith('conflitto:')
+    ? '<button class="btn sm danger" data-a="reloadremote">Scarica versione online</button>'
+    : (syncState === 'error' && !LOCAL_ONLY ? '<button class="btn sm" data-a="retry">Riprova</button>' : '');
+  return `<div class="sync ${LOCAL_ONLY ? 'local' : syncState}" id="sync"><b>${txt}</b>${recovery}</div>`;
 }
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
 function saveDraft() {
@@ -1739,7 +1742,7 @@ async function publishNow() {
   window.__santalbinoSaving = false; publishing = false;
   if (error) {
     publishPending = false;
-    setSync('error', error.code === '40001' ? 'conflitto: versione online aggiornata altrove; conserva la bozza prima di ricaricare' : 'controlla connessione, migrazione Fase 1 e autorizzazioni');
+    setSync('error', error.code === '40001' ? 'conflitto: versione online aggiornata altrove' : 'controlla connessione, migrazione Fase 1 e autorizzazioni');
     console.error('Pubblicazione Sant\'Albino Live:', error);
     return;
   }
@@ -3237,6 +3240,7 @@ document.addEventListener('click', async e => {
       armedMvp = false; proclaim(); break; }
     case 'savefb': L.fbUrl = $('#s-fb').value.trim(); saveL(); toast('Link salvato'); break;
     case 'exportbackup': downloadStateBackup(); break;
+    case 'reloadremote': await discardDraftAndReloadRemote(); break;
     case 'newmatch': if (armedNew) { armedNew = false; resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
 });
@@ -3245,6 +3249,19 @@ function downloadStateBackup() {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const date = new Date().toISOString().slice(0,10);
   saveBlob(blob, 'santalbino-live-backup-' + date + '.json');
+}
+async function discardDraftAndReloadRemote() {
+  if (!confirm('La bozza locale verrà prima scaricata come backup. Poi verrà ricaricata la versione online e la bozza locale sarà eliminata. Continuare?')) return;
+  downloadStateBackup();
+  try { localStorage.removeItem(DK); } catch (e) {}
+  const { data, error } = await db.from('live_state').select('state').eq('id',1).maybeSingle();
+  if (error || !data?.state) { setSync('error','impossibile ricaricare lo stato online'); return; }
+  S = mergeState(data.state);
+  remoteRev = Number(S.rev || 0);
+  L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+  L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+  L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+  setSync('ok'); renderHero(); updDatalists(); renderMain();
 }
 function validateImportedState(payload) {
   const d = payload?.state && payload.app === 'SantAlbinoLive' ? payload.state : payload;
