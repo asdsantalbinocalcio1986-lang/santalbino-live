@@ -3463,15 +3463,43 @@ function prepareLineupImage(blob) {
         sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = 'high';
         sc.drawImage(img, 0, 0, w, h);
 
-        // La distinta FIGC ha colonne separate: N° del ruolo a sinistra,
-        // Cognome e nome al centro. Escludiamo nascita, matricola e documenti.
-        const crop = (x1, x2) => {
+        const cropRaw = (x1, x2) => {
           const sx = Math.round(w * x1), sy = Math.round(h * .275);
           const sw = Math.round(w * (x2 - x1)), sh = Math.round(h * .675);
           const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+          c.getContext('2d').drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+          return c;
+        };
+        const makeGrayVariant = (input, mode) => {
+          const c = document.createElement('canvas'); c.width = input.width; c.height = input.height;
           const cx = c.getContext('2d', { willReadFrequently: true });
-          cx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
-          const p = cx.getImageData(0, 0, sw, sh), d = p.data;
+          cx.drawImage(input, 0, 0);
+          const p = cx.getImageData(0, 0, c.width, c.height), d = p.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const gray = d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
+            let value = gray;
+            if (mode === 'contrast') value = (gray - 128) * 1.3 + 128;
+            else if (mode === 'threshold') value = gray > 175 ? 255 : 0;
+            value = Math.max(0, Math.min(255, value));
+            d[i] = d[i + 1] = d[i + 2] = value;
+          }
+          cx.putImageData(p, 0, 0);
+          return c;
+        };
+
+        // Tre versioni della colonna nomi: scala di grigi naturale,
+        // contrasto moderato e soglia netta. Evita di cancellare tratti sottili.
+        const nameRaw = cropRaw(.245, .64);
+        const nameCrops = [
+          makeGrayVariant(nameRaw, 'gray'),
+          makeGrayVariant(nameRaw, 'contrast'),
+          makeGrayVariant(nameRaw, 'threshold')
+        ];
+        // Le zone numeriche mantengono la preparazione precedente.
+        const cropNumbers = (x1, x2) => {
+          const c = cropRaw(x1, x2);
+          const cx = c.getContext('2d', { willReadFrequently: true });
+          const p = cx.getImageData(0, 0, c.width, c.height), d = p.data;
           for (let i = 0; i < d.length; i += 4) {
             const gray = d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
             const value = Math.max(0, Math.min(255, (gray - 145) * 2.0 + 145));
@@ -3480,13 +3508,10 @@ function prepareLineupImage(blob) {
           cx.putImageData(p, 0, 0);
           return c;
         };
-        const numberCrop = crop(.105, .18);
-        // Zona esterna a sinistra: alcune distinte riportano qui i numeri maglia
-        // quando la colonna N° del Ruolo è lasciata vuota.
-        const leftMarginNumberCrop = crop(.075, .205);
-        const nameCrop = crop(.265, .59);
+        const numberCrop = cropNumbers(.105, .18);
+        const leftMarginNumberCrop = cropNumbers(.075, .205);
         URL.revokeObjectURL(url);
-        resolve({ numberCrop, leftMarginNumberCrop, nameCrop });
+        resolve({ numberCrop, leftMarginNumberCrop, nameCrops });
       } catch (err) {
         URL.revokeObjectURL(url); reject(err);
       }
@@ -3501,7 +3526,7 @@ function parseOcrNames(text) {
   const rows = [];
   for (const raw of lines) {
     let line = raw.replace(/^[|¦•·]+\s*/, '').replace(/^\d{1,2}[.)]?\s+/, '').trim();
-    if (!line || /^(cognome e nome|distinta|giocatori|titolari|riserve|panchina)\b/i.test(line)) continue;
+    if (!line || /^(cognome\s+(?:e|è)\s+nome|distinta|giocatori|titolari|riserve|panchina)\b/i.test(line)) continue;
     if (/^\(\s*[RP]\s*\)$/i.test(line)) {
       if (rows.length) {
         if (/R/i.test(line)) rows[rows.length - 1].reserve = true;
@@ -3510,11 +3535,47 @@ function parseOcrNames(text) {
     }
     const reserve = /\(\s*R\s*\)/i.test(line);
     line = line.replace(/\(\s*[RP]\s*\)/gi, '').replace(/[|]+/g, 'I').replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+/, '').trim();
-    if (!/[A-Za-zÀ-ÖØ-öø-ÿ]{2}/.test(line) || /\d{2,}/.test(line)) continue;
+    const letters = line.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '');
+    const tokens = line.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/g) || [];
+    const letterRatio = letters.length / Math.max(1, line.length);
+    // Le modalità PSM possono scambiare segni T/R e righe della griglia
+    // per nominativi: scarta frammenti brevi o con troppo rumore grafico.
+    if (letters.length < 6 || !tokens.length || (tokens.length === 1 && letters.length < 8) || letterRatio < .65 || /\d{2,}/.test(line)) continue;
     if (/^(tipo|numero|rilasciato|poggi|lnd)$/i.test(line)) continue;
     rows.push({ name: line, reserve });
   }
   return rows;
+}
+
+
+function selectOcrNameConsensus(passes) {
+  if (!passes.length) return [];
+  const ranked = [...passes].sort((a,b) =>
+    (b.parsed.length * 10 + b.confidence * .02) -
+    (a.parsed.length * 10 + a.confidence * .02)
+  );
+  const anchor = ranked[0].parsed;
+  return anchor.map((base, index) => {
+    const votes = new Map();
+    for (const pass of passes) {
+      const candidate = pass.parsed[index];
+      if (!candidate) continue;
+      const key = candidate.name.normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleUpperCase('it')
+        .replace(/[^A-Z]/g, '');
+      if (!key) continue;
+      const current = votes.get(key) || { name: candidate.name, reserve: false, score: 0, count: 0 };
+      current.score += 1 + Math.max(0, Math.min(100, pass.confidence)) / 100;
+      current.count += 1;
+      current.reserve = current.reserve || candidate.reserve;
+      if (candidate.name.length > current.name.length) current.name = candidate.name;
+      votes.set(key, current);
+    }
+    if (!votes.size) return base;
+    const winner = [...votes.values()].sort((a,b) => b.score - a.score || b.count - a.count)[0];
+    return { name: winner.name, reserve: winner.reserve || base.reserve };
+  });
 }
 
 function parseOcrNumbers(text) {
@@ -3606,14 +3667,15 @@ async function readLineup(side, stat) {
     stat.textContent = 'Preparazione delle colonne della distinta…';
     const prepared = await prepareLineupImage(photos[side].blob);
     const namePasses = [];
-    for (const mode of ['4','6','11','12']) {
-      await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
-      const result = await worker.recognize(prepared.nameCrop);
-      const parsed = parseOcrNames(result.data.text || '');
-      namePasses.push({ parsed, confidence: Number(result.data.confidence || 0), raw: result.data.text || '' });
+    for (let variant = 0; variant < prepared.nameCrops.length; variant++) {
+      for (const mode of ['4','6','11','12']) {
+        await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
+        const result = await worker.recognize(prepared.nameCrops[variant]);
+        const parsed = parseOcrNames(result.data.text || '');
+        namePasses.push({ parsed, confidence: Number(result.data.confidence || 0), raw: result.data.text || '', variant, mode });
+      }
     }
-    namePasses.sort((a,b) => (b.parsed.length * 10 + b.confidence * .02) - (a.parsed.length * 10 + a.confidence * .02));
-    const names = namePasses[0]?.parsed || [];
+    const names = selectOcrNameConsensus(namePasses);
 
     const readNumberZone = async (canvas) => {
       const passes = [];
