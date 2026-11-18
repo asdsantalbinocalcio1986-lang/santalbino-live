@@ -2857,8 +2857,31 @@ async function renderMatchDayGraphic() {
     x.fillStyle='rgba(0,0,0,.66)'; rrect(x,p.x,p.y,p.w,p.h,24); x.fill();
     x.strokeStyle=i%2===0?'rgba(184,231,200,.7)':'rgba(227,198,109,.7)'; x.lineWidth=3; rrect(x,p.x,p.y,p.w,p.h,24); x.stroke();
     x.fillStyle=i%2===0?'#b8e7c8':'#e3c66d'; x.font='900 24px Arial,sans-serif'; x.textAlign='left'; x.textBaseline='middle'; x.fillText(item.label,p.x+34,p.y+43);
-    x.fillStyle='#fff'; fitFont(x,item.value,p.w-68,46,900,'Arial,sans-serif'); x.textAlign='center'; x.fillText(item.value,p.x+p.w/2,p.y+105);
-    x.fillStyle='rgba(255,255,255,.58)'; x.font='700 16px Arial,sans-serif'; x.fillText(item.sub,p.x+p.w/2,p.y+145);
+    x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle';
+    // Le informazioni lunghe (in particolare il nome dello stadio) vanno
+    // su due righe e restano sempre nell'area interna della scheda.
+    const valueMaxWidth=p.w-68;
+    let valueFont=46,valueLines=[];
+    const wrapValue=()=>{
+      x.font=`900 ${valueFont}px Arial,sans-serif`;
+      const lines=[''];
+      item.value.split(/\s+/).forEach(word=>{
+        const current=lines[lines.length-1],candidate=current?current+' '+word:word;
+        if(current&&x.measureText(candidate).width>valueMaxWidth) lines.push(word);
+        else lines[lines.length-1]=candidate;
+      });
+      return lines;
+    };
+    valueLines=wrapValue();
+    while(valueLines.length>2&&valueFont>23){valueFont--;valueLines=wrapValue();}
+    const valueLineHeight=Math.min(34,valueFont+3);
+    const valueStartY=p.y+105-((valueLines.length-1)*valueLineHeight/2);
+    valueLines.forEach((line,index)=>{
+      fitFont(x,line,valueMaxWidth,valueFont,900,'Arial,sans-serif');
+      x.textAlign='center';x.textBaseline='middle';
+      x.fillText(line,p.x+p.w/2,valueStartY+index*valueLineHeight,valueMaxWidth);
+    });
+    x.fillStyle='rgba(255,255,255,.58)'; x.font='700 16px Arial,sans-serif'; x.textBaseline='middle'; x.fillText(item.sub,p.x+p.w/2,p.y+150);
   });
   x.fillStyle='rgba(255,255,255,.82)'; x.font='800 20px Arial,sans-serif'; x.textAlign='center'; x.fillText('ASD SANT’ALBINO TERME  ·  FORZA GIALLOVERDI',800,950);
   await addSponsorToGraphic(canvas,'matchday');
