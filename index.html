@@ -1526,6 +1526,92 @@ function voterId() {
   return id;
 }
 let mvpVoteCounts = {}, mvpVoteBusy = false;
+let archiveRows = [], archiveLoaded = false, archiveLoading = false, archiveError = '', currentArchived = false;
+
+async function loadMatchArchive(force = false) {
+  if (!db || archiveLoading || (archiveLoaded && !force)) return;
+  archiveLoading = true;
+  try {
+    const { data, error } = await db.from('match_archive')
+      .select('id,poll_id,match_date,competition,venue,home_team,away_team,home_score,away_score,state,archived_at')
+      .order('match_date', { ascending: false })
+      .order('archived_at', { ascending: false });
+    if (error) throw error;
+    archiveRows = data || [];
+    archiveLoaded = true;
+    archiveError = '';
+  } catch (error) {
+    console.warn('Caricamento archivio partite:', error);
+    archiveLoaded = false;
+    archiveError = error?.message || 'Errore di connessione';
+  } finally {
+    archiveLoading = false;
+    if ($('#main') && L.tab === 'archive' && !(CAN_EDIT && L.mode === 'regia')) renderMain();
+  }
+}
+
+function archiveHtml() {
+  if (!db) return '<div class="empty"><h3>Archivio non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
+  if (archiveLoading) return '<div class="empty">Caricamento archivio partite…</div>';
+  if (!archiveLoaded) return `<div class="card"><h3>Archivio non caricato</h3><p class="small muted">${esc(archiveError || 'Controlla la connessione e riprova.')}</p><button class="btn" data-a="reloadArchive">Riprova</button></div>`;
+  if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
+  const typeLabels = { kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
+  return archiveRows.map(row => {
+    const state = row.state || {}, events = Array.isArray(state.events) ? state.events : [];
+    const match = state.match || {}, rosters = state.rosters || {};
+    const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
+    const eventHtml = events.map(ev => {
+      const label = typeLabels[ev.type] || 'Evento';
+      const side = ev.team === 'home' ? row.home_team : ev.team === 'away' ? row.away_team : '';
+      const own = ev.type === 'goal' && ev.kind === 'autogol' ? ' · autogol' : '';
+      const person = ev.player ? ' · ' + esc(ev.player) : '';
+      const detail = ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
+      return `<div class="ev"><div class="m">${esc(ev.min || '–')}${ev.min ? '′' : ''}</div><div><div class="t"><b>${esc(label)}${own}</b>${person}</div><div class="small muted">${esc(side)}${detail ? ' · ' + detail : ''}</div></div></div>`;
+    }).join('');
+    const lineupHtml = ['home','away'].map(side => {
+      const text = typeof rosters[side] === 'string' ? rosters[side].trim() : '';
+      return text ? `<h4>${esc(side === 'home' ? row.home_team : row.away_team)}</h4><pre style="white-space:pre-wrap;font:inherit;font-size:13px">${esc(text)}</pre>` : '';
+    }).join('');
+    return `<article class="card"><div class="small muted">${esc(date)} · ${esc(row.competition || 'Partita')}${row.venue ? ' · ' + esc(row.venue) : ''}</div><div class="stat-h" style="grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);margin:12px 0"><span style="text-align:left">${esc(row.home_team)}</span><b style="white-space:nowrap">${Number(row.home_score)} – ${Number(row.away_score)}</b><span style="text-align:right">${esc(row.away_team)}</span></div><details><summary>Dettagli, cronaca e formazioni</summary><h4>Cronaca</h4>${eventHtml || '<p class="small muted">Nessun evento registrato.</p>'}${lineupHtml ? '<h4>Formazioni</h4>' + lineupHtml : ''}</details></article>`;
+  }).join('');
+}
+
+async function refreshCurrentArchiveStatus() {
+  if (!db || !S.match?.pollId) { currentArchived = false; return false; }
+  const { data, error } = await db.from('match_archive').select('id').eq('poll_id', S.match.pollId).maybeSingle();
+  if (error) { currentArchived = false; console.warn('Verifica archiviazione partita:', error.message); return false; }
+  currentArchived = !!data;
+  return currentArchived;
+}
+
+async function archiveCurrentMatch() {
+  if (!db || !CAN_EDIT) { toast('Accedi alla regia per archiviare la partita'); return; }
+  if (S.clock.phase !== 'ft') { toast('L’archiviazione è disponibile solo dopo il fischio finale'); return; }
+  if (syncState !== 'ok') { toast('Attendi la conferma “Pagina live aggiornata” prima di archiviare'); return; }
+  if (!S.match.pollId) { toast('Identificativo partita mancante: salva la partita e riprova'); return; }
+  try {
+    const { data, error } = await db.rpc('archive_santalbino_match');
+    if (error) throw error;
+    currentArchived = true;
+    await loadMatchArchive(true);
+    toast(data ? 'Partita archiviata e conservata nello storico' : 'Partita già presente nello storico');
+    renderMain();
+  } catch (error) {
+    console.error('Archiviazione partita:', error);
+    toast(error.message || 'Archiviazione non riuscita');
+  }
+}
+
+async function ensureArchivedBeforeReset() {
+  if (S.clock.phase !== 'ft') return true;
+  const archived = await refreshCurrentArchiveStatus();
+  if (archived) return true;
+  toast('Prima archivia la partita terminata: così non perderai cronaca e formazioni');
+  L.rtab = 'live';
+  renderMain();
+  return false;
+}
+
 async function refreshMvpVotes() {
   if (!db || !CAN_EDIT) return;
   const { data, error } = await db.rpc('get_santalbino_mvp_vote_counts', { p_match_key: mvpPollKey() });
@@ -1604,9 +1690,11 @@ async function initCaps() {
     L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
   } else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
   dbReady = true;
+  await loadMatchArchive(true);
+  await refreshCurrentArchiveStatus();
   offerDraftRecovery();
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); if (CAN_EDIT) refreshMvpVotes(); }
+    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); void refreshCurrentArchiveStatus().then(() => renderMain()); if (CAN_EDIT) refreshMvpVotes(); }
    }).subscribe((status, err) => {
     if (status === 'SUBSCRIBED') {
       if (realtimeNeedsResync) void refreshRemoteState('realtime-reconnected');
@@ -1810,6 +1898,7 @@ async function refreshRemoteState(reason = 'reconnect') {
     if (nextRev > Number(S.rev || 0)) {
       remoteRev = nextRev;
       S = mergeState(data.state);
+      await refreshCurrentArchiveStatus();
       L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
       L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
       L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
@@ -2935,10 +3024,10 @@ function validExternalUrl(value) {
 }
 
 function publicHtml() {
-  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['archive', 'Archivio']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -2961,6 +3050,7 @@ function regiaHtml() {
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
     <button class="btn primary block phasebtn" data-a="phase">${PHASEBTN[S.clock.phase]}</button>
+    ${S.clock.phase === 'ft' ? `<div class="card"><h2>Archivio storico</h2><p class="small muted">Salva il risultato, la cronaca e le formazioni in modo permanente. I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Partita già archiviata</p>' : '<button class="btn primary block" data-a="archiveMatch">Archivia partita</button>'}</div>` : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
     <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>`;
   else if (t === 'convocati') body = convocatiRegiaHtml();
@@ -3231,7 +3321,7 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
-  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); return; }
+  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (L.tab === 'archive') void loadMatchArchive(true); return; }
   const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
@@ -3246,8 +3336,10 @@ document.addEventListener('click', async e => {
     case 'editorPreview': await openGraphicEditorPreview(); break;
     case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
     case 'retry': publishNow(); break;
+    case 'archiveMatch': await archiveCurrentMatch(); break;
+    case 'reloadArchive': await loadMatchArchive(true); break;
     case 'phase': { const c = S.clock;
-      if (c.phase === 'ft') { if (!armedNew) { armedNew = true; a.textContent = 'Tocca ancora: nuova partita'; setTimeout(() => { armedNew = false; renderMain(); }, 3500); } else { armedNew = false; resetMatch(); } break; }
+      if (c.phase === 'ft') { if (!armedNew) { armedNew = true; a.textContent = 'Tocca ancora: nuova partita'; setTimeout(() => { armedNew = false; renderMain(); }, 3500); } else { armedNew = false; if (await ensureArchivedBeforeReset()) resetMatch(); } break; }
       if (c.phase === 'pre') { c.phase = 'p1'; c.t0 = Date.now(); addPhase('kickoff', ''); }
       else if (c.phase === 'p1') { c.phase = 'ht'; addPhase('halftime', '45'); }
       else if (c.phase === 'ht') { c.phase = 'p2'; c.t0 = Date.now(); addPhase('secondhalf', '45'); }
@@ -3328,7 +3420,7 @@ document.addEventListener('click', async e => {
     case 'savefb': L.fbUrl = $('#s-fb').value.trim(); saveL(); toast('Link salvato'); break;
     case 'exportbackup': downloadStateBackup(); break;
     case 'reloadremote': await discardDraftAndReloadRemote(); break;
-    case 'newmatch': if (armedNew) { armedNew = false; resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
+    case 'newmatch': if (armedNew) { armedNew = false; if (await ensureArchivedBeforeReset()) resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
 });
 function downloadStateBackup() {
@@ -3368,7 +3460,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
