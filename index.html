@@ -3526,7 +3526,7 @@ function parseOcrNames(text) {
   const rows = [];
   for (const raw of lines) {
     let line = raw.replace(/^[|¦•·]+\s*/, '').replace(/^\d{1,2}[.)]?\s+/, '').trim();
-    if (!line || /^(cognome e nome|distinta|giocatori|titolari|riserve|panchina)\b/i.test(line)) continue;
+    if (!line || /^(cognome\s+(?:e|è)\s+nome|distinta|giocatori|titolari|riserve|panchina)\b/i.test(line)) continue;
     if (/^\(\s*[RP]\s*\)$/i.test(line)) {
       if (rows.length) {
         if (/R/i.test(line)) rows[rows.length - 1].reserve = true;
@@ -3535,7 +3535,12 @@ function parseOcrNames(text) {
     }
     const reserve = /\(\s*R\s*\)/i.test(line);
     line = line.replace(/\(\s*[RP]\s*\)/gi, '').replace(/[|]+/g, 'I').replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+/, '').trim();
-    if (!/[A-Za-zÀ-ÖØ-öø-ÿ]{2}/.test(line) || /\d{2,}/.test(line)) continue;
+    const letters = line.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '');
+    const tokens = line.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/g) || [];
+    const letterRatio = letters.length / Math.max(1, line.length);
+    // Le modalità PSM possono scambiare segni T/R e righe della griglia
+    // per nominativi: scarta frammenti brevi o con troppo rumore grafico.
+    if (letters.length < 6 || !tokens.length || (tokens.length === 1 && letters.length < 8) || letterRatio < .65 || /\d{2,}/.test(line)) continue;
     if (/^(tipo|numero|rilasciato|poggi|lnd)$/i.test(line)) continue;
     rows.push({ name: line, reserve });
   }
