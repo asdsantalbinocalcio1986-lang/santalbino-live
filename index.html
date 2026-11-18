@@ -1527,7 +1527,7 @@ function voterId() {
 }
 let mvpVoteCounts = {}, mvpVoteBusy = false;
 async function refreshMvpVotes() {
-  if (!db) return;
+  if (!db || !CAN_EDIT) return;
   const { data, error } = await db.rpc('get_santalbino_mvp_vote_counts', { p_match_key: mvpPollKey() });
   if (error) { console.warn('Lettura conteggi MVP:', error.message); return; }
   mvpVoteCounts = {};
