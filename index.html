@@ -2374,13 +2374,14 @@ function loadGraphicImage(src) {
     img.onload = () => finish(img); img.onerror = () => finish(null); img.src = src;
   });
 }
-async function renderFormationGraphic() {
+async function renderFormationGraphic(side = 'both') {
   const teams = {
     home: { name: teamName('home'), players: parseRoster(S.rosters.home), logo: S.logos.home },
     away: { name: teamName('away'), players: parseRoster(S.rosters.away), logo: S.logos.away }
   };
-  if (!teams.home.players.length || !teams.away.players.length) {
-    throw new Error('Inserisci e salva le formazioni di entrambe le squadre prima di creare l’immagine unica.');
+  const selectedSides = side === 'both' ? ['home', 'away'] : [side];
+  if (!selectedSides.every(key => ['home','away'].includes(key) && teams[key].players.length)) {
+    throw new Error(side === 'both' ? 'Inserisci e salva le formazioni di entrambe le squadre per creare l’immagine unica.' : 'Inserisci e salva la formazione di questa squadra prima di creare la grafica.');
   }
   const W = 1600, H = 1100, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -2424,13 +2425,23 @@ async function renderFormationGraphic() {
     fitFont(x, name.toUpperCase(), 500, 30, 800, 'Arial,sans-serif');
     x.fillText(name.toUpperCase(), cx, 190);
   };
-  drawLogo(homeLogo, teams.home.name, 400);
-  drawLogo(awayLogo, teams.away.name, 1200);
-  x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.font = '900 68px Arial,sans-serif'; x.fillText('VS', W / 2, 86);
-  x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI', W / 2, 190);
-  const panelY = 270, panelH = 775, panelW = 735;
-  const panels = [{ key: 'home', x: 45, logo: '#b8e7c8' }, { key: 'away', x: 820, logo: '#f0c56b' }];
+  if (side === 'both') {
+    drawLogo(homeLogo, teams.home.name, 400);
+    drawLogo(awayLogo, teams.away.name, 1200);
+    x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '900 68px Arial,sans-serif'; x.fillText('VS', W / 2, 86);
+    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI', W / 2, 190);
+  } else {
+    const key = selectedSides[0], team = teams[key], logo = key === 'home' ? homeLogo : awayLogo;
+    drawLogo(logo, team.name, W / 2);
+    x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONE UFFICIALE', W / 2, 235);
+  }
+  const panelY = side === 'both' ? 270 : 300, panelH = side === 'both' ? 775 : 745;
+  const panelW = side === 'both' ? 735 : 1080;
+  const panels = side === 'both'
+    ? [{ key: 'home', x: 45, logo: '#b8e7c8' }, { key: 'away', x: 820, logo: '#f0c56b' }]
+    : [{ key: selectedSides[0], x: 260, logo: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
   for (const panel of panels) {
     const team = teams[panel.key], px = panel.x;
     x.fillStyle = 'rgba(0,0,0,.72)';
@@ -2476,16 +2487,20 @@ async function renderFormationGraphic() {
   return canvas;
 }
 let lineupGraphicSide = 'both';
-async function openLineupGraphic() {
+async function openLineupGraphic(side = 'both') {
   beginSponsorGraphic();
-  lineupGraphicSide = 'both';
+  lineupGraphicSide = side;
   const dlg = $('#graphicDlg');
-  dlg.innerHTML = '<div class="sheethead"><h2>Grafica unica delle formazioni</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione immagine…</p>';
+  const single = side === 'home' || side === 'away';
+  dlg.innerHTML = '<div class="sheethead"><h2>' + (single ? 'Grafica formazione' : 'Grafica unica delle formazioni') + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione immagine…</p>';
   if (!dlg.open) dlg.showModal();
   try {
-    const canvas = await renderFormationGraphic(), url = canvas.toDataURL('image/jpeg', .92);
-    if (lineupGraphicSide !== 'both' || !dlg.open) return;
-    dlg.innerHTML = '<div class="sheethead"><h2>Formazioni delle due squadre</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="' + url + '" alt="Grafica unica con entrambe le formazioni"><button class="btn primary block" type="button" data-a="saveLineupGraphic">Salva immagine unica</button>';
+    const canvas = await renderFormationGraphic(side), url = canvas.toDataURL('image/jpeg', .92);
+    if (lineupGraphicSide !== side || !dlg.open) return;
+    const title = single ? 'Formazione · ' + teamName(side) : 'Formazioni delle due squadre';
+    const alt = single ? 'Grafica della formazione di ' + teamName(side) : 'Grafica unica con entrambe le formazioni';
+    const actionLabel = single ? 'Salva grafica formazione' : 'Salva immagine unica';
+    dlg.innerHTML = '<div class="sheethead"><h2>' + esc(title) + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="' + url + '" alt="' + esc(alt) + '"><button class="btn primary block" type="button" data-a="saveLineupGraphic" data-s="' + side + '">' + actionLabel + '</button>';
   } catch (err) {
     dlg.innerHTML = '<div class="sheethead"><h2>Immagine non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nella generazione.') + '</p>';
   }
@@ -3196,12 +3211,12 @@ document.addEventListener('click', async e => {
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
-    case 'viewlineupgraphic': await openLineupGraphic(); break;
+    case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s || 'both'); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.94); break; }
     case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
-    case 'saveLineupGraphic': { const cv = await renderFormationGraphic(); cv.toBlob(blob => { if (blob) saveBlob(blob, 'formazioni-entrambe-le-squadre.jpg'); }, 'image/jpeg', .92); break; }
+    case 'saveLineupGraphic': { const side = a.dataset.s || 'both'; const cv = await renderFormationGraphic(side); cv.toBlob(blob => { if (blob) saveBlob(blob, side === 'both' ? 'formazioni-entrambe-le-squadre.jpg' : 'formazione-' + side + '.jpg'); }, 'image/jpeg', .92); break; }
     case 'graphicclose': $('#graphicDlg').close(); break;
     case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'edit': editId = ev.id; renderMain(); break;
