@@ -3245,7 +3245,14 @@ document.addEventListener('click', async e => {
   }
 });
 function downloadStateBackup() {
-  const payload = { app: 'SantAlbinoLive', version: 1, exportedAt: new Date().toISOString(), state: S };
+  const state = JSON.parse(JSON.stringify(S));
+  state.media = Object.assign({}, state.media || {}, {
+    evOne: Object.assign({}, state.media?.evOne || {}, L.evOne || {}),
+    evImg: Object.assign({}, L.evImg || {}),
+    evImgRaw: Object.assign({}, L.evImgRaw || {})
+  });
+  const localState = { fbUrl: L.fbUrl || '', social: L.social || {} };
+  const payload = { app: 'SantAlbinoLive', version: 1, exportedAt: new Date().toISOString(), state, localState };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const date = new Date().toISOString().slice(0,10);
   saveBlob(blob, 'santalbino-live-backup-' + date + '.json');
@@ -3267,6 +3274,7 @@ function validateImportedState(payload) {
   const d = payload?.state && payload.app === 'SantAlbinoLive' ? payload.state : payload;
   if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('Il file non contiene uno stato Sant’Albino Live valido.');
   if (d.match != null && (typeof d.match !== 'object' || Array.isArray(d.match))) throw new Error('Sezione partita non valida.');
+  if (payload?.localState != null && (typeof payload.localState !== 'object' || Array.isArray(payload.localState))) throw new Error('Impostazioni locali non valide.');
   if (d.events != null && !Array.isArray(d.events)) throw new Error('Elenco eventi non valido.');
   if (d.rosters != null && (typeof d.rosters !== 'object' || Array.isArray(d.rosters))) throw new Error('Formazioni non valide.');
   if (d.clock != null && (typeof d.clock !== 'object' || Array.isArray(d.clock))) throw new Error('Orologio non valido.');
@@ -3357,6 +3365,11 @@ document.addEventListener('change', async e => {
       saveDraft();
       S = mergeState(d);
       S.rev = remoteRev;
+      if (parsed?.app === 'SantAlbinoLive' && parsed.localState) {
+        L.fbUrl = typeof parsed.localState.fbUrl === 'string' ? parsed.localState.fbUrl : L.fbUrl;
+        L.social = parsed.localState.social && typeof parsed.localState.social === 'object' ? parsed.localState.social : L.social;
+        saveL();
+      }
       L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
       L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
       L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
