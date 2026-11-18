@@ -148,6 +148,27 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .tab{flex:1;min-width:0;border:0;background:none;border-radius:10px;padding:9px 4px;font:700 15px var(--fb);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tab[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 
+/* timeline orizzontale sintetica della regia */
+.match-timeline{display:grid;grid-template-columns:68px minmax(0,1fr);gap:4px 10px;align-items:center;padding:26px 4px 30px;overflow:visible}
+.match-tl-lane{font:700 12px/1.1 var(--fd);letter-spacing:.04em;text-transform:uppercase}
+.santa-label{grid-column:1;grid-row:1;color:var(--accent)}
+.opponent-label{grid-column:1;grid-row:1;align-self:end;color:var(--c-sub)}
+.match-tl-track{grid-column:2;grid-row:1;position:relative;height:1px;background:var(--line);margin:0 4px}
+.match-tl-axis{position:absolute;inset:0;height:3px;top:-1px;background:var(--line);border-radius:3px}
+.match-tl-tick{position:absolute;left:var(--x);top:50%;height:1px;transform:translateX(-50%);pointer-events:none}
+.match-tl-tick i{position:absolute;left:0;top:-5px;width:1px;height:11px;background:var(--muted)}
+.match-tl-tick b{position:absolute;left:0;top:11px;transform:translateX(-50%);font:600 10px/1 var(--fb);color:var(--muted);white-space:nowrap}
+.match-tl-tick.half i{width:2px;height:17px;top:-8px;background:var(--ink)}
+.match-tl-marker{position:absolute;left:var(--x);top:50%;width:0;height:0;z-index:2}
+.match-tl-marker i{position:absolute;left:-1px;width:2px;height:9px;background:currentColor}
+.match-tl-marker b{position:absolute;left:0;transform:translateX(-50%);font:800 12px/1 var(--fd);font-variant-numeric:tabular-nums;white-space:nowrap;color:currentColor}
+.match-tl-marker.santa{color:var(--accent)}
+.match-tl-marker.santa i{bottom:0;transform:translateY(-1px)}
+.match-tl-marker.santa b{bottom:calc(10px + var(--stack)*15px)}
+.match-tl-marker.opponent{color:var(--c-sub)}
+.match-tl-marker.opponent i{top:0;transform:translateY(1px)}
+.match-tl-marker.opponent b{top:calc(10px + var(--stack)*15px)}
+@media(max-width:420px){.match-timeline{grid-template-columns:56px minmax(0,1fr);gap:4px 7px;padding-inline:0}.match-tl-lane{font-size:11px}.match-tl-marker b{font-size:11px}.match-tl-tick b{font-size:9px}}
 /* timeline pubblica */
 .tl-list{list-style:none;margin:0;padding:0;position:relative}
 .tl-list::before{content:"";position:absolute;left:62px;top:6px;bottom:6px;width:2px;background:var(--line)}
@@ -3339,13 +3360,36 @@ function feedHtml(list) {
 }
 let editId = null, armedDel = null;
 function regiaTimelineHtml() {
-  if (!S.events.length) return '<div class="empty">Le azioni registrate appariranno qui in ordine cronologico.</div>';
-  const items = S.events.map((e, i) => ({ e, sc: scoreAt(i) })).map(({ e, sc }) => {
-    if (PHASE_EV[e.type]) return `<li class="tl-phase"><span></span><span class="tl-ic">${IC.clock}</span><span class="tl-ph">${PHASE_EV[e.type]}${e.type !== 'kickoff' ? ` · ${sc[0]}-${sc[1]}` : ''}${e.attackDirection ? ` · ${esc(teamName(S.match.ourSide))} attacca verso ${attackDirectionLabel(e.attackDirection)}` : ''}</span></li>`;
-    const d = describe(e, sc);
-    return `<li class="tl ${e.type}" style="--col:${COL[e.type] || 'var(--c-note)'}"><div class="tl-min">${esc(e.min || '')}${e.min ? '′' : ''}</div><div class="tl-ic">${IC[e.type] || ''}</div><div class="tl-card"><div class="tl-top"><span class="tl-title">${esc(d.title)}</span>${e.type === 'note' ? '' : `<span class="tl-team">${badge(e.team)}<span>${esc(teamName(e.team))}</span></span>`}</div>${d.main ? `<div class="tl-main">${esc(d.main)}</div>` : ''}<div class="tl-sub">${d.sub}</div></div></li>`;
+  const actions = S.events
+    .filter(e => !PHASE_EV[e.type] && e.type !== 'mvp' && ['home', 'away'].includes(e.team) && e.min !== '' && e.min != null)
+    .map(e => {
+      const raw = String(e.min).trim();
+      const parts = raw.match(/^(\d{1,3})(?:\s*\+\s*(\d{1,2}))?/);
+      if (!parts) return null;
+      const minute = Number(parts[1]) + Number(parts[2] || 0);
+      if (!Number.isFinite(minute)) return null;
+      return { e, minute, side: e.team === S.match.ourSide ? 'santa' : 'opponent' };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.minute - b.minute);
+  if (!actions.length) return '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>';
+  const maxMinute = Math.max(90, ...actions.map(x => x.minute));
+  const ticks = [0, 15, 30, 45, 60, 75, 90, ...(maxMinute > 90 ? [105, 120].filter(x => x < maxMinute || x === 120) : [])]
+    .filter(x => x <= maxMinute);
+  const stacks = new Map();
+  const markers = actions.map(({ e, minute, side }) => {
+    const key = side + ':' + minute;
+    const stack = stacks.get(key) || 0;
+    stacks.set(key, stack + 1);
+    const position = Math.max(0, Math.min(100, minute / maxMinute * 100));
+    return `<span class="match-tl-marker ${side}" style="--x:${position}%;--stack:${stack}" title="${esc(String(e.min))}′"><i></i><b>${esc(String(e.min))}′</b></span>`;
   }).join('');
-  return `<ul class="tl-list">${items}</ul>`;
+  const scale = ticks.map(minute => `<span class="match-tl-tick ${minute === 45 ? 'half' : ''}" style="--x:${minute / maxMinute * 100}%"><i></i><b>${minute}′</b></span>`).join('');
+  return `<div class="match-timeline" role="img" aria-label="Timeline delle azioni: Sant'Albino sopra la linea, avversari sotto">
+    <div class="match-tl-lane santa-label">S. Albino</div>
+    <div class="match-tl-track"><div class="match-tl-axis"></div>${scale}${markers}</div>
+    <div class="match-tl-lane opponent-label">Avversari</div>
+  </div>`;
 }
 function regiaHtml() {
   const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['set', 'Impost.']];
