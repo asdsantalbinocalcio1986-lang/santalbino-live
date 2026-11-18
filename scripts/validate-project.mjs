@@ -29,6 +29,6 @@ for (const fn of ['cast_santalbino_mvp_vote','get_santalbino_mvp_vote_counts','s
 }
 assert.match(sql, /revoke all on table public\.mvp_votes from anon, authenticated/i);
 assert.match(sql, /create policy ["']Only SantAlbino admin can read MVP votes["']/i);
-assert.match(sql, /if not public\\.is_santalbino_admin\\(\\) then return; end if;/i, 'I conteggi MVP devono restare riservati all’amministratore');
+assert.match(sql, /if not public\.is_santalbino_admin\(\) then return; end if;/i, 'I conteggi MVP devono restare riservati all’amministratore');
 
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');
