@@ -8,7 +8,7 @@ begin;
 -- 0) L'amministratore legge esclusivamente il proprio record.
 -- La verifica passa a SECURITY INVOKER: nessuna funzione helper privilegiata esposta.
 alter table public.santalbino_admins enable row level security;
-do $
+do $admin$
 declare p record;
 begin
   for p in
@@ -17,7 +17,7 @@ begin
   loop
     execute format('drop policy if exists %I on public.santalbino_admins',p.policyname);
   end loop;
-end $;
+end $admin$;
 revoke all on table public.santalbino_admins from public, anon, authenticated;
 grant select on table public.santalbino_admins to authenticated;
 create policy "Admin can read own admin record"
@@ -30,12 +30,12 @@ language sql
 stable
 security invoker
 set search_path = public, pg_temp
-as $
+as $admin$
   select exists (
     select 1 from public.santalbino_admins
     where user_id = (select auth.uid())
   );
-$;
+$admin$;
 revoke all on function public.is_santalbino_admin() from public, anon, authenticated;
 grant execute on function public.is_santalbino_admin() to authenticated;
 
