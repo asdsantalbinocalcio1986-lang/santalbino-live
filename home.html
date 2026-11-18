@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SANTA Live | Partite</title><meta name="description" content="Partite, risultati e dirette dell'ASD Sant'Albino Terme.">
+<meta name="theme-color" content="#102819"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./santa-live-icon.svg" type="image/svg+xml"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="SANTA Live"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="./santa-live-icon.svg">
+<style>
+:root{color-scheme:dark;--bg:#080e0b;--panel:#121d17;--line:#314237;--text:#f2f6f1;--muted:#a3b1a7;--green:#9db978;--red:#e3342f}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);font:15px/1.5 system-ui,-apple-system,sans-serif;color:var(--text);background:radial-gradient(ellipse at 50% -10%,#285437 0,transparent 48%),linear-gradient(145deg,#080e0b,#101a13 60%,#080e0b)}main{max-width:720px;margin:0 auto;padding:22px 0 40px}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}.brand{font-size:25px;font-weight:900;letter-spacing:.04em}.brand b{color:#a6bd7c}.sub{color:var(--muted);font-size:13px}.section{margin:26px 0 12px;font-size:19px;text-transform:uppercase;letter-spacing:.06em}.card{display:block;color:inherit;text-decoration:none;background:linear-gradient(145deg,#19271e,#101912);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;transition:border-color .15s}.card:active{border-color:var(--green)}.meta{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.teams{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;margin:14px 0}.team{text-align:center;min-width:0;font-weight:800;text-transform:uppercase;font-size:14px;overflow-wrap:anywhere}.logo{width:58px;height:58px;object-fit:contain;display:block;margin:0 auto 8px}.score{font-size:31px;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}.status{display:inline-flex;padding:4px 10px;border-radius:99px;background:#344438;color:#e8f1e9;font-size:12px;font-weight:800;letter-spacing:.06em}.status.live{background:var(--red);color:white;animation:pulse 1.3s infinite}@keyframes pulse{50%{opacity:.55}}.go{margin-top:12px;padding:11px 14px;border-radius:12px;background:var(--green);color:#11190d;font-weight:900;text-align:center}.empty{padding:20px;border:1px dashed var(--line);border-radius:16px;color:var(--muted);text-align:center}.foot{text-align:center;color:var(--muted);font-size:12px;padding:28px 0 12px}button{font:inherit}a:focus-visible,button:focus-visible{outline:3px solid var(--green);outline-offset:3px}
+</style>
+</head>
+<body><main>
+<header class="head"><div><div class="brand"><b>SANTA</b> Live</div><div class="sub">ASD Sant'Albino Terme · Partite e dirette</div></div><span class="status">LIVE CENTER</span></header>
+<section><h1 class="section">Partita in evidenza</h1><div id="current"><div class="empty">Caricamento della partita…</div></div></section>
+<section><h2 class="section">Partite archiviate</h2><div id="archive"><div class="empty">Caricamento dello storico…</div></div></section>
+<footer class="foot">© 2026 ASD Sant'Albino Terme · SANTA Live<br><a href="./index.html" style="color:inherit">Accesso alla piattaforma</a></footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./config.js"></script>
+<script>
+(()=>{'use strict';
+const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cfg=window.SANTALBINO_CONFIG||{};let db=null,current=null,rows=[];
+const fmtDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')?v.split('-').reverse().join('/'):v||'Data da definire';
+const score=state=>{let h=0,a=0;for(const e of state?.events||[])if(e.type==='goal'){const side=e.kind==='autogol'?(e.team==='home'?'away':'home'):e.team;if(side==='home')h++;else if(side==='away')a++;}return [h,a]};
+const phase=state=>({pre:'IN PROGRAMMA',p1:'PRIMO TEMPO',ht:'INTERVALLO',p2:'SECONDO TEMPO',ft:'FINALE'}[state?.clock?.phase]||'PARTITA');
+const isLive=state=>['p1','p2'].includes(state?.clock?.phase);
+const team=(m,s)=>m?.[s]|| (s==='home'?'Casa':'Ospiti');
+const logo=(state,s)=>state?.logos?.[s]||'';
+function card(state,id,archived=false){const m=state.match||{},[h,a]=score(state),live=isLive(state),url='./preview.html?match='+encodeURIComponent(id);
+const side=(s)=>'<div class="team">'+(logo(state,s)?'<img class="logo" src="'+esc(logo(state,s))+'" alt="">':'<div class="logo" aria-hidden="true"></div>')+esc(team(m,s))+'</div>';
+return '<a class="card" href="'+url+'"><div class="meta">'+esc(m.comp||'Partita')+' · '+esc(fmtDate(m.date))+(m.venue?' · '+esc(m.venue):'')+'</div><div class="teams">'+side('home')+'<div style="text-align:center"><div class="score">'+h+' – '+a+'</div><span class="status '+(live?'live':'')+'">'+(live?'● '+phase(state):archived?'ARCHIVIATA':phase(state))+'</span></div>'+side('away')+'</div><div class="go">APRI ANTEPRIMA →</div></a>'}
+function render(){if(current?.match?.pollId){$('#current').innerHTML=card(current,current.match.pollId,false)}else{$('#current').innerHTML='<div class="empty">Al momento non ci sono partite pubblicate. Torna qui quando sarà disponibile una nuova diretta.</div>'}
+const old=rows.filter(r=>r.poll_id&&r.poll_id!==current?.match?.pollId);
+$('#archive').innerHTML=old.length?old.map(r=>card(r.state||{match:{home:r.home_team,away:r.away_team,comp:r.competition,date:r.match_date,venue:r.venue},events:[],clock:{phase:'ft'}},r.poll_id,true)).join(''):'<div class="empty">Le partite concluse e archiviate compariranno qui.</div>'}
+async function refresh(){if(!db)return;try{const [live,arch]=await Promise.all([db.from('live_state').select('state').eq('id',1).maybeSingle(),db.from('match_archive').select('poll_id,match_date,competition,venue,home_team,away_team,state').order('match_date',{ascending:false}).order('archived_at',{ascending:false})]);if(live.error)throw live.error;if(arch.error)throw arch.error;current=live.data?.state||null;rows=arch.data||[];render()}catch(e){console.error('SANTA Live home:',e);if(!current)$('#current').innerHTML='<div class="empty">Connessione temporaneamente non disponibile. Riprova tra poco.</div>';}}
+if(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase){db=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);void refresh();db.channel('santa-home-live').on('postgres_changes',{event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'},p=>{if(p.new?.state){current=p.new.state;render()}}).subscribe();setInterval(refresh,30000)}else{$('#current').innerHTML='<div class="empty">Servizio temporaneamente non disponibile.</div>'}
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('Service worker:',e)));
+})();
+</script></body></html>
