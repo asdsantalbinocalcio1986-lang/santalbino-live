@@ -1562,7 +1562,7 @@ function seasonLabel(key) { return key + '/' + String(Number(key) + 1).slice(-2)
 function archiveOurSide(row, state) {
   const match = state?.match || {};
   if (match.ourSide === 'home' || match.ourSide === 'away') return match.ourSide;
-  const norm = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+  const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const home = norm(row.home_team), away = norm(row.away_team);
   if (home.includes("sant'albino") || home.includes('sant albino')) return 'home';
   if (away.includes("sant'albino") || away.includes('sant albino')) return 'away';
@@ -1578,7 +1578,7 @@ function scorersHtml() {
   const rows = archiveRows.filter(r => seasonKeyForDate(r.match_date) === selected);
   const players = new Map();
   let ownGoalsFor = 0, goalsWithoutName = 0, teamGoals = 0;
-  const normalize = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLocaleLowerCase('it').replace(/[^a-z0-9]/g, '');
+  const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('it').replace(/[^a-z0-9]/g, '');
   rows.forEach(row => {
     const state = row.state || {}, side = archiveOurSide(row, state);
     if (!side) return;
