@@ -2889,8 +2889,27 @@ async function renderConvocatiGraphic() {
   const meta=[fmtDate(m.date),m.time].filter(Boolean).join(' · ');
   const details=[meta,(m.comp||'').toUpperCase(),(m.venue||'').toUpperCase()].filter(Boolean);
   x.fillStyle='rgba(0,0,0,.48)';rrect(x,85,330,1430,100,20);x.fill();
-  x.fillStyle='#d8efdf';x.font='800 25px Arial,sans-serif';x.textAlign='center';
-  x.fillText(details.length?details.join('     |     '):'DETTAGLI PARTITA DA DEFINIRE',800,382);
+  x.fillStyle='#d8efdf';x.textAlign='center';x.textBaseline='middle';
+  // Mantieni tutti i dettagli dentro il fumetto: distribuisci il testo su due righe
+  // quando necessario e riduci gradualmente il font per le diciture più lunghe.
+  const detailText=details.length?details.join('     |     '):'DETTAGLI PARTITA DA DEFINIRE';
+  const detailMaxWidth=1320;
+  let detailFont=25,detailLines=[];
+  const wrapDetails=()=>{
+    x.font=`800 ${detailFont}px Arial,sans-serif`;
+    const lines=[''];
+    detailText.split(/\\s+/).forEach(word=>{
+      const current=lines[lines.length-1],candidate=current?current+' '+word:word;
+      if(current&&x.measureText(candidate).width>detailMaxWidth) lines.push(word);
+      else lines[lines.length-1]=candidate;
+    });
+    return lines;
+  };
+  detailLines=wrapDetails();
+  while(detailLines.length>2&&detailFont>16){detailFont--;detailLines=wrapDetails();}
+  const detailLineHeight=detailFont+7;
+  const detailStartY=382-((detailLines.length-1)*detailLineHeight/2);
+  detailLines.forEach((line,index)=>x.fillText(line,800,detailStartY+index*detailLineHeight,detailMaxWidth));
   x.fillStyle='rgba(0,0,0,.62)';rrect(x,85,475,1430,625,24);x.fill();
   x.fillStyle='#e3c66d';x.font='900 30px Arial,sans-serif';x.textAlign='left';x.fillText('ELENCO UFFICIALE',125,530);
   x.fillStyle='rgba(255,255,255,.65)';x.font='700 20px Arial,sans-serif';x.textAlign='right';x.fillText(players.length+' CONVOCATI',1475,530);
