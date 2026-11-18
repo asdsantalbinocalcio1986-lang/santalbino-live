@@ -1754,10 +1754,18 @@ async function ensureArchivedBeforeReset() {
   if (S.clock.phase !== 'ft') return true;
   const archived = await refreshCurrentArchiveStatus();
   if (archived) return true;
-  toast('Prima archivia la partita terminata: così non perderai cronaca e formazioni');
+  toast('Prima scegli “Salva nell’archivio” oppure “Scarta partita”');
   L.rtab = 'live';
   renderMain();
   return false;
+}
+async function discardCurrentMatch() {
+  if (!CAN_EDIT) { toast('Accedi alla regia per scartare la partita'); return; }
+  if (S.clock.phase !== 'ft') { toast('Puoi scartare la partita solo dopo il fischio finale'); return; }
+  if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione prima di scartare la partita'); return; }
+  if (!confirm('Vuoi davvero scartare questa partita? Risultato, cronaca e formazioni non entreranno nell’archivio e verranno azzerati avviando una nuova partita. L’operazione non è reversibile.')) return;
+  resetMatch();
+  toast('Partita scartata. Puoi iniziarne una nuova.');
 }
 
 async function refreshMvpVotes() {
@@ -3197,8 +3205,8 @@ function regiaHtml() {
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
-    <button class="btn primary block phasebtn" data-a="phase">${PHASEBTN[S.clock.phase]}</button>
-    ${S.clock.phase === 'ft' ? `<div class="card"><h2>Archivio storico</h2><p class="small muted">Salva il risultato, la cronaca e le formazioni in modo permanente. I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Partita già archiviata</p>' : '<button class="btn primary block" data-a="archiveMatch">Archivia partita</button>'}</div>` : ''}
+    <button class="btn primary block phasebtn" data-a="phase" ${S.clock.phase === 'ft' ? 'disabled' : ''}>${S.clock.phase === 'ft' ? 'Partita terminata' : PHASEBTN[S.clock.phase]}</button>
+    ${S.clock.phase === 'ft' ? `<div class="card"><h2>${currentArchived ? 'Partita salvata' : 'Partita terminata: cosa vuoi fare?'}</h2><p class="small muted">${currentArchived ? 'La partita è stata conservata nell’archivio storico con risultato, cronaca e formazioni.' : 'Scegli se conservare questa partita nello storico oppure scartarla. Nessuna partita viene archiviata automaticamente.'} I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Presente nell’archivio storico</p><button class="btn primary block" data-a="newmatch">Avvia una nuova partita</button>' : '<div class="row2 stack"><button class="btn primary" data-a="archiveMatch">Salva nell’archivio</button><button class="btn danger" data-a="discardMatch">Scarta partita</button></div>'}</div>` : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
     <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>`;
   else if (t === 'convocati') body = convocatiRegiaHtml();
@@ -3488,9 +3496,10 @@ document.addEventListener('click', async e => {
     case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
     case 'retry': publishNow(); break;
     case 'archiveMatch': await archiveCurrentMatch(); break;
+    case 'discardMatch': await discardCurrentMatch(); break;
     case 'reloadArchive': await loadMatchArchive(true); break;
     case 'phase': { const c = S.clock;
-      if (c.phase === 'ft') { if (!armedNew) { armedNew = true; a.textContent = 'Tocca ancora: nuova partita'; setTimeout(() => { armedNew = false; renderMain(); }, 3500); } else { armedNew = false; if (await ensureArchivedBeforeReset()) resetMatch(); } break; }
+      if (c.phase === 'ft') break;
       if (c.phase === 'pre') { c.phase = 'p1'; c.t0 = Date.now(); addPhase('kickoff', ''); }
       else if (c.phase === 'p1') { c.phase = 'ht'; addPhase('halftime', '45'); }
       else if (c.phase === 'ht') { c.phase = 'p2'; c.t0 = Date.now(); addPhase('secondhalf', '45'); }
