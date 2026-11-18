@@ -2267,6 +2267,20 @@ async function renderMatchGraphic(ev) {
     }
   }
   x.restore();
+  // Ridisegno finale del titolo di fase: resta sopra ogni livello e non viene intercettato dall'editor.
+  if(['kickoff','halftime','fulltime'].includes(ev.type)){
+    const phaseTitle=titleMap[ev.type]||'';
+    x.save();
+    x.shadowColor='rgba(0,0,0,.75)';x.shadowBlur=26;x.shadowOffsetY=8;
+    x.fillStyle='rgba(2,12,7,.97)';rrect(x,118,142,844,126,24);x.fill();
+    x.shadowBlur=0;x.shadowOffsetY=0;
+    x.strokeStyle=accent;x.lineWidth=5;rrect(x,118,142,844,126,24);x.stroke();
+    x.textAlign='center';x.textBaseline='middle';x.fillStyle='#fff';
+    x.font=`900 100px ${FD}`;
+    while(x.measureText(phaseTitle).width>770&&parseInt(x.font.match(/(\\d+)px/)[1],10)>58){const n=parseInt(x.font.match(/(\\d+)px/)[1],10)-2;x.font=`900 ${n}px ${FD}`;}
+    nativeFillText(phaseTitle,W/2,205);
+    x.restore();
+  }
   // Footer isolato dal pannello contenuti.
   x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
   x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
