@@ -2,7 +2,7 @@
 <title>SANTA Live | Cronaca in diretta</title>
 <meta name="description" content="SANTA Live: segui in diretta risultati, formazioni e cronaca delle partite dell'ASD Sant'Albino Terme.">
 <meta name="copyright" content="© 2026 ASD Sant'Albino Terme — SANTA Live. Tutti i diritti riservati.">
-<meta name="theme-color" content="#0b3b22">
+<meta name="theme-color" content="#0b3b22"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./santa-live-icon.svg" type="image/svg+xml"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="SANTA Live"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="./santa-live-icon.svg">
 <link rel="canonical" href="https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SANTA Live">
@@ -3742,11 +3742,11 @@ async function openPost(id) {
 let ROOT;
 function topHtml() {
   const controls = CAN_EDIT
-    ? `<button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
-    : `<button class="pill" data-a="login">Accesso regia</button>`;
+    ? `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
+    : `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="login">Accesso regia</button>`;
   const mobileControls = CAN_EDIT
-    ? `<button class="pill mobile-primary" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Torna in regia'}</button><details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
-    : `<button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
+    ? `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Torna in regia'}</button><details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
+    : `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
   return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div><div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
@@ -3810,7 +3810,7 @@ document.addEventListener('click', async e => {
     case 'viewMatchResult': if (S.clock.phase !== 'ft') { toast('Il MATCH RESULT è disponibile dopo il fischio finale'); break; } await openMatchResult(); break;
     case 'saveMatchResultGraphic': { const cv=await renderMatchResultGraphic(); cv.toBlob(blob=>{if(blob)saveBlob(blob,'match-result.jpg');},'image/jpeg',.94); break; }
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
-    case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); window.open('https://wa.me/?text='+encodeURIComponent(txt+'\\n\\nSegui SANTA Live: https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/'),'_blank','noopener'); break; }
+    case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); const url=S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.94); break; }
     case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
@@ -3825,7 +3825,8 @@ document.addEventListener('click', async e => {
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
-      const shareText = so.text + '\n\nSegui la partita in diretta: https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/';
+      const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
+      const shareText = so.text + '\n\nSegui la partita su SANTA Live: ' + matchUrl;
       window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
       break;
     }
@@ -3932,6 +3933,7 @@ function saveMatch() {
     return;
   }
 
+  if (!S.match.pollId) S.match.pollId = uid();
   S.match.home = g('#s-home') || defaults().match.home;
   S.match.away = g('#s-away');
   S.match.ourSide = $('#s-our').value;
@@ -4353,6 +4355,7 @@ async function readLineup(side, stat) {
 
 /* ================= avvio ================= */
 (async function start() {
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service worker SANTA Live:', err)));
   ROOT = $('#root');
   const mk = (tag, id) => { const d = document.createElement(tag); d.id = id; document.body.appendChild(d); return d; };
   mk('dialog', 'sheet').setAttribute('aria-label', 'Nuovo evento'); mk('dialog', 'postDlg').setAttribute('aria-label', 'Pubblica su Facebook'); mk('dialog', 'graphicDlg').setAttribute('aria-label', 'Immagine evento');
