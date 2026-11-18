@@ -2898,7 +2898,7 @@ async function renderConvocatiGraphic() {
   const wrapDetails=()=>{
     x.font=`800 ${detailFont}px Arial,sans-serif`;
     const lines=[''];
-    detailText.split(/\\s+/).forEach(word=>{
+    detailText.split(/\s+/).forEach(word=>{
       const current=lines[lines.length-1],candidate=current?current+' '+word:word;
       if(current&&x.measureText(candidate).width>detailMaxWidth) lines.push(word);
       else lines[lines.length-1]=candidate;
