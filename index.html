@@ -1546,7 +1546,7 @@ async function loadMatchArchive(force = false) {
     archiveError = error?.message || 'Errore di connessione';
   } finally {
     archiveLoading = false;
-    if ($('#main') && ['archive','season','scorers'].includes(L.tab) && !(CAN_EDIT && L.mode === 'regia')) renderMain();
+    if ($('#main') && ((L.mode === 'regia' && L.rtab === 'archive') || (L.mode !== 'regia' && ['archive','season','scorers','archiveForms'].includes(L.tab)))) renderMain();
   }
 }
 
@@ -1662,9 +1662,11 @@ function archiveHtml() {
   if (!db) return '<div class="empty"><h3>Archivio non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
   if (archiveLoading) return '<div class="empty">Caricamento archivio partite…</div>';
   if (!archiveLoaded) return `<div class="card"><h3>Archivio non caricato</h3><p class="small muted">${esc(archiveError || 'Controlla la connessione e riprova.')}</p><button class="btn" data-a="reloadArchive">Riprova</button></div>`;
-  if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
+  const canDelete = CAN_EDIT && L.mode === 'regia';
+  const intro = canDelete ? '<div class="card"><h2>Gestione archivio</h2><p class="small muted">Da questa scheda puoi consultare ed eliminare le gare archiviate. L’eliminazione è definitiva e richiede conferma.</p></div>' : '';
+  if (!archiveRows.length) return intro + '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
   const typeLabels = { kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
-  return archiveRows.map(row => {
+  return intro + archiveRows.map(row => {
     const state = row.state || {}, events = Array.isArray(state.events) ? state.events : [];
     const match = state.match || {}, rosters = state.rosters || {};
     const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
@@ -1680,10 +1682,33 @@ function archiveHtml() {
       const text = typeof rosters[side] === 'string' ? rosters[side].trim() : '';
       return text ? `<h4>${esc(side === 'home' ? row.home_team : row.away_team)}</h4><pre style="white-space:pre-wrap;font:inherit;font-size:13px">${esc(text)}</pre>` : '';
     }).join('');
-    return `<article class="card"><div class="small muted">${esc(date)} · ${esc(row.competition || 'Partita')}${row.venue ? ' · ' + esc(row.venue) : ''}</div><div class="stat-h" style="grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);margin:12px 0"><span style="text-align:left">${esc(row.home_team)}</span><b style="white-space:nowrap">${Number(row.home_score)} – ${Number(row.away_score)}</b><span style="text-align:right">${esc(row.away_team)}</span></div><details><summary>Dettagli, cronaca e formazioni</summary><h4>Cronaca</h4>${eventHtml || '<p class="small muted">Nessun evento registrato.</p>'}${lineupHtml ? '<h4>Formazioni</h4>' + lineupHtml : ''}</details></article>`;
+    return `<article class="card"><div class="small muted">${esc(date)} · ${esc(row.competition || 'Partita')}${row.venue ? ' · ' + esc(row.venue) : ''}</div><div class="stat-h" style="grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);margin:12px 0"><span style="text-align:left">${esc(row.home_team)}</span><b style="white-space:nowrap">${Number(row.home_score)} – ${Number(row.away_score)}</b><span style="text-align:right">${esc(row.away_team)}</span></div><details><summary>Dettagli, cronaca e formazioni</summary><h4>Cronaca</h4>${eventHtml || '<p class="small muted">Nessun evento registrato.</p>'}${lineupHtml ? '<h4>Formazioni</h4>' + lineupHtml : ''}</details>${canDelete ? `<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn sm danger" data-a="deleteArchivedMatch" data-id="${esc(row.id)}">Elimina gara dall’archivio</button></div>` : ''}</article>`;
   }).join('');
 }
 
+async function deleteArchivedMatch(id) {
+  if (!CAN_EDIT || L.mode !== 'regia') { toast('Accedi alla regia per eliminare una gara'); return; }
+  if (!db || !id) { toast('Partita non identificata'); return; }
+  const row = archiveRows.find(item => String(item.id) === String(id));
+  if (!row) { toast('La gara non è più presente nell’archivio. Aggiorno l’elenco.'); await loadMatchArchive(true); return; }
+  const date = row.match_date && /^\\d{4}-\\d{2}-\\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'data non indicata');
+  const description = `${date}: ${row.home_team || 'Casa'} ${Number(row.home_score || 0)}–${Number(row.away_score || 0)} ${row.away_team || 'Ospiti'}`;
+  if (!confirm(`Vuoi eliminare definitivamente questa gara dall’archivio?\\n\\n${description}\\n\\nL’operazione non è reversibile. Le altre gare resteranno invariate.`)) return;
+  try {
+    const { data, error } = await db.from('match_archive').delete().eq('id', id).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Eliminazione non autorizzata o gara già rimossa.');
+    if (row.poll_id === S.match?.pollId) currentArchived = false;
+    if (String(L.archiveFormationId || '') === String(id)) L.archiveFormationId = '';
+    saveL();
+    await loadMatchArchive(true);
+    toast('Gara eliminata dall’archivio');
+    renderMain();
+  } catch (error) {
+    console.error('Eliminazione gara archiviata:', error);
+    toast(error?.message || 'Eliminazione non riuscita');
+  }
+}
 
 function archivedFormationsHtml() {
   if (!db) return '<div class="empty"><h3>Archivio formazioni non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
@@ -3201,7 +3226,7 @@ function feedHtml(list) {
 }
 let editId = null, armedDel = null;
 function regiaHtml() {
-  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['set', 'Impost.']];
+  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
@@ -3209,6 +3234,7 @@ function regiaHtml() {
     ${S.clock.phase === 'ft' ? `<div class="card"><h2>${currentArchived ? 'Partita salvata' : 'Partita terminata: cosa vuoi fare?'}</h2><p class="small muted">${currentArchived ? 'La partita è stata conservata nell’archivio storico con risultato, cronaca e formazioni.' : 'Scegli se conservare questa partita nello storico oppure scartarla. Nessuna partita viene archiviata automaticamente.'} I voti MVP riservati non vengono pubblicati.</p>${currentArchived ? '<p class="small">✓ Presente nell’archivio storico</p><button class="btn primary block" data-a="startNewMatch">Avvia una nuova partita</button>' : '<div class="row2 stack"><button class="btn primary" data-a="archiveMatch">Salva nell’archivio</button><button class="btn danger" data-a="discardMatch">Scarta partita</button></div>'}</div>` : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
     <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>`;
+  else if (t === 'archive') body = archiveHtml();
   else if (t === 'convocati') body = convocatiRegiaHtml();
   else if (t === 'lineup') body = ['home', 'away'].map(s => {
     const pl = parseRoster(S.rosters[s]), ns = pl.filter(p => p.starter).length;
@@ -3481,7 +3507,7 @@ document.addEventListener('click', async e => {
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
   const archiveMatchBtn = t.closest('[data-archive-match]'); if (archiveMatchBtn) { L.archiveFormationId = archiveMatchBtn.dataset.archiveMatch; saveL(); renderMain(); return; }
-  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); return; }
+  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadMatchArchive(true); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
@@ -3496,6 +3522,7 @@ document.addEventListener('click', async e => {
     case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
     case 'retry': publishNow(); break;
     case 'archiveMatch': await archiveCurrentMatch(); break;
+    case 'deleteArchivedMatch': await deleteArchivedMatch(a.dataset.id); break;
     case 'discardMatch': await discardCurrentMatch(); break;
     case 'reloadArchive': await loadMatchArchive(true); break;
     case 'phase': { const c = S.clock;
