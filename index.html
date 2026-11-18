@@ -3099,7 +3099,7 @@ function resizeLogo(file) {
 /* ================= grafica della pagina ================= */
 function badge(side, cls = '') {
   const lg = S.logos[side];
-  if (lg) return `<span class="badge ${cls}"><img src="${lg}" alt=""></span>`;
+  if (lg) return `<span class="badge ${cls}"><img src="${esc(lg)}" alt=""></span>`;
   const ini = teamName(side).replace(/^ASD\s+/i, '').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
   return `<span class="badge ${cls}"><i>${esc(ini)}</i></span>`;
 }
@@ -3310,7 +3310,8 @@ function buildMatchSummary() {
   const ourGoals = goals.filter(e => scoringSide(e) === S.match.ourSide).length;
   const ourName = teamName(S.match.ourSide);
   let outcome = h === a ? 'pareggio' : (S.match.ourSide === 'home' ? h > a : a > h) ? 'vittoria' : 'sconfitta';
-  const sentences = [`Si chiude ${outcome} per ${ourName}: ${home} ${h}-${a} ${away}.`];
+  const resultLabel = outcome === 'pareggio' ? 'è un pareggio' : outcome === 'vittoria' ? 'è una vittoria' : 'è una sconfitta';
+  const sentences = [`Per ${ourName}, ${resultLabel}: ${home} ${h}-${a} ${away}.`];
   if (goalText.length) sentences.push(`A segno: ${goalText.join('; ')}.`);
   else sentences.push(`Una partita senza reti: il risultato finale è ${h}-${a}.`);
   const reds = S.events.filter(e => e.type === 'red');
@@ -3795,12 +3796,12 @@ document.addEventListener('click', async e => {
         S.match.attackDirectionCurrent = S.match.attackDirectionFirst;
         c.phase = 'p1'; c.t0 = Date.now(); addPhase('kickoff', '', { attackDirection: S.match.attackDirectionCurrent });
       }
-      else if (c.phase === 'p1') { c.phase = 'ht'; addPhase('halftime', '45'); }
+      else if (c.phase === 'p1') { const endMinute = curMinute(); c.phase = 'ht'; addPhase('halftime', endMinute); }
       else if (c.phase === 'ht') {
         S.match.attackDirectionCurrent = oppositeAttackDirection(S.match.attackDirectionFirst);
         c.phase = 'p2'; c.t0 = Date.now(); addPhase('secondhalf', '45', { attackDirection: S.match.attackDirectionCurrent });
       }
-      else if (c.phase === 'p2') { c.phase = 'ft'; addPhase('fulltime', '90'); }
+      else if (c.phase === 'p2') { const endMinute = curMinute(); c.phase = 'ft'; addPhase('fulltime', endMinute); }
       break; }
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;

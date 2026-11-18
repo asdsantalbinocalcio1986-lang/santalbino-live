@@ -19,6 +19,10 @@ for (const file of ['home.html', 'preview.html']) {
 new vm.Script(fs.readFileSync('sw.js', 'utf8'), { filename: 'sw.js' });
 JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
+assert.match(html, /<img src="\$\{esc\(lg\)\}" alt="">/, 'I loghi devono essere escapati negli attributi HTML');
+assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ht'; addPhase\('halftime', endMinute\)/, 'Il recupero del primo tempo deve essere conservato');
+assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ft'; addPhase\('fulltime', endMinute\)/, 'Il recupero del secondo tempo deve essere conservato');
+assert.match(html, /Per \$\{ourName\}, \$\{resultLabel\}/, 'Il mini riepilogo deve usare una frase grammaticalmente corretta');
 assert.match(html, /if \(!S\.match\.pollId\) S\.match\.pollId = uid\(\);/);
 
 
