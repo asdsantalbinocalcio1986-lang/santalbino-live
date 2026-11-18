@@ -1552,7 +1552,7 @@ async function loadMatchArchive(force = false) {
 
 
 function seasonKeyForDate(value) {
-  const m = String(value || '').match(/^(\\d{4})-(\\d{2})-\\d{2}$/);
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-\d{2}$/);
   if (!m) return '';
   const year = Number(m[1]), month = Number(m[2]);
   return String(month >= 7 ? year : year - 1);
