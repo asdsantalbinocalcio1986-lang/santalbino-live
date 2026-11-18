@@ -3530,6 +3530,11 @@ function parseOcrNumbers(text) {
 }
 
 let tesseractLoader = null;
+let tesseractWorker = null;
+let tesseractWorkerPromise = null;
+let activeOcrStatus = null;
+let ocrQueue = Promise.resolve();
+
 async function ensureTesseract() {
   if (window.Tesseract && window.Tesseract.createWorker) return window.Tesseract;
   if (!tesseractLoader) {
@@ -3544,21 +3549,57 @@ async function ensureTesseract() {
   }
   return tesseractLoader;
 }
+
+// Un solo worker per sessione: il download dei dati italiani e l'inizializzazione
+// avvengono una volta. Le letture vengono serializzate perché un worker non è
+// riutilizzabile in sicurezza da due riconoscimenti contemporanei.
+async function ensureOcrWorker() {
+  if (tesseractWorker) return tesseractWorker;
+  if (!tesseractWorkerPromise) {
+    tesseractWorkerPromise = (async () => {
+      const Tesseract = await ensureTesseract();
+      const logger = message => {
+        const stat = activeOcrStatus;
+        if (!stat) return;
+        if (message.status === 'recognizing text') stat.textContent = 'Riconoscimento testo: ' + Math.round((message.progress || 0) * 100) + '%';
+        else if (message.status === 'loading language traineddata' || message.status === 'initializing api') stat.textContent = 'Caricamento del riconoscimento italiano…';
+      };
+      const worker = await Tesseract.createWorker('ita', 1, { logger });
+      tesseractWorker = worker;
+      return worker;
+    })().catch(error => {
+      tesseractWorkerPromise = null;
+      throw error;
+    });
+  }
+  return tesseractWorkerPromise;
+}
+
+async function resetOcrWorker() {
+  const worker = tesseractWorker;
+  tesseractWorker = null;
+  tesseractWorkerPromise = null;
+  if (worker) {
+    try { await worker.terminate(); } catch (error) { console.warn('Chiusura worker OCR non riuscita:', error); }
+  }
+}
+
 async function readLineup(side, stat) {
   if (!photos[side]) { toast('Prima scegli la foto'); return; }
   const button = document.querySelector('[data-a="readlist"][data-s="' + side + '"]');
   if (button) { button.disabled = true; button.textContent = 'Lettura in corso…'; }
+  let releaseQueue;
+  const previousRead = ocrQueue;
+  ocrQueue = new Promise(resolve => { releaseQueue = resolve; });
   let worker;
   try {
+    if (previousRead !== Promise.resolve()) stat.textContent = 'In attesa dell’altra lettura OCR…';
+    await previousRead;
+    activeOcrStatus = stat;
     stat.textContent = 'Caricamento del riconoscimento…';
-    await ensureTesseract();
+    worker = await ensureOcrWorker();
     stat.textContent = 'Preparazione delle colonne della distinta…';
     const prepared = await prepareLineupImage(photos[side].blob);
-    const logger = message => {
-      if (message.status === 'recognizing text') stat.textContent = 'Riconoscimento testo: ' + Math.round((message.progress || 0) * 100) + '%';
-      else if (message.status === 'loading language traineddata' || message.status === 'initializing api') stat.textContent = 'Caricamento del riconoscimento italiano…';
-    };
-    worker = await Tesseract.createWorker('ita', 1, { logger });
     const namePasses = [];
     for (const mode of ['4','6','11','12']) {
       await worker.setParameters({ tessedit_pageseg_mode: mode, preserve_interword_spaces: '1', tessedit_char_whitelist: '' });
@@ -3618,9 +3659,11 @@ async function readLineup(side, stat) {
       'Fonte numeri: ' + numberSource + '. Controlla i numeri di maglia e correggi eventuali errori prima di salvare.';
   } catch (error) {
     console.error(error);
+    await resetOcrWorker();
     stat.textContent = 'Lettura non riuscita: ' + (error.message || 'controlla la foto e riprova.');
   } finally {
-    if (worker) await worker.terminate();
+    if (activeOcrStatus === stat) activeOcrStatus = null;
+    releaseQueue();
     if (button) { button.disabled = false; button.textContent = 'Leggi e prepara la formazione'; }
   }
 }
