@@ -30,5 +30,13 @@ for (const fn of ['cast_santalbino_mvp_vote','get_santalbino_mvp_vote_counts','s
 assert.match(sql, /revoke all on table public\.mvp_votes from anon, authenticated/i);
 assert.match(sql, /create policy ["']Only SantAlbino admin can read MVP votes["']/i);
 assert.match(sql, /if not public\.is_santalbino_admin\(\) then return; end if;/i, 'I conteggi MVP devono restare riservati all’amministratore');
+assert.match(sql, /create policy ["']Admin can read own admin record["']/i, 'La tabella amministratori deve avere una policy RLS per il solo record proprio');
+assert.match(sql, /function public\.is_santalbino_admin\(\)[\\s\\S]*?security invoker/i, 'La funzione di verifica admin deve rispettare RLS');
+assert.match(sql, /function public\.get_santalbino_mvp_vote_counts\(p_match_key text\)[\\s\\S]*?security invoker/i, 'I conteggi MVP devono rispettare RLS');
+assert.match(sql, /function public\.save_santalbino_live_state\([\\s\\S]*?security invoker/i, 'Il salvataggio deve rispettare RLS');
+assert.match(sql, /revoke all on function public\.get_santalbino_mvp_vote_counts\(text\) from public, anon, authenticated/i);
+assert.match(sql, /grant execute on function public\.get_santalbino_mvp_vote_counts\(text\) to authenticated/i);
+assert.match(sql, /revoke all on function public\.save_santalbino_live_state\(bigint,jsonb\) from public, anon, authenticated/i);
+
 
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');
