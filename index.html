@@ -1698,7 +1698,7 @@ function archivedFormationsHtml() {
   const selectedRow = seasonRows.find(r => String(r.id) === String(L.archiveFormationId)) || seasonRows[0];
   const seasonButtons = seasons.map(key => '<button class="btn sm ' + (key === selectedSeason ? 'primary' : '') + '" data-archive-season="' + esc(key) + '">' + esc(seasonLabel(key)) + '</button>').join('');
   const matchButtons = seasonRows.map(row => {
-    const date = row.match_date && /^\\d{4}-\\d{2}-\\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
+    const date = row.match_date && /^\d{4}-\d{2}-\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
     const active = selectedRow && String(row.id) === String(selectedRow.id);
     return '<button class="btn sm ' + (active ? 'primary' : '') + '" style="text-align:left;justify-content:flex-start;white-space:normal;height:auto;min-height:48px" data-archive-match="' + esc(row.id) + '"><span><b>' + esc(date) + '</b><br><span class="small">' + esc(row.home_team || 'Casa') + ' ' + Number(row.home_score || 0) + '–' + Number(row.away_score || 0) + ' ' + esc(row.away_team || 'Ospiti') + '</span></span></button>';
   }).join('');
@@ -1717,7 +1717,7 @@ function archivedFormationsHtml() {
       '<h4>Titolari <span class="muted">· ' + starters.length + '</span></h4>' + (starters.length ? playerRows(starters) : '<p class="small muted">Nessun titolare indicato.</p>') +
       (bench.length ? '<h4>Panchina · ' + bench.length + '</h4>' + playerRows(bench) : '') + '</section>';
   }).join('');
-  const date = selectedRow.match_date && /^\\d{4}-\\d{2}-\\d{2}$/.test(selectedRow.match_date) ? selectedRow.match_date.split('-').reverse().join('/') : (selectedRow.match_date || 'Data non indicata');
+  const date = selectedRow.match_date && /^\d{4}-\d{2}-\d{2}$/.test(selectedRow.match_date) ? selectedRow.match_date.split('-').reverse().join('/') : (selectedRow.match_date || 'Data non indicata');
   return '<div class="card"><h2>Archivio formazioni</h2><p class="small muted">Consultazione delle distinte conservate negli snapshot delle partite archiviate. I dati storici non sono modificabili da questa scheda.</p><div style="display:flex;flex-wrap:wrap;gap:7px;margin:12px 0">' + seasonButtons + '</div></div>' +
     '<div class="card"><h3>Partite · ' + esc(seasonLabel(selectedSeason)) + '</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px">' + matchButtons + '</div></div>' +
     '<div class="card"><div class="small muted">' + esc(date) + ' · ' + esc(selectedRow.competition || 'Partita') + (selectedRow.venue ? ' · ' + esc(selectedRow.venue) : '') + '</div><div class="stat-h" style="grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);margin:12px 0"><span style="text-align:left">' + esc(selectedRow.home_team || 'Casa') + '</span><b style="white-space:nowrap">' + Number(selectedRow.home_score || 0) + ' – ' + Number(selectedRow.away_score || 0) + '</b><span style="text-align:right">' + esc(selectedRow.away_team || 'Ospiti') + '</span></div>' +
@@ -3172,7 +3172,7 @@ function validExternalUrl(value) {
 }
 
 function publicHtml() {
-  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['season', 'Stagione'], ['scorers', 'Marcatori'], ['archive', 'Archivio'], ['archiveForms', 'Storico formazioni']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['season', 'Stagione'], ['scorers', 'Marcatori'], ['archive', 'Archivio'], ['archiveForms', 'Storico']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
