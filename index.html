@@ -2049,7 +2049,18 @@ async function renderMatchGraphic(ev) {
   x.textAlign='center';x.fillStyle=accent;x.font=`800 19px ${FB}`;
   const eventHeader='TIPO EVENTO: '+eventTypeLabel+'   •   SQUADRA: '+eventTeamLabel.toUpperCase();
   fitFont(x,eventHeader,930,19,800,FB);x.fillText(eventHeader,W/2,105);
-  const title=titleMap[ev.type]||'CRONACA LIVE';fitFont(x,title,900,84,900,FD);x.fillStyle='#fff';x.font=`900 84px ${FD}`;x.fillText(title,W/2,205);
+  const title=titleMap[ev.type]||'CRONACA LIVE';
+  if(['kickoff','halftime','fulltime'].includes(ev.type)){
+    // Titolo dedicato e ad alto contrasto per le tre grafiche di fase.
+    x.save();x.shadowColor='rgba(0,0,0,.58)';x.shadowBlur=24;x.shadowOffsetY=7;
+    x.fillStyle='rgba(2,12,7,.92)';rrect(x,150,142,780,112,22);x.fill();x.restore();
+    x.strokeStyle=accent;x.lineWidth=4;rrect(x,150,142,780,112,22);x.stroke();
+    x.textAlign='center';x.textBaseline='middle';x.fillStyle='#fff';
+    x.font=`900 94px ${FD}`;fitFont(x,title,720,94,900,FD);x.fillText(title,W/2,199);
+    x.textBaseline='alphabetic';
+  }else{
+    fitFont(x,title,900,84,900,FD);x.fillStyle='#fff';x.font=`900 84px ${FD}`;x.fillText(title,W/2,205);
+  }
   // Sottotitolo su due righe, con gerarchia da poster Kick Off.
   const compParts=String(S.match.comp||'').split(/\s*[·|]\s*/).filter(Boolean);
   const compLine1=compParts.shift()||'';
