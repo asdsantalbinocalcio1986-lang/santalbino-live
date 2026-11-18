@@ -2861,7 +2861,7 @@ async function renderMatchDayGraphic() {
     // Le informazioni lunghe (in particolare il nome dello stadio) vanno
     // su due righe e restano sempre nell'area interna della scheda.
     const valueMaxWidth=p.w-68;
-    let valueFont=36,valueLines=[];
+    let valueFont=i===3?15:19,valueLines=[];
     const wrapValue=()=>{
       x.font=`600 ${valueFont}px Arial,sans-serif`;
       const lines=[''];
