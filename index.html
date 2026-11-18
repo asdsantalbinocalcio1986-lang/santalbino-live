@@ -1606,12 +1606,12 @@ async function initCaps() {
   dbReady = true;
   offerDraftRecovery();
   remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); refreshMvpVotes(); }
+    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); if (CAN_EDIT) refreshMvpVotes(); }
    }).subscribe();
   db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
-  await refreshMvpVotes();
+  if (CAN_EDIT) await refreshMvpVotes();
   if (legacyLogoMigration && CAN_EDIT) commit(true);
 }
 function migrateBundledLogos(state) {
@@ -1658,6 +1658,7 @@ async function signInAdmin() {
     return;
   }
   $('#authDlg').close(); $('#authPassword').value = '';
+  await refreshMvpVotes();
 }
 async function requestPasswordReset() {
   const email = $('#authEmail')?.value.trim();
