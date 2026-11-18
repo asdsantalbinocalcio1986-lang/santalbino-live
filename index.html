@@ -2259,7 +2259,7 @@ async function renderPhaseCard(ev) {
 
 // Unico template grafico per ogni contenuto condiviso: griglia fissa, aree separate e testi contenuti.
 function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
-  const words = String(text || '').split(/\\s+/).filter(Boolean);
+  const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = []; let line = '';
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
@@ -2732,7 +2732,7 @@ async function renderFormationGraphic(side = 'both') {
       const w = img.width * scale, h = img.height * scale;
       x.drawImage(img, cx - w / 2, cy - h / 2, w, h);
     } else {
-      const initials = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
+      const initials = name.replace(/^ASD\\s+/i, '').split(/\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
       x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.font = '900 42px Arial,sans-serif'; x.fillText(initials, cx, cy);
     }
@@ -2838,7 +2838,7 @@ async function renderMatchDayGraphic() {
   const logo = (img,name,cx) => {
     x.fillStyle='#fff'; rrect(x,cx-100,32,200,200,26); x.fill();
     if(img){ const k=Math.min(180/img.width,180/img.height),w=img.width*k,h=img.height*k; x.drawImage(img,cx-w/2,42+(180-h)/2,w,h); }
-    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
+    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
     x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),470,31,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,270);
   };
   logo(homeLogo,teamName('home'),330); logo(awayLogo,teamName('away'),1270);
@@ -2868,7 +2868,7 @@ async function renderMatchDayGraphic() {
     let valueFont=21;
     const wrapValue=()=>{
       x.font=`600 ${valueFont}px Arial,sans-serif`;
-      const words=item.value.split(/\\s+/),lines=[''];
+      const words=item.value.split(/\s+/),lines=[''];
       words.forEach(word=>{
         const current=lines[lines.length-1],candidate=current?current+' '+word:word;
         if(current&&x.measureText(candidate).width>valueMaxWidth) lines.push(word);
