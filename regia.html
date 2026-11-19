@@ -3527,7 +3527,7 @@ function matchTimelineHtml() {
   </div>`;
 }
 function regiaHtml() {
-  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['set', 'Impost.']];
+  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['analytics', 'Statistiche'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
@@ -3555,6 +3555,7 @@ function regiaHtml() {
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();
+  else if (t === 'analytics') body = analyticsHtml();
   else body = settingsHtml();
   return (LOCAL_ONLY || API.artifact ? syncHtml() : '') + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-rtab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` + body;
 }
@@ -3695,6 +3696,21 @@ function libraryHtml() {
     <div class="card"><h2>Prossimo passaggio</h2><p class="small muted">I modelli GOAL e FORMAZIONE restano separati dalla raccolta sponsor. I loghi sponsor vengono applicati automaticamente ai diversi generatori grafici.</p></div>`;
 }
 
+function analyticsHtml() {
+  return `<div class="card"><h2>Statistiche SANTA Live</h2><p class="small muted" style="margin-top:0">Dati aggregati, senza indirizzi IP né profili personali. Le visite sono conteggiate una volta per sessione del browser; le installazioni sono registrate quando il browser conferma l'installazione PWA.</p><div id="analyticsStats"><div class="empty">Caricamento statistiche…</div></div><button class="btn primary block" data-a="refreshAnalytics">Aggiorna statistiche</button></div>`;
+}
+async function loadAnalytics() {
+  const target=$('#analyticsStats');
+  if(!db||!CAN_EDIT){if(target)target.innerHTML='<div class="empty">Accedi come amministratore per consultare le statistiche.</div>';return}
+  if(target)target.innerHTML='<div class="empty">Aggiornamento…</div>';
+  const since=new Date(Date.now()-30*24*60*60*1000).toISOString();
+  const count=(eventType,recent=false)=>{let q=db.from('santalbino_analytics_events').select('id',{count:'exact',head:true}).eq('event_type',eventType);if(recent)q=q.gte('created_at',since);return q};
+  const results=await Promise.all([count('visit'),count('download'),count('visit',true),count('download',true)]);
+  const error=results.find(x=>x.error)?.error;
+  if(error){if(target)target.innerHTML='<div class="empty">Statistiche non disponibili: '+esc(error.message)+'</div>';console.warn('Statistiche SANTA Live:',error.message);return}
+  const [visits,downloads,recentVisits,recentDownloads]=results.map(x=>Number(x.count||0));
+  if(target)target.innerHTML=`<div class="row2" style="margin:12px 0"><div class="card" style="margin:0;text-align:center"><div class="small muted">VISITE TOTALI</div><div style="font-size:38px;font-weight:900;font-variant-numeric:tabular-nums">${visits.toLocaleString('it-IT')}</div><div class="small muted">${recentVisits.toLocaleString('it-IT')} negli ultimi 30 giorni</div></div><div class="card" style="margin:0;text-align:center"><div class="small muted">DOWNLOAD / INSTALLAZIONI PWA</div><div style="font-size:38px;font-weight:900;font-variant-numeric:tabular-nums">${downloads.toLocaleString('it-IT')}</div><div class="small muted">${recentDownloads.toLocaleString('it-IT')} negli ultimi 30 giorni</div></div></div><p class="small muted">Nota: iOS/iPadOS non comunica al sito il completamento manuale di “Aggiungi alla schermata Home”; tali installazioni non sono conteggiabili automaticamente.</p>`;
+}
 function settingsHtml() {
   const I = (id, label, v, ph = '', type = 'text') => `<label class="f"><span>${label}</span><input type="${type}" id="${id}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
   const m = S.match;
@@ -3817,11 +3833,12 @@ document.addEventListener('click', async e => {
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
   const archiveMatchBtn = t.closest('[data-archive-match]'); if (archiveMatchBtn) { L.archiveFormationId = archiveMatchBtn.dataset.archiveMatch; saveL(); renderMain(); return; }
-  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); return; }
+  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
   switch (act) {
+    case 'refreshAnalytics': await loadAnalytics(); break;
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
     case 'draftRecovery': recoverDraftManually(); break;
