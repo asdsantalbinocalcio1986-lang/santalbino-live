@@ -1464,7 +1464,7 @@ function describe(e, sc) {
       const bits = [t, how, e.assist ? `assist <b>${esc(e.assist)}</b>` : ''].filter(Boolean);
       return { title: e.kind === 'autogol' ? 'Autogol' : 'Gol!', main: p || 'Gol', sub: bits.map((b, i) => i ? b : esc(b)).join(' · ') + ` · <b>${sc[0]}-${sc[1]}</b>` };
     }
-    case 'foul': return { title: e.kind === 'rigore' ? 'Fallo da rigore' : 'Fallo', main: p || t, sub: e.kind === 'rigore' ? esc(t) + ' · calcio di rigore assegnato' : esc(t) + ' · non è rigore' };
+    case 'foul': return { title: e.kind === 'rigore' && e.foulInArea !== false ? 'Fallo da rigore' : e.handball ? 'Fallo di mano' : 'Fallo', main: p || t, sub: e.kind === 'rigore' && e.foulInArea !== false ? esc(t) + ' · calcio di rigore assegnato' : e.handball ? esc(t) + ' · fallo di mano' : esc(t) + ' · fallo' };
     case 'yellow': return { title: 'Cartellino giallo', main: p || t, sub: esc(t) };
     case 'red': return { title: e.kind === 'doppio' ? 'Doppio giallo' : 'Espulsione', main: p || t, sub: esc(t) + ' · in dieci' };
     case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}`, subRaw: true };
@@ -1493,7 +1493,7 @@ function buildText(ev, sc) {
         : (p ? `Segna ${p} (${t})${how}${ev.assist ? `, assist di ${ev.assist}` : ''}.` : `Gol del ${t}${how}.`);
       x = `⚽ ${m}${head}\n${line}\n${d}`; break;
     }
-    case 'foul': x = `⚠️ ${m}${ev.kind === 'rigore' ? 'FALLO DA RIGORE' : 'FALLO'}\n${p ? p + ' (' + t + ')' : t}${ev.kind === 'rigore' ? '\nCalcio di rigore assegnato.' : '\nFallo non da rigore.'}`; break;
+    case 'foul': { const penalty = ev.kind === 'rigore' && ev.foulInArea !== false; const label = penalty ? 'FALLO DA RIGORE' : ev.handball ? 'FALLO DI MANO' : 'FALLO'; x = `⚠️ ${m}${label}\n${p ? p + ' (' + t + ')' : t}${penalty ? '\nCalcio di rigore assegnato.' : ev.handball ? '\nFallo di mano.' : '\nFallo.'}`; break; }
     case 'yellow': x = `🟨 ${m}CARTELLINO GIALLO\n${p ? p + ' (' + t + ')' : t}`; break;
     case 'red': x = `🟥 ${m}ESPULSIONE\n${ev.kind === 'doppio' ? 'Doppio giallo' : 'Rosso diretto'}${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
     case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
@@ -1820,11 +1820,11 @@ function archiveHtml() {
     const match = state.match || {}, rosters = state.rosters || {};
     const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
     const eventHtml = events.map(ev => {
-      const label = ev.type === 'foul' && ev.kind === 'rigore' ? 'Fallo da rigore' : (typeLabels[ev.type] || 'Evento');
+      const label = ev.type === 'foul' ? (ev.kind === 'rigore' && ev.foulInArea !== false ? 'Fallo da rigore' : ev.handball ? 'Fallo di mano' : 'Fallo') : (typeLabels[ev.type] || 'Evento');
       const side = ev.team === 'home' ? row.home_team : ev.team === 'away' ? row.away_team : '';
       const own = ev.type === 'goal' && ev.kind === 'autogol' ? ' · autogol' : '';
       const person = ev.player ? ' · ' + esc(ev.player) : '';
-      const detail = ev.type === 'foul' ? (ev.kind === 'rigore' ? 'Calcio di rigore assegnato' : 'Non da rigore') : ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
+      const detail = ev.type === 'foul' ? (ev.kind === 'rigore' && ev.foulInArea !== false ? 'Calcio di rigore assegnato' : ev.handball ? 'Fallo di mano' : 'Fallo') : ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
       return `<div class="ev"><div class="m">${esc(ev.min || '–')}${ev.min ? '′' : ''}</div><div><div class="t"><b>${esc(label)}${own}</b>${person}</div><div class="small muted">${esc(side)}${detail ? ' · ' + detail : ''}</div></div></div>`;
     }).join('');
     const lineupHtml = ['home','away'].map(side => {
@@ -2565,7 +2565,7 @@ async function renderMatchGraphic(ev) {
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
   const ownGoal=ev.type==='goal' && scoringSide(ev)===S.match.ourSide;
-  const titleMap={foul:ev.kind==='rigore'?'FALLO DA RIGORE':'FALLO',kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:ev.kind==='facile'?'PARATA':'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const titleMap={foul:ev.kind==='rigore'&&ev.foulInArea!==false?'FALLO DA RIGORE':ev.handball?'FALLO DI MANO':'FALLO',kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:ev.kind==='facile'?'PARATA':'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   if(ev.graphicTitle)titleMap[ev.type]=ev.graphicTitle.toUpperCase();
   const accent=({foul:'#ffad62',goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
@@ -2727,7 +2727,7 @@ async function renderMatchGraphic(ev) {
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
-    if(ev.type==='foul')detail+=ev.kind==='rigore'?'  •  RIGORE ASSEGNATO':'  •  NON DA RIGORE';
+    if(ev.type==='foul')detail+=ev.kind==='rigore'&&ev.foulInArea!==false?'  •  RIGORE ASSEGNATO':ev.handball?'  •  FALLO DI MANO':'  •  FALLO';
     if(ev.type==='goal')detail+=({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
     else if(ev.type==='sub')detail='ENTRA  '+(ev.inn||'—')+'   •   ESCE  '+(ev.out||'—')+'   •   '+detail;
     else if(ev.type==='mvp'&&ev.votes)detail+='  •  '+ev.votes+' VOTI';
@@ -3220,7 +3220,7 @@ function statsHtml() {
   const shotsOnTarget = s => goals(s) + savesAgainst(s) + unSavedOnTargetShots(s);
   const shotsOut = s => S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'fuori').length;
   const greatSaves = s => S.events.filter(e => e.type === 'save' && e.team === s && e.kind === 'complicata').length;
-  const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Punizioni', cnt('freekick', 'home'), cnt('freekick', 'away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
+  const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Falli', cnt('foul', 'home'), cnt('foul', 'away')], ['Punizioni', cnt('freekick', 'home'), cnt('freekick', 'away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
   if (!S.events.length) return `<div class="empty"><h3>Nessun dato</h3>Le statistiche compaiono durante la partita.</div>`;
   return `<div class="card">` + rows.map(([l, a, b]) => { const t = (a + b) || 1; return `<div class="stat"><div class="stat-h"><b>${a}</b><span>${l}</span><b>${b}</b></div><div class="bars"><div class="bar l"><i style="width:${a / t * 100}%"></i></div><div class="bar r"><i style="width:${b / t * 100}%"></i></div></div></div>`; }).join('') + `</div>`;
 }
@@ -3773,12 +3773,12 @@ let armedNew = false;
 let draft = null, textManual = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function openSheet(type) {
-  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '' };
+  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '', foulInArea: false, handball: false };
   textManual = false; renderSheet(); $('#sheet').showModal();
 }
 function draftEvent() {
   const d = draft, t = d.team;
-  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: d.min.trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), note: d.note.trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '' };
+  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: d.min.trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), note: d.note.trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '', foulInArea: !!d.foulInArea, handball: !!d.handball };
 }
 function renderSheet() {
   const keepText = textManual && $('#fText') ? $('#fText').value : null;
@@ -3787,7 +3787,7 @@ function renderSheet() {
   const SEL = (k, label, opts) => `<label class="f"><span>${label}</span><select data-d="${k}">${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${d[k] === v ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select></label>`;
   let fields = '';
   switch (d.type) {
-    case 'foul': fields = P('player', 'Giocatore coinvolto (facoltativo)') + SEL('kind', 'Il fallo è da rigore?', [['normal', 'No, non è rigore'], ['rigore', 'Sì, è rigore']]); break;
+    case 'foul': fields = P('player', 'Giocatore coinvolto (facoltativo)') + \`<div class="f"><span>Dove è avvenuto il fallo?</span><div class="seg" role="group" aria-label="Posizione del fallo"><button type="button" data-foul-area="no" aria-pressed="\${!d.foulInArea}">Fuori area</button><button type="button" data-foul-area="yes" aria-pressed="\${!!d.foulInArea}">Dentro area</button></div>\${d.foulInArea ? SEL('kind', 'Decisione arbitrale', [['normal', 'Fallo (nessun rigore)'], ['rigore', 'Rigore assegnato']]) : '<p class="small muted">Fuori area: il rigore non è selezionabile.</p>'}</div><div class="f"><span>Il fallo è di mano?</span><div class="seg" role="group" aria-label="Fallo di mano"><button type="button" data-foul-handball="no" aria-pressed="\${!d.handball}">No, fallo normale</button><button type="button" data-foul-handball="yes" aria-pressed="\${!!d.handball}">Sì, fallo di mano</button></div></div>\`; break;
      case 'goal': fields = P('player', d.kind === 'autogol' ? 'Chi ha segnato (autogol)' : 'Marcatore') + (d.kind === 'autogol' ? '' : P('assist', 'Assist (facoltativo)')) + SEL('kind', 'Tipo di gol', [['azione', 'Azione'], ['rigore', 'Rigore'], ['punizione', 'Punizione'], ['testa', 'Di testa'], ['autogol', 'Autogol']]); break;
     case 'yellow': case 'injury': fields = P('player', 'Giocatore'); break;
     case 'save': fields = P('player', 'Portiere') + SEL('kind', 'Tipo di parata', [['facile', 'Parata facile'], ['complicata', 'Grande parata']]); break;
@@ -4133,10 +4133,13 @@ function wireSheet() {
     if (e.target.matches('[data-evimg-one-rm]')) { draft.img = ''; draft.raw = false; renderSheet(); return; }
     if (e.target.id === 'sheetClose') { sh.close(); return; }
     const tb = e.target.closest('[data-team]'); if (tb) { draft.team = tb.dataset.team; draft.player = draft.assist = draft.out = draft.inn = ''; draft.freeKickZone = ''; draft.cornerSide = ''; renderSheet(); return; }
+    const foulArea = e.target.closest('[data-foul-area]'); if (foulArea && draft?.type === 'foul') { draft.foulInArea = foulArea.dataset.foulArea === 'yes'; if (!draft.foulInArea) draft.kind = 'normal'; textManual = false; renderSheet(); return; }
+    const foulHandball = e.target.closest('[data-foul-handball]'); if (foulHandball && draft?.type === 'foul') { draft.handball = foulHandball.dataset.foulHandball === 'yes'; textManual = false; renderSheet(); return; }
     const fkZone = e.target.closest('[data-free-kick-zone]'); if (fkZone && draft?.type === 'freekick') { draft.freeKickZone = fkZone.dataset.freeKickZone || ''; textManual = false; renderSheet(); return; }
     const cornerSide = e.target.closest('[data-corner-side]'); if (cornerSide && draft?.type === 'corner') { draft.cornerSide = cornerSide.dataset.cornerSide || ''; textManual = false; renderSheet(); return; }
     const shotZone = e.target.closest('[data-shot-zone]'); if (shotZone && draft?.type === 'shot') { draft.shotZone = shotZone.dataset.shotZone || 'fuori'; draft.kind = draft.shotZone === 'fuori' ? 'fuori' : 'in_porta'; textManual = false; renderSheet(); return; }
     if (e.target.closest('[data-sub]')) {
+      if (draft?.type === 'foul' && draft.kind === 'rigore' && !draft.foulInArea) { toast('Un fallo fuori area non può essere registrato come rigore'); return; }
       if (draft?.type === 'shot' && !draft.shotZone) { toast('Seleziona prima il punto del tiro sulla porta'); return; }
       if (draft?.type === 'freekick' && !draft.freeKickZone) { toast('Seleziona prima la posizione del calcio di punizione'); return; }
       if (draft?.type === 'corner' && !draft.cornerSide) { toast('Seleziona prima il lato del calcio d’angolo'); return; }
