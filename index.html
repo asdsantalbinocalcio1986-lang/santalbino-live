@@ -1465,8 +1465,8 @@ function describe(e, sc) {
     case 'yellow': return { title: 'Cartellino giallo', main: p || t, sub: esc(t) };
     case 'red': return { title: e.kind === 'doppio' ? 'Doppio giallo' : 'Espulsione', main: p || t, sub: esc(t) + ' · in dieci' };
     case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}`, subRaw: true };
-    case 'save': return { title: e.kind === 'complicata' ? 'Grande parata' : 'Parata', main: p || t, sub: esc(t) };
-    case 'shot': return { title: e.kind === 'fuori' ? 'Tiro fuori' : 'Tiro nello specchio', main: p || t, sub: esc(t) + (e.shotZone ? ' · ' + esc(e.shotZone.replaceAll('-', ' ')) : '') };
+    case 'save': return { title: e.kind === 'facile' ? 'Parata' : 'Grande parata', main: p || t, sub: esc(t) };
+    case 'shot': return { title: e.kind === 'fuori' ? 'Tiro fuori' : e.kind === 'in_porta' ? 'Tiro nello specchio' : 'Tiro', main: p || t, sub: esc(t) + (e.shotZone ? ' · ' + esc(e.shotZone.replaceAll('-', ' ')) : '') };
     case 'crossbar': return { title: 'Traversa', main: p || t, sub: esc(t) };
     case 'corner': return { title: 'Calcio d’angolo', main: '', sub: esc(t) };
     case 'freekick': return { title: 'Calcio di punizione', main: p || t, sub: esc(t) };
@@ -1494,8 +1494,8 @@ function buildText(ev, sc) {
     case 'yellow': x = `🟨 ${m}CARTELLINO GIALLO\n${p ? p + ' (' + t + ')' : t}`; break;
     case 'red': x = `🟥 ${m}ESPULSIONE\n${ev.kind === 'doppio' ? 'Doppio giallo' : 'Rosso diretto'}${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
     case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
-    case 'save': x = `🧤 ${m}${ev.kind === 'complicata' ? 'GRANDE PARATA' : 'PARATA'}\n${p ? 'di ' + p + ' (' + t + ')' : t}`; break;
-    case 'shot': x = ev.kind === 'fuori' ? `⚽ ${m}TIRO FUORI\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : `🎯 ${m}TIRO NELLO SPECCHIO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}${ev.shotZone ? ' · ' + ev.shotZone.replaceAll('-', ' ') : ''}.`; break;
+    case 'save': x = `🧤 ${m}${ev.kind === 'facile' ? 'PARATA' : 'GRANDE PARATA'}\n${p ? 'di ' + p + ' (' + t + ')' : t}`; break;
+    case 'shot': x = ev.kind === 'fuori' ? `⚽ ${m}TIRO FUORI\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : ev.kind === 'in_porta' ? `🎯 ${m}TIRO NELLO SPECCHIO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}${ev.shotZone ? ' · ' + ev.shotZone.replaceAll('-', ' ') : ''}.` : `⚽ ${m}TIRO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.`; break;
     case 'crossbar': x = `🥅 ${m}TRAVERSA!\n${p ? 'Colpita da ' + p + ' (' + t + ')' : t}.`; break;
     case 'corner': x = `🚩 ${m}CALCIO D’ANGOLO\nPer ${t}.`; break;
     case 'freekick': x = `🎯 ${m}CALCIO DI PUNIZIONE\nPer ${t}${p ? ', battuto da ' + p : ''}.`; break;
@@ -3189,7 +3189,7 @@ function statsHtml() {
   const cnt = (t, s) => S.events.filter(e => e.type === t && e.team === s).length;
   const goals = s => S.events.filter(e => e.type === 'goal' && scoringSide(e) === s).length;
   const shots = s => goals(s) + cnt('save', other(s)) + cnt('miss', s) + cnt('shot', s) + cnt('crossbar', s);
-  const shotsOnTarget = s => goals(s) + cnt('save', other(s)) + S.events.filter(e => e.type === 'shot' && e.team === s && e.kind !== 'fuori').length;
+  const shotsOnTarget = s => goals(s) + cnt('save', other(s)) + S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'in_porta').length;
   const shotsOut = s => S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'fuori').length;
   const greatSaves = s => S.events.filter(e => e.type === 'save' && e.team === s && e.kind === 'complicata').length;
   const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
