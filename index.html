@@ -1375,6 +1375,9 @@ const LK = 'cronaca-live-local-v2', DK = 'cronaca-live-draft-v2';
 const CARD_TYPES = ['goal', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
+// Ogni apertura dell'app riparte dalla schermata iniziale, senza alterare gli altri dati locali.
+L.tab = 'cron';
+L.rtab = 'live';
 const saveL = () => { try { localStorage.setItem(LK, JSON.stringify(L)); } catch (e) { toast('Memoria piena: togli qualche immagine'); } };
 const stash = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }, del(k) { try { sessionStorage.removeItem(k); } catch (e) {} } };
 const photos = { home: null, away: null };
