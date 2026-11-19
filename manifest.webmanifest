@@ -11,7 +11,7 @@
   "theme_color": "#102819",
   "icons": [
     {
-      "src": "./santa-live-icon.svg?v=4",
+      "src": "./santa-live-icon.svg?v=5",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

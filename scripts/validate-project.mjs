@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const sql = fs.readFileSync('supabase-phase1-security.sql', 'utf8');
+const home = fs.readFileSync('home.html', 'utf8');
+const preview = fs.readFileSync('preview.html', 'utf8');
+const sw = fs.readFileSync('sw.js', 'utf8');
 
 for (const file of ['home.html', 'preview.html']) {
   const page = fs.readFileSync(file, 'utf8');
@@ -17,7 +20,14 @@ for (const file of ['home.html', 'preview.html']) {
   assert.ok(pageChecked >= 1, 'Script inline mancante o non verificabile in ' + file);
 }
 new vm.Script(fs.readFileSync('sw.js', 'utf8'), { filename: 'sw.js' });
-JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
+const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
+assert.ok(manifest.icons?.some(icon => icon.src.includes('santa-live-icon.svg')), 'Icona PWA mancante');
+for (const [file, source] of [['home.html', home], ['preview.html', preview], ['index.html', html]]) {
+  assert.match(source, /@supabase\/supabase-js@2\.119\.1/, 'Versione Supabase JS non fissata in ' + file);
+}
+assert.match(home, /\.range\(start,start\+PAGE_SIZE-1\)/, 'Archivio non paginato');
+assert.match(sw, /'\.\/index\.html'/, 'Shell offline senza pagina regia');
+assert.match(sw, /'\.\/config\.js'/, 'Shell offline senza configurazione');
 assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
 assert.match(html, /<img src="\$\{esc\(lg\)\}" alt="">/, 'I loghi devono essere escapati negli attributi HTML');
 assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ht'; addPhase\('halftime', endMinute\)/, 'Il recupero del primo tempo deve essere conservato');
