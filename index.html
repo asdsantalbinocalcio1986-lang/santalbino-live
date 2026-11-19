@@ -1453,6 +1453,9 @@ const COL = { foul: 'var(--c-injury)', offside: 'var(--c-note)', shot: 'var(--c-
 const PHASE_EV = { kickoff: "Fischio d'inizio", halftime: 'Fine primo tempo', secondhalf: 'Inizio secondo tempo', fulltime: 'Fine partita' };
 
 /* ================= testi ================= */
+function freeKickZoneLabel(zone) {
+  return ({ difensiva: '3/4 difensiva', offensiva: '3/4 offensiva', 'limite-centro': 'Limite area · centrale', 'limite-destra': 'Limite area · destra', 'limite-sinistra': 'Limite area · sinistra' })[zone] || '';
+}
 function describe(e, sc) {
   const t = teamName(e.team), p = e.player || '';
   switch (e.type) {
@@ -1468,8 +1471,8 @@ function describe(e, sc) {
     case 'save': return { title: e.kind === 'facile' ? 'Parata' : 'Grande parata', main: p || t, sub: esc(t) };
     case 'shot': return { title: e.kind === 'fuori' ? 'Tiro fuori' : e.kind === 'in_porta' ? describeShot(e) : 'Tiro', main: p || t, sub: esc(t) };
     case 'crossbar': return { title: 'Traversa', main: p || t, sub: esc(t) };
-    case 'corner': return { title: 'Calcio d’angolo', main: '', sub: esc(t) };
-    case 'freekick': return { title: 'Calcio di punizione', main: p || t, sub: esc(t) };
+    case 'corner': return { title: 'Calcio d’angolo', main: '', sub: esc(t) + (e.cornerSide ? ' · da ' + esc(e.cornerSide) : '') };
+    case 'freekick': return { title: 'Calcio di punizione', main: p || t, sub: esc(t) + (e.freeKickZone ? ' · ' + esc(freeKickZoneLabel(e.freeKickZone)) : '') };
     case 'offside': return { title: 'Fuorigioco', main: p || t, sub: esc(t) };
     case 'miss': return { title: e.kind || 'Occasione', main: p || t, sub: esc(t) };
     case 'injury': return { title: 'Infortunio', main: p || t, sub: 'Gioco fermo · ' + esc(t) };
@@ -1497,8 +1500,8 @@ function buildText(ev, sc) {
     case 'save': x = `🧤 ${m}${ev.kind === 'facile' ? 'PARATA' : 'GRANDE PARATA'}\n${p ? 'di ' + p + ' (' + t + ')' : t}`; break;
     case 'shot': x = ev.kind === 'fuori' ? `⚽ ${m}TIRO FUORI\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : ev.kind === 'in_porta' ? `🎯 ${m}${describeShot(ev).toUpperCase()}\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : `⚽ ${m}TIRO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.`; break;
     case 'crossbar': x = `🥅 ${m}TRAVERSA!\n${p ? 'Colpita da ' + p + ' (' + t + ')' : t}.`; break;
-    case 'corner': x = `🚩 ${m}CALCIO D’ANGOLO\nPer ${t}.`; break;
-    case 'freekick': x = `🎯 ${m}CALCIO DI PUNIZIONE\nPer ${t}${p ? ', battuto da ' + p : ''}.`; break;
+    case 'corner': x = `🚩 ${m}CALCIO D’ANGOLO${ev.cornerSide ? ' DA ' + ev.cornerSide.toUpperCase() : ''}\nPer ${t}.`; break;
+    case 'freekick': x = `🎯 ${m}CALCIO DI PUNIZIONE${ev.freeKickZone ? ' · ' + freeKickZoneLabel(ev.freeKickZone).toUpperCase() : ''}\nPer ${t}${p ? ', battuto da ' + p : ''}.`; break;
     case 'offside': x = `🚩 ${m}FUORIGIOCO\n${p ? p + ' (' + t + ')' : t}.`; break;
     case 'miss': x = `😮 ${m}${String(ev.kind || 'OCCASIONE').toUpperCase()}\n${p ? 'Per ' + p + ' (' + t + ')' : t + '!'}`; break;
     case 'injury': x = `🚑 ${m}INFORTUNIO\nGioco fermo per soccorrere ${p || 'un giocatore'} (${t}).`; break;
@@ -3217,7 +3220,7 @@ function statsHtml() {
   const shotsOnTarget = s => goals(s) + savesAgainst(s) + unSavedOnTargetShots(s);
   const shotsOut = s => S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'fuori').length;
   const greatSaves = s => S.events.filter(e => e.type === 'save' && e.team === s && e.kind === 'complicata').length;
-  const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
+  const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Punizioni', cnt('freekick', 'home'), cnt('freekick', 'away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
   if (!S.events.length) return `<div class="empty"><h3>Nessun dato</h3>Le statistiche compaiono durante la partita.</div>`;
   return `<div class="card">` + rows.map(([l, a, b]) => { const t = (a + b) || 1; return `<div class="stat"><div class="stat-h"><b>${a}</b><span>${l}</span><b>${b}</b></div><div class="bars"><div class="bar l"><i style="width:${a / t * 100}%"></i></div><div class="bar r"><i style="width:${b / t * 100}%"></i></div></div></div>`; }).join('') + `</div>`;
 }
@@ -3754,12 +3757,12 @@ let armedNew = false;
 let draft = null, textManual = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function openSheet(type) {
-  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', note: '', min: '', shotZone: '' };
+  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '' };
   textManual = false; renderSheet(); $('#sheet').showModal();
 }
 function draftEvent() {
   const d = draft, t = d.team;
-  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: d.min.trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), note: d.note.trim(), shotZone: d.shotZone || '' };
+  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: d.min.trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), note: d.note.trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '' };
 }
 function renderSheet() {
   const keepText = textManual && $('#fText') ? $('#fText').value : null;
@@ -3774,14 +3777,16 @@ function renderSheet() {
     case 'save': fields = P('player', 'Portiere') + SEL('kind', 'Tipo di parata', [['facile', 'Parata facile'], ['complicata', 'Grande parata']]); break;
     case 'shot': fields = P('player', 'Giocatore (facoltativo)') + `<div class="f"><span>Seleziona il punto del tiro</span><p class="small muted">Tocca dentro la porta per un tiro nello specchio; tocca fuori dalla porta per un tiro fuori.</p><svg viewBox="0 0 360 220" role="group" aria-label="Seleziona la posizione del tiro" style="width:100%;max-width:520px;display:block;margin:auto;border-radius:14px;background:#174d32;touch-action:manipulation"><rect x="0" y="0" width="360" height="220" fill="#174d32" data-shot-zone="fuori"/><path d="M8 8H352V212H8Z" fill="none" stroke="#d8eadc" stroke-width="2" pointer-events="none"/><rect x="82" y="48" width="196" height="132" rx="3" fill="#dbe8dc" fill-opacity=".13" stroke="#fff" stroke-width="5" pointer-events="none"/><path d="M82 48L278 180M278 48L82 180M82 92H278M82 136H278M147 48V180M213 48V180" stroke="#fff" stroke-opacity=".22" stroke-width="1.5" pointer-events="none"/><g data-shot-zone="alto-sinistra"><rect x="86" y="52" width="62" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="117" y="76" font-size="10" text-anchor="middle" fill="#fff" pointer-events="none">ALTO SX</text></g><g data-shot-zone="alto-centro"><rect x="149" y="52" width="62" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="180" y="76" font-size="10" text-anchor="middle" fill="#fff" pointer-events="none">ALTO</text></g><g data-shot-zone="alto-destra"><rect x="213" y="52" width="61" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="243" y="76" font-size="10" text-anchor="middle" fill="#fff" pointer-events="none">ALTO DX</text></g><g data-shot-zone="centro-sinistra"><rect x="86" y="94" width="62" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="117" y="118" font-size="9" text-anchor="middle" fill="#fff" pointer-events="none">CENTRO SX</text></g><g data-shot-zone="centro"><rect x="149" y="94" width="62" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="180" y="118" font-size="10" text-anchor="middle" fill="#fff" pointer-events="none">CENTRO</text></g><g data-shot-zone="centro-destra"><rect x="213" y="94" width="61" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="243" y="118" font-size="9" text-anchor="middle" fill="#fff" pointer-events="none">CENTRO DX</text></g><g data-shot-zone="basso-sinistra"><rect x="86" y="136" width="62" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="117" y="160" font-size="9" text-anchor="middle" fill="#fff" pointer-events="none">BASSO SX</text></g><g data-shot-zone="basso-centro"><rect x="149" y="136" width="62" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="180" y="160" font-size="9" text-anchor="middle" fill="#fff" pointer-events="none">BASSO</text></g><g data-shot-zone="basso-destra"><rect x="213" y="136" width="61" height="40" fill="#fff" fill-opacity=".18" stroke="#fff"/><text x="243" y="160" font-size="9" text-anchor="middle" fill="#fff" pointer-events="none">BASSO DX</text></g></svg><div class="small muted" style="text-align:center">${d.shotZone === 'fuori' ? 'Tiro fuori dallo specchio' : d.shotZone ? 'Tiro nello specchio · ' + d.shotZone.replaceAll('-', ' ') : 'Nessuna posizione selezionata'}</div></div>`; break;
     case 'crossbar': fields = P('player', 'Giocatore (facoltativo)'); break;
-    case 'freekick': fields = P('player', 'Battitore (facoltativo)'); break;
+    case 'corner': fields = `<div class="f"><span>Da quale lato viene battuto?</span><p class="small muted">Lato visto dalla squadra che attacca.</p><div class="seg" role="group" aria-label="Lato del calcio d’angolo"><button type="button" data-corner-side="sinistra" aria-pressed="${d.cornerSide === 'sinistra'}">Da sinistra</button><button type="button" data-corner-side="destra" aria-pressed="${d.cornerSide === 'destra'}">Da destra</button></div></div>`; break;
+    case 'freekick': fields = P('player', 'Battitore (facoltativo)') + `<div class="f"><span>Seleziona la posizione del fallo</span><p class="small muted">Campetto orientato dal punto di vista della squadra che ha subito il fallo, con l’attacco verso l’alto.</p><svg viewBox="0 0 320 420" role="group" aria-label="Seleziona la zona del calcio di punizione" style="width:100%;max-width:340px;display:block;margin:auto;border-radius:12px;background:#174d32;touch-action:manipulation"><rect x="12" y="10" width="296" height="400" rx="3" fill="#17613d" stroke="#e4f0e5" stroke-width="2"/><path d="M12 210H308M105 210a55 55 0 0 0 110 0" fill="none" stroke="#e4f0e5" stroke-opacity=".7" stroke-width="2"/><rect x="90" y="10" width="140" height="60" fill="none" stroke="#e4f0e5" stroke-width="2"/><rect x="125" y="10" width="70" height="20" fill="none" stroke="#e4f0e5" stroke-width="2"/><path d="M12 100H308" stroke="#e4f0e5" stroke-opacity=".45" stroke-dasharray="5 4"/><g data-free-kick-zone="offensiva"><rect x="14" y="102" width="292" height="106" fill="#fff" fill-opacity=".12" stroke="#fff" stroke-opacity=".35"/><text x="160" y="160" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" pointer-events="none">3/4 OFFENSIVA</text></g><g data-free-kick-zone="difensiva"><rect x="14" y="212" width="292" height="196" fill="#fff" fill-opacity=".08" stroke="#fff" stroke-opacity=".35"/><text x="160" y="310" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" pointer-events="none">3/4 DIFENSIVA</text></g><g data-free-kick-zone="limite-sinistra"><rect x="14" y="72" width="96" height="28" fill="#e3c66d" fill-opacity=".9" stroke="#fff"/><text x="62" y="90" text-anchor="middle" font-size="10" font-weight="700" fill="#17251d" pointer-events="none">LIMITE SX</text></g><g data-free-kick-zone="limite-centro"><rect x="112" y="72" width="96" height="28" fill="#e3c66d" stroke="#fff"/><text x="160" y="90" text-anchor="middle" font-size="10" font-weight="700" fill="#17251d" pointer-events="none">CENTRALE</text></g><g data-free-kick-zone="limite-destra"><rect x="210" y="72" width="96" height="28" fill="#e3c66d" fill-opacity=".9" stroke="#fff"/><text x="258" y="90" text-anchor="middle" font-size="10" font-weight="700" fill="#17251d" pointer-events="none">LIMITE DX</text></g></svg><div class="small muted" style="text-align:center">${d.freeKickZone ? freeKickZoneLabel(d.freeKickZone) : 'Nessuna posizione selezionata'}</div></div>`; break;
     case 'offside': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'red': fields = P('player', 'Giocatore') + SEL('kind', 'Motivo', [['diretto', 'Rosso diretto'], ['doppio', 'Doppio giallo']]); break;
     case 'miss': fields = P('player', 'Giocatore') + SEL('kind', 'Cosa è successo', MISS_KINDS); break;
     case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra'); break;
     case 'note': fields = `<label class="f"><span>Testo</span><textarea data-d="note" rows="3" placeholder="Es. Recupero di 3 minuti">${esc(d.note)}</textarea></label>`; break;
   }
-  const teamSeg = d.type === 'note' ? '' : `<div class="seg" role="group" aria-label="Squadra">${['home', 'away'].map(s => `<button type="button" data-team="${s}" aria-pressed="${d.team === s}">${esc(teamName(s))}</button>`).join('')}</div>`;
+  const teamHint = d.type === 'freekick' ? '<p class="small muted">Seleziona la squadra che ha subito il fallo.</p>' : d.type === 'corner' ? '<p class="small muted">Seleziona la squadra che ha guadagnato il calcio d’angolo.</p>' : '';
+  const teamSeg = d.type === 'note' ? '' : teamHint + `<div class="seg" role="group" aria-label="Squadra">${['home', 'away'].map(s => `<button type="button" data-team="${s}" aria-pressed="${d.team === s}">${esc(teamName(s))}</button>`).join('')}</div>`;
   const imgBox = CARD_TYPES.includes(d.type) ? `<div class="f"><span>Immagine per questo evento (facoltativa)</span>${d.img ? `<img class="thumb" style="max-height:110px" src="${d.img}" alt="Immagine scelta">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${d.img ? 'Cambia immagine' : 'Scegli immagine'}<input type="file" accept="image/*" data-evimg-one hidden></label>${d.img ? '<button type="button" class="btn sm danger" data-evimg-one-rm>Togli</button>' : ''}</div>
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
@@ -4110,10 +4115,14 @@ function wireSheet() {
   sh.addEventListener('click', e => {
     if (e.target.matches('[data-evimg-one-rm]')) { draft.img = ''; draft.raw = false; renderSheet(); return; }
     if (e.target.id === 'sheetClose') { sh.close(); return; }
-    const tb = e.target.closest('[data-team]'); if (tb) { draft.team = tb.dataset.team; draft.player = draft.assist = draft.out = draft.inn = ''; renderSheet(); return; }
+    const tb = e.target.closest('[data-team]'); if (tb) { draft.team = tb.dataset.team; draft.player = draft.assist = draft.out = draft.inn = ''; draft.freeKickZone = ''; draft.cornerSide = ''; renderSheet(); return; }
+    const fkZone = e.target.closest('[data-free-kick-zone]'); if (fkZone && draft?.type === 'freekick') { draft.freeKickZone = fkZone.dataset.freeKickZone || ''; textManual = false; renderSheet(); return; }
+    const cornerSide = e.target.closest('[data-corner-side]'); if (cornerSide && draft?.type === 'corner') { draft.cornerSide = cornerSide.dataset.cornerSide || ''; textManual = false; renderSheet(); return; }
     const shotZone = e.target.closest('[data-shot-zone]'); if (shotZone && draft?.type === 'shot') { draft.shotZone = shotZone.dataset.shotZone || 'fuori'; draft.kind = draft.shotZone === 'fuori' ? 'fuori' : 'in_porta'; textManual = false; renderSheet(); return; }
     if (e.target.closest('[data-sub]')) {
       if (draft?.type === 'shot' && !draft.shotZone) { toast('Seleziona prima il punto del tiro sulla porta'); return; }
+      if (draft?.type === 'freekick' && !draft.freeKickZone) { toast('Seleziona prima la posizione del calcio di punizione'); return; }
+      if (draft?.type === 'corner' && !draft.cornerSide) { toast('Seleziona prima il lato del calcio d’angolo'); return; }
       const ev = draftEvent(), txt = $('#fText').value.trim(); sh.close();
       const made = addEvent(ev, { post: true });
       if (txt && txt !== buildText(made, scoreAt(S.events.indexOf(made)))) { socialOf(made.id).text = txt; saveL(); }
