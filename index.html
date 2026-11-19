@@ -1777,11 +1777,11 @@ function seasonalStatsHtml() {
 
 function archiveHtml() {
   if (!db) return '<div class="empty"><h3>Archivio non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
+  const canDelete = CAN_EDIT && L.mode === 'regia';
   if (canDelete && regiaArchiveLoading) return '<div class="empty">Caricamento archivio partite…</div>';
   if (canDelete && !regiaArchiveLoaded) return `<div class="card"><h3>Archivio non caricato</h3><p class="small muted">${esc(regiaArchiveError || 'Controlla la connessione e riprova.')}</p><button class="btn" data-a="reloadArchive">Riprova</button></div>`;
   if (!canDelete && archiveLoading) return '<div class="empty">Caricamento archivio partite…</div>';
   if (!canDelete && !archiveLoaded) return `<div class="card"><h3>Archivio non caricato</h3><p class="small muted">${esc(archiveError || 'Controlla la connessione e riprova.')}</p><button class="btn" data-a="reloadArchive">Riprova</button></div>`;
-  const canDelete = CAN_EDIT && L.mode === 'regia';
   const rows = canDelete ? regiaArchiveRows : archiveRows;
   const intro = canDelete ? '<div class="card"><h2>Gestione archivio</h2><p class="small muted">Da questa scheda puoi consultare ed eliminare le gare archiviate. L’eliminazione è definitiva e richiede conferma.</p></div>' : '';
   if (!rows.length) return intro + '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
