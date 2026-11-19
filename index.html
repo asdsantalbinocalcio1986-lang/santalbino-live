@@ -9,8 +9,8 @@
 <meta property="og:title" content="SANTA Live">
 <meta property="og:description" content="Risultati, formazioni e cronaca delle partite in diretta.">
 <meta property="og:url" content="https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/">
-<meta property="og:image" content="https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/hydra-goal.svg">
-<meta property="og:image:alt" content="Idra gialloverde dell'ASD Sant'Albino Terme">
+<meta property="og:image" content="https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/assets/icon-512.png">
+<meta property="og:image:alt" content="Icona SANTA Live dell'ASD Sant'Albino Terme">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SANTA Live">
 <meta name="twitter:description" content="Risultati, formazioni e cronaca delle partite in diretta.">
@@ -4222,7 +4222,7 @@ async function ensureTesseract() {
   if (!tesseractLoader) {
     tesseractLoader = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
       script.async = true;
       script.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Motore OCR non disponibile.'));
       script.onerror = () => reject(new Error('Impossibile caricare il motore OCR. Controlla la connessione e riprova.'));
