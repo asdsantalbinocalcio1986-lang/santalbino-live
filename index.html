@@ -1797,11 +1797,11 @@ function archiveHtml() {
     const match = state.match || {}, rosters = state.rosters || {};
     const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
     const eventHtml = events.map(ev => {
-      const label = typeLabels[ev.type] || 'Evento';
+      const label = ev.type === 'foul' && ev.kind === 'rigore' ? 'Fallo da rigore' : (typeLabels[ev.type] || 'Evento');
       const side = ev.team === 'home' ? row.home_team : ev.team === 'away' ? row.away_team : '';
       const own = ev.type === 'goal' && ev.kind === 'autogol' ? ' · autogol' : '';
       const person = ev.player ? ' · ' + esc(ev.player) : '';
-      const detail = ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
+      const detail = ev.type === 'foul' ? (ev.kind === 'rigore' ? 'Calcio di rigore assegnato' : 'Non da rigore') : ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
       return `<div class="ev"><div class="m">${esc(ev.min || '–')}${ev.min ? '′' : ''}</div><div><div class="t"><b>${esc(label)}${own}</b>${person}</div><div class="small muted">${esc(side)}${detail ? ' · ' + detail : ''}</div></div></div>`;
     }).join('');
     const lineupHtml = ['home','away'].map(side => {
