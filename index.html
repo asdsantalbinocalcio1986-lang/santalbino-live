@@ -2541,7 +2541,7 @@ async function renderMatchGraphic(ev) {
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
   const ownGoal=ev.type==='goal' && scoringSide(ev)===S.match.ourSide;
-  const titleMap={foul:ev.kind==='rigore'?'FALLO DA RIGORE':'FALLO',kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:ev.kind==='complicata'?'GRANDE PARATA':'PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const titleMap={foul:ev.kind==='rigore'?'FALLO DA RIGORE':'FALLO',kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:ev.kind==='facile'?'PARATA':'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   if(ev.graphicTitle)titleMap[ev.type]=ev.graphicTitle.toUpperCase();
   const accent=({foul:'#ffad62',goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
