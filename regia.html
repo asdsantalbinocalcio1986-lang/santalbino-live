@@ -3801,7 +3801,8 @@ function renderSheet() {
     case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra'); break;
     case 'note': fields = `<label class="f"><span>Testo</span><textarea data-d="note" rows="3" placeholder="Es. Recupero di 3 minuti">${esc(d.note)}</textarea></label>`; break;
   }
-  const teamSeg = d.type === 'note' ? '' : `<div class="seg" role="group" aria-label="Squadra">${['home', 'away'].map(s => `<button type="button" data-team="${s}" aria-pressed="${d.team === s}">${esc(teamName(s))}</button>`).join('')}</div>`;
+  const teamHint = d.type === 'freekick' ? '<p class="small muted">Seleziona la squadra che ha subito il fallo.</p>' : d.type === 'corner' ? '<p class="small muted">Seleziona la squadra che ha guadagnato il calcio d’angolo.</p>' : '';
+  const teamSeg = d.type === 'note' ? '' : teamHint + `<div class="seg" role="group" aria-label="Squadra">${['home', 'away'].map(s => `<button type="button" data-team="${s}" aria-pressed="${d.team === s}">${esc(teamName(s))}</button>`).join('')}</div>`;
   const imgBox = CARD_TYPES.includes(d.type) ? `<div class="f"><span>Immagine per questo evento (facoltativa)</span>${d.img ? `<img class="thumb" style="max-height:110px" src="${d.img}" alt="Immagine scelta">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${d.img ? 'Cambia immagine' : 'Scegli immagine'}<input type="file" accept="image/*" data-evimg-one hidden></label>${d.img ? '<button type="button" class="btn sm danger" data-evimg-one-rm>Togli</button>' : ''}</div>
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
@@ -4131,7 +4132,7 @@ function wireSheet() {
   sh.addEventListener('click', e => {
     if (e.target.matches('[data-evimg-one-rm]')) { draft.img = ''; draft.raw = false; renderSheet(); return; }
     if (e.target.id === 'sheetClose') { sh.close(); return; }
-    const tb = e.target.closest('[data-team]'); if (tb) { draft.team = tb.dataset.team; draft.player = draft.assist = draft.out = draft.inn = ''; renderSheet(); return; }
+    const tb = e.target.closest('[data-team]'); if (tb) { draft.team = tb.dataset.team; draft.player = draft.assist = draft.out = draft.inn = ''; draft.freeKickZone = ''; draft.cornerSide = ''; renderSheet(); return; }
     const fkZone = e.target.closest('[data-free-kick-zone]'); if (fkZone && draft?.type === 'freekick') { draft.freeKickZone = fkZone.dataset.freeKickZone || ''; textManual = false; renderSheet(); return; }
     const cornerSide = e.target.closest('[data-corner-side]'); if (cornerSide && draft?.type === 'corner') { draft.cornerSide = cornerSide.dataset.cornerSide || ''; textManual = false; renderSheet(); return; }
     const shotZone = e.target.closest('[data-shot-zone]'); if (shotZone && draft?.type === 'shot') { draft.shotZone = shotZone.dataset.shotZone || 'fuori'; draft.kind = draft.shotZone === 'fuori' ? 'fuori' : 'in_porta'; textManual = false; renderSheet(); return; }
