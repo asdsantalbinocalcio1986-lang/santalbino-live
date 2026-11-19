@@ -1372,7 +1372,7 @@ let S = (() => {
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = 'cronaca-live-local-v2', DK = 'cronaca-live-draft-v2';
-const CARD_TYPES = ['goal', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
+const CARD_TYPES = ['goal', 'foul', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
 // Ogni apertura dell'app riparte dalla schermata iniziale, senza alterare gli altri dati locali.
@@ -1432,6 +1432,7 @@ function statusHtml() {
 
 /* ================= icone ================= */
 const IC = {
+  foul: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11l5 4-5 4H4z"/><path d="M8 15v5m-3 0h6M4 4v3"/></svg>',
   shot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="13" r="5.5"/><path d="m13.2 9.7 2.3 1.1 2.4-1.1m-4.7 4.4 2.3-1.1 2.4 1.1m-4.7 3.3 2.3-2.2 2.4 2.2M2 8l5-2M3 12h6M2 16l5 2"/></svg>',
   crossbar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V5h18v15M3 9h18M7 9v11m10-11v11"/><circle cx="12" cy="5" r="2.4" fill="currentColor" stroke="none"/><path d="m9.5 2.5 2.5-1 2.5 1"/></svg>',
   corner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V3m0 2h15l-4 4 4 4H4"/><path d="M4 16a5 5 0 0 0 5 5"/></svg>',
@@ -1448,7 +1449,7 @@ const IC = {
   mvp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2.5 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.1l6.3-.9z"/><path d="M8 20.5v2h8v-2"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><path d="M12 6.5V12l3.8 2.2"/></svg>'
 };
-const COL = { offside: 'var(--c-note)', shot: 'var(--c-miss)', crossbar: 'var(--c-miss)', corner: 'var(--c-note)', freekick: 'var(--c-note)', mvp: 'var(--c-mvp)', goal: 'var(--c-goal)', yellow: 'var(--c-yellow)', red: 'var(--c-red)', sub: 'var(--c-sub)', injury: 'var(--c-injury)', save: 'var(--c-save)', miss: 'var(--c-miss)', note: 'var(--c-note)' };
+const COL = { foul: 'var(--c-injury)', offside: 'var(--c-note)', shot: 'var(--c-miss)', crossbar: 'var(--c-miss)', corner: 'var(--c-note)', freekick: 'var(--c-note)', mvp: 'var(--c-mvp)', goal: 'var(--c-goal)', yellow: 'var(--c-yellow)', red: 'var(--c-red)', sub: 'var(--c-sub)', injury: 'var(--c-injury)', save: 'var(--c-save)', miss: 'var(--c-miss)', note: 'var(--c-note)' };
 const PHASE_EV = { kickoff: "Fischio d'inizio", halftime: 'Fine primo tempo', secondhalf: 'Inizio secondo tempo', fulltime: 'Fine partita' };
 
 /* ================= testi ================= */
@@ -1460,6 +1461,7 @@ function describe(e, sc) {
       const bits = [t, how, e.assist ? `assist <b>${esc(e.assist)}</b>` : ''].filter(Boolean);
       return { title: e.kind === 'autogol' ? 'Autogol' : 'Gol!', main: p || 'Gol', sub: bits.map((b, i) => i ? b : esc(b)).join(' · ') + ` · <b>${sc[0]}-${sc[1]}</b>` };
     }
+    case 'foul': return { title: e.kind === 'rigore' ? 'Fallo da rigore' : 'Fallo', main: p || t, sub: e.kind === 'rigore' ? esc(t) + ' · calcio di rigore assegnato' : esc(t) + ' · non è rigore' };
     case 'yellow': return { title: 'Cartellino giallo', main: p || t, sub: esc(t) };
     case 'red': return { title: e.kind === 'doppio' ? 'Doppio giallo' : 'Espulsione', main: p || t, sub: esc(t) + ' · in dieci' };
     case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}`, subRaw: true };
@@ -1488,6 +1490,7 @@ function buildText(ev, sc) {
         : (p ? `Segna ${p} (${t})${how}${ev.assist ? `, assist di ${ev.assist}` : ''}.` : `Gol del ${t}${how}.`);
       x = `⚽ ${m}${head}\n${line}\n${d}`; break;
     }
+    case 'foul': x = `⚠️ ${m}${ev.kind === 'rigore' ? 'FALLO DA RIGORE' : 'FALLO'}\n${p ? p + ' (' + t + ')' : t}${ev.kind === 'rigore' ? '\nCalcio di rigore assegnato.' : '\nFallo non da rigore.'}`; break;
     case 'yellow': x = `🟨 ${m}CARTELLINO GIALLO\n${p ? p + ' (' + t + ')' : t}`; break;
     case 'red': x = `🟥 ${m}ESPULSIONE\n${ev.kind === 'doppio' ? 'Doppio giallo' : 'Rosso diretto'}${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
     case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
@@ -1788,17 +1791,17 @@ function archiveHtml() {
   const rows = canDelete ? regiaArchiveRows : archiveRows;
   const intro = canDelete ? '<div class="card"><h2>Gestione archivio</h2><p class="small muted">Da questa scheda puoi consultare ed eliminare le gare archiviate. L’eliminazione è definitiva e richiede conferma.</p></div>' : '';
   if (!rows.length) return intro + '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
-  const typeLabels = { kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
+  const typeLabels = { foul:'Fallo', kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
   return intro + rows.map(row => {
     const state = row.state || {}, events = Array.isArray(state.events) ? state.events : [];
     const match = state.match || {}, rosters = state.rosters || {};
     const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
     const eventHtml = events.map(ev => {
-      const label = typeLabels[ev.type] || 'Evento';
+      const label = ev.type === 'foul' && ev.kind === 'rigore' ? 'Fallo da rigore' : (typeLabels[ev.type] || 'Evento');
       const side = ev.team === 'home' ? row.home_team : ev.team === 'away' ? row.away_team : '';
       const own = ev.type === 'goal' && ev.kind === 'autogol' ? ' · autogol' : '';
       const person = ev.player ? ' · ' + esc(ev.player) : '';
-      const detail = ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
+      const detail = ev.type === 'foul' ? (ev.kind === 'rigore' ? 'Calcio di rigore assegnato' : 'Non da rigore') : ev.type === 'sub' ? [ev.out, ev.inn].filter(Boolean).map(esc).join(' → ') : (ev.note ? esc(ev.note) : '');
       return `<div class="ev"><div class="m">${esc(ev.min || '–')}${ev.min ? '′' : ''}</div><div><div class="t"><b>${esc(label)}${own}</b>${person}</div><div class="small muted">${esc(side)}${detail ? ' · ' + detail : ''}</div></div></div>`;
     }).join('');
     const lineupHtml = ['home','away'].map(side => {
@@ -2538,9 +2541,9 @@ async function renderMatchGraphic(ev) {
   const score=ev.type==='kickoff'?[0,0]:(idx>=0?scoreAt(idx):scoreOf(S.events));
   const goals=prior.filter(e=>e.type==='goal');
   const ownGoal=ev.type==='goal' && scoringSide(ev)===S.match.ourSide;
-  const titleMap={kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
+  const titleMap={foul:ev.kind==='rigore'?'FALLO DA RIGORE':'FALLO',kickoff:'KICK OFF',halftime:'HALF TIME',secondhalf:'SECOND HALF',fulltime:'FULL TIME',goal:ev.kind==='autogol'?'AUTOGOL':'GOOOOAL',yellow:'AMMONIZIONE',red:ev.kind==='doppio'?'DOPPIA AMMONIZIONE':'ESPULSIONE',injury:'INFORTUNIO',sub:'SOSTITUZIONE',mvp:'PLAYER OF THE MATCH',save:'GRANDE PARATA',miss:'OCCASIONE',note:'AGGIORNAMENTO'};
   if(ev.graphicTitle)titleMap[ev.type]=ev.graphicTitle.toUpperCase();
-  const accent=({goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
+  const accent=({foul:'#ffad62',goal:'#b7f36b',yellow:'#ffd34e',red:'#ff625e',injury:'#ffad62',sub:'#72c5ff',mvp:'#ffe078',halftime:'#ffd34e'})[ev.type]||'#b7f36b';
   // Due metà verticali, colorate in base al colore prevalente dei rispettivi loghi.
   // Trama fibra di carbonio su tutta la superficie.
   const weave=document.createElement('canvas');weave.width=weave.height=64;const wx=weave.getContext('2d');wx.fillStyle='rgba(0,0,0,.24)';wx.fillRect(0,0,64,64);
@@ -2700,6 +2703,7 @@ async function renderMatchGraphic(ev) {
     const minute=ev.type==='mvp'?'MVP':(ev.min?String(ev.min)+"′":'LIVE');
     const player=ev.type==='sub'?'':(ev.player||'');
     let detail=teamName(ev.team||S.match.ourSide);
+    if(ev.type==='foul')detail+=ev.kind==='rigore'?'  •  RIGORE ASSEGNATO':'  •  NON DA RIGORE';
     if(ev.type==='goal')detail+=({rigore:'  •  RIGORE',punizione:'  •  PUNIZIONE',testa:'  •  DI TESTA',autogol:'  •  AUTOGOL'}[ev.kind]||'')+(ev.assist?'  •  ASSIST '+ev.assist:'');
     else if(ev.type==='sub')detail='ENTRA  '+(ev.inn||'—')+'   •   ESCE  '+(ev.out||'—')+'   •   '+detail;
     else if(ev.type==='mvp'&&ev.votes)detail+='  •  '+ev.votes+' VOTI';
@@ -3481,7 +3485,7 @@ function publicHtml() {
 }
 
 /* ================= regia ================= */
-const QUICK = [['goal', 'Gol'], ['yellow', 'Giallo'], ['red', 'Rosso'], ['sub', 'Cambio'], ['save', 'Parata'], ['miss', 'Occasione'], ['shot', 'Tiro'], ['crossbar', 'Traversa'], ['corner', 'Calcio d’angolo'], ['freekick', 'Calcio di punizione'], ['offside', 'Fuorigioco'], ['injury', 'Infortunio'], ['note', 'Nota']];
+const QUICK = [['goal', 'Gol'], ['foul', 'Fallo'], ['yellow', 'Giallo'], ['red', 'Rosso'], ['sub', 'Cambio'], ['save', 'Parata'], ['miss', 'Occasione'], ['shot', 'Tiro'], ['crossbar', 'Traversa'], ['corner', 'Calcio d’angolo'], ['freekick', 'Calcio di punizione'], ['offside', 'Fuorigioco'], ['injury', 'Infortunio'], ['note', 'Nota']];
 function feedHtml(list) {
   if (!list.length) return '<div class="empty">Nessun evento. Premi “Fischio d’inizio” o aggiungi un evento.</div>';
   return list.map(e => {
@@ -3592,7 +3596,7 @@ function graphicEditorHtml() {
   const cfg=graphicEditorConfig(),key=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'global';
   const v=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{});
   const options=[['global','Stile globale'],['event','Template eventi'],['phase','Kick off / intervallo / fine'],['matchday','Match Day'],['convocati','Convocati'],['formation','Formazioni']];
-  const eventTypes=[['goal','Gol'],['yellow','Ammonizione'],['red','Espulsione'],['injury','Infortunio'],['sub','Sostituzione'],['mvp','MVP'],['save','Parata'],['shot','Tiro'],['crossbar','Traversa'],['corner','Calcio d’angolo'],['freekick','Calcio di punizione'],['miss','Occasione'],['note','Aggiornamento'],['kickoff','Calcio d’inizio'],['halftime','Fine primo tempo'],['secondhalf','Inizio secondo tempo'],['fulltime','Fine partita']];
+  const eventTypes=[['goal','Gol'],['foul','Fallo'],['yellow','Ammonizione'],['red','Espulsione'],['injury','Infortunio'],['sub','Sostituzione'],['mvp','MVP'],['save','Parata'],['shot','Tiro'],['crossbar','Traversa'],['corner','Calcio d’angolo'],['freekick','Calcio di punizione'],['miss','Occasione'],['note','Aggiornamento'],['kickoff','Calcio d’inizio'],['halftime','Fine primo tempo'],['secondhalf','Inizio secondo tempo'],['fulltime','Fine partita']];
   const eventType=eventTypes.some(([t])=>t===L.editorEventTemplate)?L.editorEventTemplate:'goal';
   return `<div class="row2 stack" style="margin-bottom:10px"><button class="btn" data-a="editorBack">← Torna alla regia</button><span class="small muted" style="align-self:center">Editor grafico</span></div><div class="card"><h2>Personalizza la grafica</h2>
     <p class="small muted" style="margin-top:0">Scegli un modello, guarda l’anteprima e seleziona direttamente ciò che vuoi spostare o modificare. Le modifiche valgono per quel modello.</p>
@@ -3622,8 +3626,8 @@ async function renderEditorCanvas(layout) {
     const ev=S.events.find(e=>['kickoff','halftime','fulltime'].includes(e.type))||{id:'editor-preview-phase',type:'kickoff',minute:''};
     return renderPhaseCard(ev);
   }
-  const type=['goal','yellow','red','injury','sub','mvp','save','shot','crossbar','corner','freekick','miss','note','kickoff','halftime','secondhalf','fulltime'].includes(L.editorEventTemplate)?L.editorEventTemplate:'goal';
-  const sample={id:'__template_preview__',type,team:'home',min:'67',player:'Mario Rossi',assist:'Luca Bianchi',inn:'Paolo Verdi',out:'Andrea Neri',kind:'',note:'Esempio di testo',votes:8};
+  const type=['goal','foul','yellow','red','injury','sub','mvp','save','shot','crossbar','corner','freekick','miss','note','kickoff','halftime','secondhalf','fulltime'].includes(L.editorEventTemplate)?L.editorEventTemplate:'goal';
+  const sample={id:'__template_preview__',type,team:'home',min:'67',player:'Mario Rossi',assist:'Luca Bianchi',inn:'Paolo Verdi',out:'Andrea Neri',kind:type==='foul'?'rigore':'',note:'Esempio di testo',votes:8};
   return renderMatchGraphic(sample);
 }
 async function openGraphicEditorPreview() {
@@ -3723,7 +3727,7 @@ function settingsHtml() {
     ${['home', 'away'].map(s => `<div class="f"><span>Logo ${esc(teamName(s))}</span>${S.logos[s] ? `<img class="thumb" style="max-height:90px;background:#fff;padding:4px" src="${S.logos[s]}" alt="Logo">` : ''}
       <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${S.logos[s] ? 'Cambia logo' : 'Carica logo'}<input type="file" accept="image/*" data-logo="${s}" hidden></label>${S.logos[s] ? `<button class="btn sm danger" data-a="rmlogo" data-s="${s}">Togli logo</button>` : ''}</div></div>`).join('')}</div>
   <div class="card"><h2>Immagini degli eventi</h2><p class="small muted" style="margin-top:0">Una tua immagine per ogni tipo di evento: diventa lo sfondo della grafica, con logo della squadra e minuto sopra. “Solo immagine” la usa così com’è. Sono archiviate online e condivise con tutti i dispositivi.</p>
-    ${[['goal', 'Gol'], ['yellow', 'Cartellino giallo'], ['red', 'Cartellino rosso'], ['injury', 'Infortunio'], ['sub', 'Cambio']].map(([k, l]) => `<div class="f"><span>${l}</span>${L.evImg[k] ? `<img class="thumb" style="max-height:100px" src="${L.evImg[k]}" alt="Immagine ${l}">` : ''}
+    ${[['goal', 'Gol'], ['foul', 'Fallo'], ['yellow', 'Cartellino giallo'], ['red', 'Cartellino rosso'], ['injury', 'Infortunio'], ['sub', 'Cambio']].map(([k, l]) => `<div class="f"><span>${l}</span>${L.evImg[k] ? `<img class="thumb" style="max-height:100px" src="${L.evImg[k]}" alt="Immagine ${l}">` : ''}
       <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${L.evImg[k] ? 'Cambia immagine' : 'Carica immagine'}<input type="file" accept="image/*" data-evimg="${k}" hidden></label>${L.evImg[k] ? `<button class="btn sm danger" data-a="rmevimg" data-k="${k}">Togli</button>` : ''}</div>
       ${L.evImg[k] ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-evraw="${k}" ${L.evImgRaw[k] ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>`).join('')}</div>
   <div class="card"><h2>Facebook</h2>${I('s-fb', 'Link o nome della pagina Facebook', L.fbUrl, 'https://www.facebook.com/nomepagina')}
@@ -3739,7 +3743,7 @@ let armedNew = false;
 let draft = null, textManual = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function openSheet(type) {
-  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : '', player: '', assist: '', out: '', inn: '', note: '', min: '' };
+  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : '', player: '', assist: '', out: '', inn: '', note: '', min: '' };
   textManual = false; renderSheet(); $('#sheet').showModal();
 }
 function draftEvent() {
@@ -3753,7 +3757,8 @@ function renderSheet() {
   const SEL = (k, label, opts) => `<label class="f"><span>${label}</span><select data-d="${k}">${opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${d[k] === v ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select></label>`;
   let fields = '';
   switch (d.type) {
-    case 'goal': fields = P('player', d.kind === 'autogol' ? 'Chi ha segnato (autogol)' : 'Marcatore') + (d.kind === 'autogol' ? '' : P('assist', 'Assist (facoltativo)')) + SEL('kind', 'Tipo di gol', [['azione', 'Azione'], ['rigore', 'Rigore'], ['punizione', 'Punizione'], ['testa', 'Di testa'], ['autogol', 'Autogol']]); break;
+    case 'foul': fields = P('player', 'Giocatore coinvolto (facoltativo)') + SEL('kind', 'Il fallo è da rigore?', [['normal', 'No, non è rigore'], ['rigore', 'Sì, è rigore']]); break;
+     case 'goal': fields = P('player', d.kind === 'autogol' ? 'Chi ha segnato (autogol)' : 'Marcatore') + (d.kind === 'autogol' ? '' : P('assist', 'Assist (facoltativo)')) + SEL('kind', 'Tipo di gol', [['azione', 'Azione'], ['rigore', 'Rigore'], ['punizione', 'Punizione'], ['testa', 'Di testa'], ['autogol', 'Autogol']]); break;
     case 'yellow': case 'injury': case 'save': fields = P('player', d.type === 'save' ? 'Portiere' : 'Giocatore'); break;
     case 'shot': case 'crossbar': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'freekick': fields = P('player', 'Battitore (facoltativo)'); break;
@@ -3767,7 +3772,7 @@ function renderSheet() {
   const imgBox = CARD_TYPES.includes(d.type) ? `<div class="f"><span>Immagine per questo evento (facoltativa)</span>${d.img ? `<img class="thumb" style="max-height:110px" src="${d.img}" alt="Immagine scelta">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${d.img ? 'Cambia immagine' : 'Scegli immagine'}<input type="file" accept="image/*" data-evimg-one hidden></label>${d.img ? '<button type="button" class="btn sm danger" data-evimg-one-rm>Togli</button>' : ''}</div>
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
-  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${esc(({ goal: 'Gol', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
+  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
     <label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>
     <button type="button" class="btn primary block" data-sub="go">Registra evento</button></form>`;
