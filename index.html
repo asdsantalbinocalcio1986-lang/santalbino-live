@@ -2233,6 +2233,7 @@ function setEvOne(id, img, raw) {
 }
 function addEvent(ev, opts = {}) {
   ev.id = uid(); ev.ts = Date.now();
+  if (ev.type === 'save') { const pendingShot = [...S.events].reverse().find(x => x.type === 'shot' && x.team === other(ev.team) && x.kind === 'in_porta' && !S.events.some(y => y.type === 'save' && y.relatedShotId === x.id)); if (pendingShot) ev.relatedShotId = pendingShot.id; }
   if (!S.match.pollId) S.match.pollId = uid();
   if (ev._img) setEvOne(ev.id, ev._img, ev._raw); delete ev._img; delete ev._raw;
   if (!S.match.date) S.match.date = new Date().toISOString().slice(0, 10);
@@ -3188,8 +3189,9 @@ function timelineHtml() {
 function statsHtml() {
   const cnt = (t, s) => S.events.filter(e => e.type === t && e.team === s).length;
   const goals = s => S.events.filter(e => e.type === 'goal' && scoringSide(e) === s).length;
-  const shots = s => goals(s) + cnt('save', other(s)) + cnt('miss', s) + cnt('shot', s) + cnt('crossbar', s);
-  const shotsOnTarget = s => goals(s) + cnt('save', other(s)) + S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'in_porta').length;
+  const unpairedSaves = s => S.events.filter(e => e.type === 'save' && e.team === other(s) && !S.events.some(x => x.type === 'shot' && x.id === e.relatedShotId)).length;
+  const shots = s => goals(s) + unpairedSaves(s) + cnt('miss', s) + cnt('shot', s) + cnt('crossbar', s);
+  const shotsOnTarget = s => goals(s) + unpairedSaves(s) + S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'in_porta').length;
   const shotsOut = s => S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'fuori').length;
   const greatSaves = s => S.events.filter(e => e.type === 'save' && e.team === s && e.kind === 'complicata').length;
   const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
