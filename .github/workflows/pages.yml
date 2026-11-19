@@ -13,7 +13,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Keep pull-request validation separate from production Pages deployment.
+  # A PR check must never cancel an in-progress deployment on main.
+  group: pages-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'deployment' }}
   cancel-in-progress: true
 
 jobs:
