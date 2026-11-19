@@ -3191,7 +3191,10 @@ function statsHtml() {
   const goals = s => S.events.filter(e => e.type === 'goal' && scoringSide(e) === s).length;
   const unpairedSaves = s => S.events.filter(e => e.type === 'save' && e.team === other(s) && !S.events.some(x => x.type === 'shot' && x.id === e.relatedShotId)).length;
   const shots = s => goals(s) + unpairedSaves(s) + cnt('miss', s) + cnt('shot', s) + cnt('crossbar', s);
-  const shotsOnTarget = s => goals(s) + unpairedSaves(s) + S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'in_porta').length;
+  const savesAgainst = s => S.events.filter(e => e.type === 'save' && e.team === other(s)).length;
+  const savedShotIds = new Set(S.events.filter(e => e.type === 'save' && e.relatedShotId).map(e => e.relatedShotId));
+  const unSavedOnTargetShots = s => S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'in_porta' && !savedShotIds.has(e.id)).length;
+  const shotsOnTarget = s => goals(s) + savesAgainst(s) + unSavedOnTargetShots(s);
   const shotsOut = s => S.events.filter(e => e.type === 'shot' && e.team === s && e.kind === 'fuori').length;
   const greatSaves = s => S.events.filter(e => e.type === 'save' && e.team === s && e.kind === 'complicata').length;
   const rows = [['Gol', goals('home'), goals('away')], ['Occasioni', cnt('miss', 'home') + goals('home'), cnt('miss', 'away') + goals('away')], ['Tiri', shots('home'), shots('away')], ['Tiri in porta', shotsOnTarget('home'), shotsOnTarget('away')], ['Tiri fuori', shotsOut('home'), shotsOut('away')], ['Parate', cnt('save', 'home'), cnt('save', 'away')], ['Grandi parate', greatSaves('home'), greatSaves('away')], ['Calci d’angolo', cnt('corner', 'home'), cnt('corner', 'away')], ['Gialli', cnt('yellow', 'home'), cnt('yellow', 'away')], ['Rossi', cnt('red', 'home'), cnt('red', 'away')], ['Sostituzioni', cnt('sub', 'home'), cnt('sub', 'away')]];
