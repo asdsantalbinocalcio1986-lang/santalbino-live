@@ -2013,6 +2013,25 @@ async function uploadSharedImage(file, folder, max = 1080, type = 'image/jpeg', 
   return data.publicUrl;
 }
 
+async function importOfficialSponsorsToTest() {
+  if (!TEST_MODE || !db) return 0;
+  const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
+  if (error) {
+    console.warn('Libreria sponsor ufficiale non leggibile in modalità prova:', error.message);
+    return 0;
+  }
+  const officialSponsors = data?.state?.media?.library?.sponsors;
+  if (!Array.isArray(officialSponsors) || !officialSponsors.length) {
+    console.warn('La libreria sponsor ufficiale non contiene loghi.');
+    return 0;
+  }
+  S.media = S.media || {};
+  S.media.library = Object.assign({goal:'',formation:'',sponsors:[]}, S.media.library || {});
+  const testSponsors = Array.isArray(S.media.library.sponsors) ? S.media.library.sponsors : [];
+  if (!testSponsors.length) S.media.library.sponsors = officialSponsors.slice();
+  return S.media.library.sponsors.length;
+}
+
 async function initCaps() {
   LOCAL_ONLY = !configured || !window.supabase;
   if (LOCAL_ONLY) { CAN_EDIT = false; setSync('error', 'backend non configurato'); return; }
@@ -2048,18 +2067,9 @@ async function initCaps() {
     L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
     L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
   } else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
-  // In modalità prova importa SOLO i riferimenti ai loghi sponsor dalla libreria ufficiale,
-  // senza modificare live_state: la simulazione mantiene il proprio stato separato.
-  if (TEST_MODE) {
-    const { data: officialData, error: officialError } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
-    if (!officialError && officialData?.state) {
-      const officialSponsors = officialData.state.media?.library?.sponsors;
-      S.media = S.media || {};
-      S.media.library = Object.assign({goal:'',formation:'',sponsors:[]}, S.media.library || {});
-      const testSponsors = Array.isArray(S.media.library.sponsors) ? S.media.library.sponsors : [];
-      if (!testSponsors.length && Array.isArray(officialSponsors)) S.media.library.sponsors = officialSponsors.slice();
-    }
-  }
+  // In modalità prova importa SOLO i riferimenti ai loghi sponsor dalla libreria ufficiale.
+  // La funzione viene riutilizzata anche dopo "Azzera prova", che ricrea uno stato vuoto.
+  if (TEST_MODE) await importOfficialSponsorsToTest();
   dbReady = true;
   if (!TEST_MODE && !(CAN_EDIT && L.mode === 'regia') && ['archive','season','scorers','archiveForms'].includes(L.tab)) await loadMatchArchive(true);
   if (!TEST_MODE && CAN_EDIT && L.mode === 'regia' && L.rtab === 'archive') await loadRegiaArchivePage(0);
@@ -4038,7 +4048,7 @@ document.addEventListener('click', async e => {
     case 'exportbackup': downloadStateBackup(); break;
     case 'reloadremote': await discardDraftAndReloadRemote(); break;
     case 'startTest': if (!CAN_EDIT) { toast('Accedi alla regia per avviare una simulazione'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della partita ufficiale'); break; } if (confirm('Aprire una partita di prova separata? La cronaca ufficiale resterà intatta.')) window.location.href = './regia.html?test=1'; break;
-     case 'resetTest': if (!TEST_MODE || !CAN_EDIT) { toast('Azione disponibile solo nella regia di prova'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della simulazione'); break; } if (confirm('Vuoi azzerare soltanto la partita di prova? I dati ufficiali non verranno modificati.')) { S = mergeState(testDefaults()); S.rev = remoteRev; L.evOne = {}; L.evImg = {}; L.evImgRaw = {}; L.social = {}; currentArchived = false; saveL(); commit(true); renderHero(); renderMain(); toast('Simulazione azzerata. Puoi iniziare una nuova prova.'); } break;
+     case 'resetTest': if (!TEST_MODE || !CAN_EDIT) { toast('Azione disponibile solo nella regia di prova'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della simulazione'); break; } if (confirm('Vuoi azzerare soltanto la partita di prova? I dati ufficiali resteranno intatti. I loghi sponsor saranno copiati in sola lettura.')) { S = mergeState(testDefaults()); await importOfficialSponsorsToTest(); S.rev = remoteRev; L.evOne = {}; L.evImg = {}; L.evImgRaw = {}; L.social = {}; currentArchived = false; saveL(); commit(true); renderHero(); renderMain(); toast('Simulazione azzerata: libreria sponsor importata senza modificare i dati ufficiali.'); } break;
      case 'startNewMatch': if (TEST_MODE) { if (!CAN_EDIT) { toast('Accedi alla regia per avviare una simulazione'); break; } if (syncState !== 'ok') { toast('Attendi la sincronizzazione'); break; } resetMatch(); toast('Nuova partita di prova pronta'); break; } if (!CAN_EDIT) { toast('Accedi alla regia per avviare una nuova partita'); break; } if (S.clock.phase !== 'ft' || !currentArchived) { toast('Prima salva la partita terminata nell’archivio'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione'); break; } resetMatch(); toast('Nuova partita avviata'); break;
     case 'newmatch': if (armedNew) { armedNew = false; if (await ensureArchivedBeforeReset()) resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
