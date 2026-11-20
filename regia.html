@@ -3870,7 +3870,7 @@ async function openPost(id) {
 /* ================= disegno pagina ================= */
 let ROOT;
 function topHtml() {
-  const brand = `<div class="brand"><img src="./santa-live-icon.svg?v=7" alt=""><b>SANTA Live</b><span>${esc(teamName(S.match.ourSide))}</span></div>`;
+  const brandHtml = `<div class="brand"><img src="./santa-live-icon.svg?v=7" alt=""><b>SANTA Live</b><span>${esc(teamName(S.match.ourSide))}</span></div>`;
   const testControls = TEST_MODE
     ? `<a class="pill" href="./index.html?test=1&amp;view=public" target="_blank" rel="noopener">Pagina pubblica prova</a><button class="pill" data-a="resetTest">Azzera prova</button><a class="pill" href="./regia.html">Esci dalla prova</a>`
     : `<button class="pill" data-a="startTest">Partita di prova</button>`;
@@ -3885,7 +3885,7 @@ function topHtml() {
       ? `<a class="pill mobile-primary" href="./home.html">Home</a><span class="pill mobile-primary">Solo visualizzazione</span>`
       : `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
-  return `${banner}<div class="top">${brand}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
+  return `${banner}<div class="top">${brandHtml}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
 let lastVote = 'none';
