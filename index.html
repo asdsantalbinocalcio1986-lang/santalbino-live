@@ -3895,6 +3895,7 @@ document.addEventListener('click', async e => {
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
+  if (TEST_MODE && ['sharewa','copyig','shareig','markdone'].includes(act)) { toast('Le azioni di pubblicazione social sono disattivate nella simulazione.'); return; }
   switch (act) {
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
