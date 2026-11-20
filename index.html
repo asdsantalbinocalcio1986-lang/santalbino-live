@@ -2339,31 +2339,25 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  const slots = {
-    event: {x: canvas.width-220, y: canvas.height-210, w: 170, h: 72},
-    phase: {x: canvas.width-220, y: canvas.height-195, w: 170, h: 72},
-    formation: {x: canvas.width-190, y: canvas.height-52, w: 165, h: 42},
-    matchday: {x: canvas.width-190, y: canvas.height-102, w: 160, h: 44},
-    convocati: {x: canvas.width-190, y: canvas.height-102, w: 160, h: 44}
-  };
-  const p = slots[layout] || slots.event, x = canvas.getContext('2d');
-  const style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
+  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:140,right:42,bottom:125},matchday:{w:470,h:140,right:42,bottom:125},convocati:{w:470,h:140,right:42,bottom:135}};
+  const slot=sizes[layout]||sizes.event,p={x:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
   const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
+  p.x=Math.max(8,Math.min(canvas.width-p.w-8,p.x));p.y=Math.max(8,Math.min(canvas.height-p.h-8,p.y));
   if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
   if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
   if(style.sponsor===false)return canvas;
-  if(!activeSponsorGraphicUrl){
-    const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];
-    if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];
-  }
+  if(!activeSponsorGraphicUrl){const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];}
   if(!activeSponsorGraphicUrl)return canvas;
   const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
-  x.save();
-  x.fillStyle='rgba(255,255,255,.96)';rrect(x,p.x,p.y,p.w,p.h,12);x.fill();
-  x.strokeStyle='rgba(10,35,23,.22)';x.lineWidth=1.5;rrect(x,p.x,p.y,p.w,p.h,12);x.stroke();
-  const pad=7,scale=Math.min((p.w-pad*2)/img.width,(p.h-pad*2)/img.height),w=img.width*scale,h=img.height*scale;
-  x.drawImage(img,p.x+(p.w-w)/2,p.y+(p.h-h)/2,w,h);x.restore();
+  x.save();x.shadowColor='rgba(0,0,0,.24)';x.shadowBlur=14;x.shadowOffsetY=4;
+  x.fillStyle='#fff';rrect(x,p.x,p.y,p.w,p.h,16);x.fill();x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
+  x.strokeStyle='rgba(10,35,23,.34)';x.lineWidth=2.5;rrect(x,p.x,p.y,p.w,p.h,16);x.stroke();
+  x.fillStyle='#17482a';x.textAlign='center';x.textBaseline='middle';x.font='900 '+Math.max(13,Math.round(p.h*.105))+'px Arial,sans-serif';
+  x.fillText('SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*.16);
+  const padX=p.w*.07,padTop=p.h*.29,padBottom=p.h*.08,scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);x.restore();
   return canvas;
 }
 
@@ -2855,8 +2849,8 @@ async function renderMatchGraphic(ev) {
 }
 async function renderCard(ev) { return renderMatchGraphic(ev); }
 async function renderPhaseCard(ev) { return renderMatchGraphic(ev); }
-const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .92)); };
-const cardUrl = async ev => (await renderCard(ev)).toDataURL('image/jpeg', .88);
+const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .97)); };
+const cardUrl = async ev => (await renderCard(ev)).toDataURL('image/jpeg', .97);
 
 
 function loadGraphicImage(src) {
@@ -3145,7 +3139,7 @@ async function openConvocatiGraphic() {
   dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open)dlg.showModal();
   try{
-    const canvas=await renderConvocatiGraphic(),url=canvas.toDataURL('image/jpeg',.93);
+    const canvas=await renderConvocatiGraphic(),url=canvas.toDataURL('image/jpeg',.97);
     if(!dlg.open)return;
     dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica elenco convocati"><button class="btn primary block" data-a="saveConvocatiGraphic">Salva immagine convocati</button>';
   }catch(err){
@@ -3170,6 +3164,22 @@ function resizeImage(file, max, type = 'image/jpeg', q = .82) {
     const img = new Image(), u = URL.createObjectURL(file);
     img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => res({ blob: b, url: c.toDataURL(type, q) }), type, q); };
     img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Immagine non leggibile')); }; img.src = u;
+  });
+}
+
+function resizeSponsorImage(file) {
+  return new Promise((resolve,reject)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=2400,k=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+      const w=Math.max(1,Math.round((img.naturalWidth||img.width)*k)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*k));
+      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      ctx.clearRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+      canvas.toBlob(blob=>blob?resolve({blob,url:canvas.toDataURL('image/png')}):reject(new Error('Elaborazione logo sponsor non riuscita')),'image/png');
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Logo sponsor non leggibile: carica un PNG, SVG o WebP di buona qualità.'));};
+    img.src=url;
   });
 }
 
@@ -3533,11 +3543,25 @@ function validExternalUrl(value) {
   try { const u = new URL(String(value || '').trim()); return ['https:', 'http:'].includes(u.protocol) ? u.href : ''; } catch (e) { return ''; }
 }
 
+function convocatiPublicHtml() {
+  const players=parseRoster(S.convocati);
+  if(!players.length)return '<div class="empty"><h3>Convocati non ancora pubblicati</h3>La lista comparirà qui quando sarà salvata dalla regia.</div>';
+  const side=S.match.ourSide||'home',meta=[matchDateTime(),S.match.comp,S.match.venue].filter(Boolean);
+  return `<section class="lu">
+    <div class="lu-h">${badge(side)}<div><span class="lu-kicker">LISTA UFFICIALE</span><h3>${esc(teamName(side))}</h3></div><span class="chip">${players.length} convocati</span></div>
+    ${meta.length?`<div class="small muted" style="padding:10px 14px">${meta.map(esc).join(' · ')}</div>`:''}
+    <div class="lu-section"><div class="pl-grid starters">${players.map(p=>`<div class="pl"><b>${esc(p.num||'•')}</b><span>${esc(p.name)}</span></div>`).join('')}</div></div>
+    <p class="small muted" style="padding:8px 14px;margin:0">Forza Sant’Albino! 💚💛</p>
+  </section>`;
+}
 function publicHtml() {
-  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni'], ['stat', 'Statistiche'], ['season', 'Stagione'], ['scorers', 'Marcatori'], ['archive', 'Archivio'], ['archiveForms', 'Storico']]; if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni']];
+  if(parseRoster(S.convocati).length)tabs.push(['convocati','Convocati']);
+  tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
+  if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -3670,10 +3694,9 @@ function graphicEditorHtml() {
     <p class="small muted">Le modifiche al testo e alla posizione vengono salvate nel template della tipologia selezionata e non nel singolo evento.</p></div>`;
 }
 function editorSponsorSlot(layout,w,h) {
-  const slots={event:{x:w-220,y:h-210,w:170,h:72},phase:{x:w-220,y:h-195,w:170,h:72},formation:{x:w-190,y:h-52,w:165,h:42},matchday:{x:w-190,y:h-102,w:160,h:44},convocati:{x:w-190,y:h-102,w:160,h:44}};
-  return slots[layout]||slots.event;
-}
-async function renderEditorCanvas(layout) {
+  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:140,right:42,bottom:125},matchday:{w:470,h:140,right:42,bottom:125},convocati:{w:470,h:140,right:42,bottom:135}};
+  const s=sizes[layout]||sizes.event;return{x:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
+}async function renderEditorCanvas(layout) {
   if(layout==='matchday')return renderMatchDayGraphic();
   if(layout==='convocati')return renderConvocatiGraphic();
   if(layout==='formation')return renderFormationGraphic();
@@ -3937,8 +3960,8 @@ document.addEventListener('click', async e => {
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
     case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); const url=S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
-    case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.94); break; }
-    case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.94); break; }
+    case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.97); break; }
+    case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.97); break; }
     case 'saveLineupGraphic': { const side = a.dataset.s || 'both'; const cv = await renderFormationGraphic(side); cv.toBlob(blob => { if (blob) saveBlob(blob, side === 'both' ? 'formazioni-entrambe-le-squadre.jpg' : 'formazione-' + side + '.jpg'); }, 'image/jpeg', .92); break; }
     case 'graphicclose': $('#graphicDlg').close(); break;
     case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
@@ -4112,7 +4135,7 @@ document.addEventListener('change', async e => {
         const files = Array.from(t.files).filter(file => file.type.startsWith('image/'));
         for (let i=0;i<files.length;i++) {
           toast('Caricamento sponsor '+(i+1)+' di '+files.length+'…');
-          const url = await uploadSharedImage(files[i], 'libreria-grafica/sponsor', 1600, 'image/png');
+          const url = await uploadSharedImage(files[i], 'libreria-grafica/sponsor', 2400, 'image/png', resizeSponsorImage);
           S.media.library.sponsors.push(url);
           commit(true);
         }
