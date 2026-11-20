@@ -1322,6 +1322,9 @@ input:focus,select:focus,textarea:focus {
     flex-basis: calc(50% - 6px);
   }
 }
+html.santa-test-mode .test-banner{margin:0 0 12px;padding:10px 12px;border:1px solid #b7791f;border-radius:12px;background:#fff4d6;color:#713f12;font:900 12px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-align:center}
+html.santa-test-mode [data-tab="archive"],html.santa-test-mode [data-tab="season"],html.santa-test-mode [data-tab="scorers"],html.santa-test-mode [data-tab="archiveForms"],html.santa-test-mode [data-tab="mvp"],html.santa-test-mode [data-rtab="archive"],html.santa-test-mode [data-rtab="analytics"]{display:none!important}
+html.santa-test-mode [data-a="archiveCurrentMatch"],html.santa-test-mode [data-a="deleteArchivedMatch"]{display:none!important}
 </style>
 </head><body><div id="root"></div>
 <footer id="copyright-footer" style="max-width:720px;margin:22px auto 0;padding:14px 10px 8px;text-align:center;color:#69766e;font:12px/1.6 system-ui,sans-serif;border-top:1px solid #d3dcd1">
@@ -1349,6 +1352,12 @@ input:focus,select:focus,textarea:focus {
 })();
 </script><script type="application/json" id="app-state">{"rev":4,"match":{"home":"ASD Sant'Albino Terme","away":"","comp":"Terza Categoria Toscana · Girone A","venue":"","date":"","ourSide":"home","hashtag":"#SantAlbinoTerme"},"logos":{"home":"./assets/logo-home.png","away":"./assets/logo-away.png"},"rosters":{"home":"","away":""},"clock":{"phase":"pre","t0":0},"mvp":{"link":"","ourOnly":false,"votes":{},"tpl":"","raw":false},"events":[]}</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script><script src="./config.js"></script><script id="app-js">
 'use strict';
+const TEST_PARAMS = new URLSearchParams(window.location.search);
+const TEST_MODE = TEST_PARAMS.get('test') === '1';
+const FORCE_PUBLIC_TEST = TEST_MODE && TEST_PARAMS.get('view') === 'public';
+const STATE_TABLE = TEST_MODE ? 'live_test_state' : 'live_state';
+const SAVE_RPC = TEST_MODE ? 'save_santalbino_test_state' : 'save_santalbino_live_state';
+if (TEST_MODE) document.documentElement.classList.add('santa-test-mode');
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1368,6 +1377,15 @@ const defaults = () => ({
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
+function testDefaults() {
+  const d = defaults();
+  d.match = Object.assign(d.match, { home: "ASD Sant'Albino Terme · TEST", away: 'SQUADRA AVVERSARIA · TEST', comp: 'SIMULAZIONE SANTA LIVE', venue: 'Centro Sportivo Luciano Monaci · TEST', date: '', time: '', ourSide: 'home', hashtag: '#SANTALIVETEST', pollId: 'SANTALBINO-TEST' });
+  d.logos = { home: './assets/logo-home.png', away: './assets/logo-away.png' };
+  d.mvp.ourOnly = true;
+  d.media.library = { goal: '', formation: '', sponsors: [] };
+  d.media.graphicEditor.global.sponsor = false;
+  return d;
+}
 let S = (() => {
   let raw = {}; try { raw = JSON.parse($('#app-state').textContent) || {}; } catch (e) {}
   const d = defaults();
@@ -1375,7 +1393,7 @@ let S = (() => {
 })();
 
 /* ================= stato locale (solo questo dispositivo) ================= */
-const LK = 'cronaca-live-local-v2', DK = 'cronaca-live-draft-v2';
+const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
 const CARD_TYPES = ['goal', 'foul', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
@@ -1644,7 +1662,7 @@ const REGIA_ARCHIVE_PAGE_SIZE = 10;
 let regiaArchiveRows = [], regiaArchiveTotal = 0, regiaArchivePage = 0, regiaArchiveLoaded = false, regiaArchiveLoading = false, regiaArchiveError = '';
 
 async function loadMatchArchive(force = false) {
-  if (!db || archiveLoading || (archiveLoaded && !force)) return;
+  if (TEST_MODE || !db || archiveLoading || (archiveLoaded && !force)) return;
   archiveLoading = true;
   try {
     const { data, error } = await db.from('match_archive')
@@ -1667,7 +1685,7 @@ async function loadMatchArchive(force = false) {
 
 
 async function loadRegiaArchivePage(page = regiaArchivePage) {
-  if (!db || regiaArchiveLoading) return;
+  if (TEST_MODE || !db || regiaArchiveLoading) return;
   const nextPage = Math.max(0, Math.floor(Number(page) || 0));
   regiaArchiveLoading = true;
   regiaArchiveError = '';
@@ -1840,7 +1858,8 @@ function archiveHtml() {
 }
 
 async function deleteArchivedMatch(id) {
-  if (!CAN_EDIT || L.mode !== 'regia') { toast('Accedi alla regia per eliminare una gara'); return; }
+  if (TEST_MODE) { toast('L’archivio ufficiale non è disponibile nella simulazione.'); return; }
+   if (!CAN_EDIT || L.mode !== 'regia') { toast('Accedi alla regia per eliminare una gara'); return; }
   if (!db || !id) { toast('Partita non identificata'); return; }
   const row = (L.mode === 'regia' ? regiaArchiveRows : archiveRows).find(item => String(item.id) === String(id));
   if (!row) { toast('La gara non è più presente nell’archivio. Aggiorno l’elenco.'); await loadRegiaArchivePage(regiaArchivePage); return; }
@@ -1904,7 +1923,7 @@ function archivedFormationsHtml() {
 }
 
 async function refreshCurrentArchiveStatus() {
-  if (!db || !S.match?.pollId) { currentArchived = false; return false; }
+  if (TEST_MODE || !db || !S.match?.pollId) { currentArchived = false; return false; }
   const { data, error } = await db.from('match_archive').select('id').eq('poll_id', S.match.pollId).maybeSingle();
   if (error) { currentArchived = false; console.warn('Verifica archiviazione partita:', error.message); return false; }
   currentArchived = !!data;
@@ -1912,7 +1931,8 @@ async function refreshCurrentArchiveStatus() {
 }
 
 async function archiveCurrentMatch() {
-  if (!db || !CAN_EDIT) { toast('Accedi alla regia per archiviare la partita'); return; }
+  if (TEST_MODE) { toast('L’archivio ufficiale è disattivato durante la simulazione.'); return; }
+   if (!db || !CAN_EDIT) { toast('Accedi alla regia per archiviare la partita'); return; }
   if (S.clock.phase !== 'ft') { toast('L’archiviazione è disponibile solo dopo il fischio finale'); return; }
   if (syncState !== 'ok') { toast('Attendi la conferma “Pagina live aggiornata” prima di archiviare'); return; }
   if (!S.match.pollId) { toast('Identificativo partita mancante: salva la partita e riprova'); return; }
@@ -1931,7 +1951,7 @@ async function archiveCurrentMatch() {
 }
 
 async function ensureArchivedBeforeReset() {
-  if (S.clock.phase !== 'ft') return true;
+  if (TEST_MODE || S.clock.phase !== 'ft') return true;
   const archived = await refreshCurrentArchiveStatus();
   if (archived) return true;
   toast('Prima scegli “Salva nell’archivio” oppure “Scarta partita”');
@@ -1949,7 +1969,7 @@ async function discardCurrentMatch() {
 }
 
 async function refreshMvpVotes() {
-  if (!db || !CAN_EDIT) return;
+  if (TEST_MODE || !db || !CAN_EDIT) return;
   const { data, error } = await db.rpc('get_santalbino_mvp_vote_counts', { p_match_key: mvpPollKey() });
   if (error) { console.warn('Lettura conteggi MVP:', error.message); return; }
   mvpVoteCounts = {};
@@ -1957,6 +1977,7 @@ async function refreshMvpVotes() {
   if ($('#main') && L.tab === 'mvp') renderMain();
 }
 async function castMvpVote(candidateKey) {
+  if (TEST_MODE) { toast('La votazione MVP è disattivata nella simulazione.'); return; }
   if (mvpVoteBusy || !db) return;
   mvpVoteBusy = true;
   try {
@@ -1977,6 +1998,7 @@ async function castMvpVote(candidateKey) {
   finally { mvpVoteBusy = false; }
 }
 async function uploadSharedImage(file, folder, max = 1080, type = 'image/jpeg', processor = null) {
+  if (TEST_MODE) throw new Error('I caricamenti nell’archivio immagini ufficiale sono disattivati durante la simulazione.');
   if (!db || !CAN_EDIT) throw new Error('Accedi alla regia per caricare immagini.');
   const resized = processor ? await processor(file) : await resizeImage(file, max, type);
   const ext = resized.blob.type === 'image/png' ? 'png' : resized.blob.type === 'image/webp' ? 'webp' : 'jpg';
@@ -2003,7 +2025,7 @@ async function initCaps() {
       // Defer Supabase queries until the auth callback has returned.
       setTimeout(async () => {
         await verifyAdminAccess();
-        L.mode = CAN_EDIT ? 'regia' : 'public';
+        L.mode = CAN_EDIT && !FORCE_PUBLIC_TEST ? 'regia' : 'public';
         if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
       }, 0);
     }
@@ -2015,7 +2037,7 @@ async function initCaps() {
   const { data: { session } } = await db.auth.getSession();
   authUser = session?.user || null;
   await verifyAdminAccess();
-  const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
+  const { data, error } = await db.from(STATE_TABLE).select('state').eq('id', 1).maybeSingle();
   let legacyLogoMigration = false;
   if (!error && data?.state) {
     S = mergeState(data.state);
@@ -2026,11 +2048,11 @@ async function initCaps() {
     L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
   } else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
   dbReady = true;
-  if (!(CAN_EDIT && L.mode === 'regia') && ['archive','season','scorers','archiveForms'].includes(L.tab)) await loadMatchArchive(true);
-  if (CAN_EDIT && L.mode === 'regia' && L.rtab === 'archive') await loadRegiaArchivePage(0);
-  await refreshCurrentArchiveStatus();
+  if (!TEST_MODE && !(CAN_EDIT && L.mode === 'regia') && ['archive','season','scorers','archiveForms'].includes(L.tab)) await loadMatchArchive(true);
+  if (!TEST_MODE && CAN_EDIT && L.mode === 'regia' && L.rtab === 'archive') await loadRegiaArchivePage(0);
+  if (!TEST_MODE) await refreshCurrentArchiveStatus();
   offerDraftRecovery();
-  remoteChannel = db.channel('santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:'live_state',filter:'id=eq.1'}, payload => {
+  remoteChannel = db.channel(TEST_MODE ? 'santalbino-test-state' : 'santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:STATE_TABLE,filter:'id=eq.1'}, payload => {
     if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); void refreshCurrentArchiveStatus().then(() => renderMain()); if (CAN_EDIT) refreshMvpVotes(); }
    }).subscribe((status, err) => {
     if (status === 'SUBSCRIBED') {
@@ -2050,7 +2072,7 @@ async function initCaps() {
       void refreshRemoteState('page-visible');
     }
   });
-  db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
+  if (!TEST_MODE) db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
   if (CAN_EDIT) await refreshMvpVotes();
@@ -2199,7 +2221,7 @@ async function publishNow() {
   setSync('sending'); window.__santalbinoSaving = true;
   let error = null;
   try {
-    const result = await db.rpc('save_santalbino_live_state', {
+    const result = await db.rpc(SAVE_RPC, {
       p_expected_rev: remoteRev,
       p_state: snapshot
     });
@@ -2228,7 +2250,7 @@ async function refreshRemoteState(reason = 'reconnect') {
   if (!db || !dbReady || remoteRefreshBusy || publishing || syncState !== 'ok') return false;
   remoteRefreshBusy = true;
   try {
-    const { data, error } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
+    const { data, error } = await db.from(STATE_TABLE).select('state').eq('id', 1).maybeSingle();
     if (error) throw error;
     if (!data?.state) return false;
     const nextRev = Number(data.state.rev || 0);
@@ -3831,17 +3853,26 @@ async function openPost(id) {
 /* ================= disegno pagina ================= */
 let ROOT;
 function topHtml() {
-  const controls = CAN_EDIT
-    ? `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
-    : `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="login">Accesso regia</button>`;
-  const mobileControls = CAN_EDIT
-    ? `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Torna in regia'}</button><details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu"><button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
-    : `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
-  return `<div class="top"><div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div><div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
+  const testControls = TEST_MODE
+    ? `<a class="pill" href="./index.html?test=1&amp;view=public" target="_blank" rel="noopener">Pagina pubblica prova</a><button class="pill" data-a="resetTest">Azzera prova</button><a class="pill" href="./regia.html">Esci dalla prova</a>`
+    : `<button class="pill" data-a="startTest">Partita di prova</button>`;
+  const controls = CAN_EDIT && !FORCE_PUBLIC_TEST
+    ? `<a class="pill" href="./home.html">Home</a>${testControls}<button class="pill" data-a="draftRecovery">Bozza locale</button><button class="pill ${L.mode === 'regia' ? 'on' : ''}" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Apri la regia'}</button><button class="pill" data-a="logout">Esci</button>`
+    : FORCE_PUBLIC_TEST
+      ? `<a class="pill" href="./home.html">Home</a><span class="pill">Visualizzazione pubblica</span>`
+      : `<a class="pill" href="./home.html">Home</a><button class="pill" data-a="login">Accesso regia</button>`;
+  const mobileControls = CAN_EDIT && !FORCE_PUBLIC_TEST
+    ? `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="mode">${L.mode === 'regia' ? 'Vedi pagina pubblica' : 'Torna in regia'}</button><details class="mobile-actions"><summary>Azioni <span aria-hidden="true">▾</span></summary><div class="mobile-actions-menu">${testControls}<button class="pill" data-a="draftRecovery">Recupera bozza locale</button><button class="pill" data-a="logout">Esci dalla regia</button></div></details>`
+    : FORCE_PUBLIC_TEST
+      ? `<a class="pill mobile-primary" href="./home.html">Home</a><span class="pill mobile-primary">Solo visualizzazione</span>`
+      : `<a class="pill mobile-primary" href="./home.html">Home</a><button class="pill mobile-primary" data-a="login">Accesso regia</button>`;
+  const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
+  return `${banner}<div class="top">${brand}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
 function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
 let lastVote = 'none';
 function renderAll() {
+  if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
   ROOT.innerHTML = `<div class="wrap"><div id="top">${topHtml()}</div><section class="hero" id="hero">${heroHtml()}</section><div id="main"></div></div>`;
   renderMain();
 }
@@ -3974,7 +4005,9 @@ document.addEventListener('click', async e => {
     case 'savefb': L.fbUrl = $('#s-fb').value.trim(); saveL(); toast('Link salvato'); break;
     case 'exportbackup': downloadStateBackup(); break;
     case 'reloadremote': await discardDraftAndReloadRemote(); break;
-    case 'startNewMatch': if (!CAN_EDIT) { toast('Accedi alla regia per avviare una nuova partita'); break; } if (S.clock.phase !== 'ft' || !currentArchived) { toast('Prima salva la partita terminata nell’archivio'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione'); break; } resetMatch(); toast('Nuova partita avviata'); break;
+    case 'startTest': if (!CAN_EDIT) { toast('Accedi alla regia per avviare una simulazione'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della partita ufficiale'); break; } if (confirm('Aprire una partita di prova separata? La cronaca ufficiale resterà intatta.')) window.location.href = './regia.html?test=1'; break;
+     case 'resetTest': if (!TEST_MODE || !CAN_EDIT) { toast('Azione disponibile solo nella regia di prova'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della simulazione'); break; } if (confirm('Vuoi azzerare soltanto la partita di prova? I dati ufficiali non verranno modificati.')) { S = mergeState(testDefaults()); S.rev = remoteRev; L.evOne = {}; L.evImg = {}; L.evImgRaw = {}; L.social = {}; currentArchived = false; saveL(); commit(true); renderHero(); renderMain(); toast('Simulazione azzerata. Puoi iniziare una nuova prova.'); } break;
+     case 'startNewMatch': if (TEST_MODE) { if (!CAN_EDIT) { toast('Accedi alla regia per avviare una simulazione'); break; } if (syncState !== 'ok') { toast('Attendi la sincronizzazione'); break; } resetMatch(); toast('Nuova partita di prova pronta'); break; } if (!CAN_EDIT) { toast('Accedi alla regia per avviare una nuova partita'); break; } if (S.clock.phase !== 'ft' || !currentArchived) { toast('Prima salva la partita terminata nell’archivio'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione'); break; } resetMatch(); toast('Nuova partita avviata'); break;
     case 'newmatch': if (armedNew) { armedNew = false; if (await ensureArchivedBeforeReset()) resetMatch(); } else { armedNew = true; renderMain(); setTimeout(() => { armedNew = false; renderMain(); }, 3500); } break;
   }
 });
@@ -3995,7 +4028,7 @@ async function discardDraftAndReloadRemote() {
   if (!confirm('La bozza locale verrà prima scaricata come backup. Poi verrà ricaricata la versione online e la bozza locale sarà eliminata. Continuare?')) return;
   downloadStateBackup();
   try { localStorage.removeItem(DK); } catch (e) {}
-  const { data, error } = await db.from('live_state').select('state').eq('id',1).maybeSingle();
+  const { data, error } = await db.from(STATE_TABLE).select('state').eq('id',1).maybeSingle();
   if (error || !data?.state) { setSync('error','impossibile ricaricare lo stato online'); return; }
   S = mergeState(data.state);
   remoteRev = Number(S.rev || 0);
@@ -4471,7 +4504,7 @@ async function readLineup(side, stat) {
   renderAll();
   setInterval(tickClock, 1000);
   await initCaps();
-  if (CAN_EDIT) L.mode = 'regia'; else L.mode = 'public';
+  if (CAN_EDIT && !FORCE_PUBLIC_TEST) L.mode = 'regia'; else L.mode = 'public';
   if (LOCAL_ONLY) toast('Database non configurato: consulta la guida di installazione');
   updDatalists();
   $('#top').innerHTML = topHtml(); renderHero(); renderMain();
