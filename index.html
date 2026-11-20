@@ -3853,6 +3853,7 @@ async function openPost(id) {
 /* ================= disegno pagina ================= */
 let ROOT;
 function topHtml() {
+  const brand = `<div class="brand"><b>Live</b><span>${esc(teamName(S.match.ourSide))}</span></div>`;
   const testControls = TEST_MODE
     ? `<a class="pill" href="./index.html?test=1&amp;view=public" target="_blank" rel="noopener">Pagina pubblica prova</a><button class="pill" data-a="resetTest">Azzera prova</button><a class="pill" href="./regia.html">Esci dalla prova</a>`
     : `<button class="pill" data-a="startTest">Partita di prova</button>`;
