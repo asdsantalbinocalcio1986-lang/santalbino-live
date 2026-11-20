@@ -11,13 +11,13 @@
   "theme_color": "#102819",
   "icons": [
     {
-      "src": "./santa-live-icon.svg",
+      "src": "./santa-live-icon.svg?v=7",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "./santa-live-icon.svg",
+      "src": "./santa-live-icon.svg?v=7",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
