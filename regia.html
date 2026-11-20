@@ -2362,17 +2362,24 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  const slots = {
-    event: {x: canvas.width-220, y: canvas.height-210, w: 170, h: 72},
-    phase: {x: canvas.width-220, y: canvas.height-195, w: 170, h: 72},
-    formation: {x: canvas.width-190, y: canvas.height-52, w: 165, h: 42},
-    matchday: {x: canvas.width-190, y: canvas.height-102, w: 160, h: 44},
-    convocati: {x: canvas.width-190, y: canvas.height-102, w: 160, h: 44}
+  // Spazi sponsor ampliati: il logo deve restare leggibile anche dopo la condivisione.
+  // Coordinate ancorate al bordo destro/inferiore per adattarsi ai diversi formati.
+  const sizes = {
+    event:      {w: 250, h: 104, right: 42, bottom: 220},
+    phase:      {w: 250, h: 104, right: 42, bottom: 205},
+    formation:  {w: 245, h: 78,  right: 42, bottom: 48},
+    matchday:   {w: 240, h: 78,  right: 42, bottom: 96},
+    convocati:  {w: 240, h: 78,  right: 42, bottom: 96}
   };
-  const p = slots[layout] || slots.event, x = canvas.getContext('2d');
+  const slot = sizes[layout] || sizes.event;
+  const p = {x:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const x = canvas.getContext('2d');
   const style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
   const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
+  // Evita che gli spostamenti dell'editor portino il logo fuori dalla grafica.
+  p.x=Math.max(8,Math.min(canvas.width-p.w-8,p.x));
+  p.y=Math.max(8,Math.min(canvas.height-p.h-8,p.y));
   if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
   if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
   if(style.sponsor===false)return canvas;
@@ -2383,9 +2390,12 @@ async function addSponsorToGraphic(canvas, layout) {
   if(!activeSponsorGraphicUrl)return canvas;
   const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
   x.save();
-  x.fillStyle='rgba(255,255,255,.96)';rrect(x,p.x,p.y,p.w,p.h,12);x.fill();
-  x.strokeStyle='rgba(10,35,23,.22)';x.lineWidth=1.5;rrect(x,p.x,p.y,p.w,p.h,12);x.stroke();
-  const pad=7,scale=Math.min((p.w-pad*2)/img.width,(p.h-pad*2)/img.height),w=img.width*scale,h=img.height*scale;
+  x.shadowColor='rgba(0,0,0,.22)';x.shadowBlur=10;x.shadowOffsetY=3;
+  x.fillStyle='rgba(255,255,255,.98)';rrect(x,p.x,p.y,p.w,p.h,13);x.fill();
+  x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
+  x.strokeStyle='rgba(10,35,23,.28)';x.lineWidth=2;rrect(x,p.x,p.y,p.w,p.h,13);x.stroke();
+  const pad=10,scale=Math.min((p.w-pad*2)/img.width,(p.h-pad*2)/img.height),w=img.width*scale,h=img.height*scale;
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
   x.drawImage(img,p.x+(p.w-w)/2,p.y+(p.h-h)/2,w,h);x.restore();
   return canvas;
 }
@@ -2878,8 +2888,8 @@ async function renderMatchGraphic(ev) {
 }
 async function renderCard(ev) { return renderMatchGraphic(ev); }
 async function renderPhaseCard(ev) { return renderMatchGraphic(ev); }
-const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .92)); };
-const cardUrl = async ev => (await renderCard(ev)).toDataURL('image/jpeg', .88);
+const cardBlob = async ev => { const c = await renderCard(ev); return new Promise(r => c.toBlob(r, 'image/jpeg', .96)); };
+const cardUrl = async ev => (await renderCard(ev)).toDataURL('image/jpeg', .96);
 
 
 function loadGraphicImage(src) {
