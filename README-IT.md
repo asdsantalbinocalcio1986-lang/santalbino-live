@@ -43,6 +43,18 @@ Sant'Albino Live è una pagina pubblica per seguire la partita e una regia priva
 - Il motore OCR viene scaricato solo quando viene avviata la lettura di una distinta, per ridurre il caricamento iniziale.
 - Per Facebook, il modulo prepara testo e immagine; l'operatore li pubblica manualmente.
 
+## Modalità Partita di Prova
+
+Dalla regia, l'amministratore può selezionare **Partita di prova**. Si apre una sessione separata con squadre e dati chiaramente marcati come simulazione.
+
+- La regia di prova usa esclusivamente la tabella `live_test_state` e la funzione `save_santalbino_test_state`.
+- La pagina pubblica di prova è disponibile da **Pagina pubblica prova** e si aggiorna tramite Supabase Realtime anche su un secondo dispositivo.
+- Le bozze locali della simulazione hanno chiavi separate da quelle della partita ufficiale.
+- La simulazione non scrive in `live_state`, `match_archive` o `mvp_votes`, non carica file nell'archivio immagini ufficiale e non abilita le azioni di pubblicazione social.
+- **Azzera prova** ripristina solo i dati simulati. **Esci dalla prova** riporta alla regia ufficiale.
+
+La tabella di prova è leggibile pubblicamente solo perché contiene dati simulati; gli aggiornamenti sono consentiti esclusivamente all'amministratore autorizzato. Non inserire dati personali o informazioni reali nella simulazione.
+
 ## 5. Verifiche prima della prima partita
 
 1. Apri la pagina pubblica da un browser non autenticato.
