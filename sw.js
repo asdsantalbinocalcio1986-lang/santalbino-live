@@ -1,4 +1,4 @@
-const CACHE='santa-live-shell-v16';
+const CACHE='santa-live-shell-v17';
 const SHELL=['./home.html','./index.html','./regia.html','./preview.html','./config.js','./manifest.webmanifest','./santa-live-icon.svg?v=7','./hydra-goal.svg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
