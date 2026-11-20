@@ -2048,6 +2048,18 @@ async function initCaps() {
     L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
     L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
   } else if (error && error.code !== 'PGRST116') setSync('error', 'lettura database');
+  // In modalità prova importa SOLO i riferimenti ai loghi sponsor dalla libreria ufficiale,
+  // senza modificare live_state: la simulazione mantiene il proprio stato separato.
+  if (TEST_MODE) {
+    const { data: officialData, error: officialError } = await db.from('live_state').select('state').eq('id', 1).maybeSingle();
+    if (!officialError && officialData?.state) {
+      const officialSponsors = officialData.state.media?.library?.sponsors;
+      S.media = S.media || {};
+      S.media.library = Object.assign({goal:'',formation:'',sponsors:[]}, S.media.library || {});
+      const testSponsors = Array.isArray(S.media.library.sponsors) ? S.media.library.sponsors : [];
+      if (!testSponsors.length && Array.isArray(officialSponsors)) S.media.library.sponsors = officialSponsors.slice();
+    }
+  }
   dbReady = true;
   if (!TEST_MODE && !(CAN_EDIT && L.mode === 'regia') && ['archive','season','scorers','archiveForms'].includes(L.tab)) await loadMatchArchive(true);
   if (!TEST_MODE && CAN_EDIT && L.mode === 'regia' && L.rtab === 'archive') await loadRegiaArchivePage(0);
