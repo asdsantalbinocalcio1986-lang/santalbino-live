@@ -2339,7 +2339,7 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:140,right:42,bottom:125},matchday:{w:470,h:140,right:42,bottom:125},convocati:{w:470,h:140,right:42,bottom:135}};
+  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
   const slot=sizes[layout]||sizes.event,p={x:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
   const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
@@ -2926,7 +2926,7 @@ async function renderFormationGraphic(side = 'both') {
     x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONE UFFICIALE', W / 2, 235);
   }
-  const panelY = side === 'both' ? 270 : 300, panelH = side === 'both' ? 775 : 745;
+  const panelY = side === 'both' ? 270 : 300, panelH = side === 'both' ? 650 : 620;
   const panelW = side === 'both' ? 735 : 1080;
   const panels = side === 'both'
     ? [{ key: 'home', x: 45, logo: '#b8e7c8' }, { key: 'away', x: 820, logo: '#f0c56b' }]
@@ -3694,7 +3694,7 @@ function graphicEditorHtml() {
     <p class="small muted">Le modifiche al testo e alla posizione vengono salvate nel template della tipologia selezionata e non nel singolo evento.</p></div>`;
 }
 function editorSponsorSlot(layout,w,h) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:140,right:42,bottom:125},matchday:{w:470,h:140,right:42,bottom:125},convocati:{w:470,h:140,right:42,bottom:135}};
+  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
   const s=sizes[layout]||sizes.event;return{x:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
 }async function renderEditorCanvas(layout) {
   if(layout==='matchday')return renderMatchDayGraphic();
