@@ -2365,8 +2365,8 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const slot=sizes[layout]||sizes.event,p={x:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const sizes={event:{w:430,h:100,bottom:125},phase:{w:430,h:100,bottom:125},formation:{w:470,h:120,bottom:20},matchday:{w:430,h:90,bottom:20},convocati:{w:430,h:100,bottom:30}};
+  const slot=sizes[layout]||sizes.event,p={x:(canvas.width-slot.w)/2,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
   const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
   const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
@@ -2866,8 +2866,8 @@ async function renderMatchGraphic(ev) {
     x.restore();
   }
   // Footer isolato dal pannello contenuti.
-  x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
-  x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SANTALive';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
+  x.fillStyle=accent;x.fillRect(62,1240,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1290);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SANTALive';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1290);
   
   lastGraphicTextItems=capturedTextItems;
   await addSponsorToGraphic(canvas,['kickoff','halftime','fulltime'].includes(ev.type)?'phase':'event');
@@ -3022,7 +3022,7 @@ async function openLineupGraphic(side = 'both') {
 }
 
 async function renderMatchDayGraphic() {
-  const m = S.match, W = 1600, H = 1000, canvas = document.createElement('canvas');
+  const m = S.match, W = 1600, H = 1120, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'matchday',W,H);
   const [homeLogo, awayLogo] = await Promise.all([loadGraphicImage(S.logos.home), loadGraphicImage(S.logos.away)]);
@@ -3102,7 +3102,7 @@ async function renderMatchDayGraphic() {
 async function renderConvocatiGraphic() {
   const players = parseRoster(S.convocati);
   if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
-  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
+  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1320, canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   const x=canvas.getContext('2d'); applyGraphicTypography(x,'convocati',W,H); const clubLogo=await loadGraphicImage(S.logos[side]);
   const bg=x.createLinearGradient(0,0,W,H);
@@ -3721,8 +3721,8 @@ function graphicEditorHtml() {
     <p class="small muted">Le modifiche al testo e alla posizione vengono salvate nel template della tipologia selezionata e non nel singolo evento.</p></div>`;
 }
 function editorSponsorSlot(layout,w,h) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const s=sizes[layout]||sizes.event;return{x:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
+  const sizes={event:{w:430,h:100,bottom:125},phase:{w:430,h:100,bottom:125},formation:{w:470,h:120,bottom:20},matchday:{w:430,h:90,bottom:20},convocati:{w:430,h:100,bottom:30}};
+  const s=sizes[layout]||sizes.event;return{x:(w-s.w)/2,y:h-s.h-s.bottom,w:s.w,h:s.h};
 }async function renderEditorCanvas(layout) {
   if(layout==='matchday')return renderMatchDayGraphic();
   if(layout==='convocati')return renderConvocatiGraphic();
