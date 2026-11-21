@@ -3214,15 +3214,16 @@ async function renderConvocatiGraphicPremium() {
   x.textAlign='left';x.fillStyle='#d8c276';x.font="800 32px 'Manrope',Arial,sans-serif";x.fillText('ELENCO UFFICIALE',122,510);
   x.textAlign='right';x.fillStyle='rgba(232,241,234,.62)';x.font="700 19px 'Manrope',Arial,sans-serif";x.fillText(players.length+' CONVOCATI',1475,510);
   x.strokeStyle='rgba(255,255,255,.12)';x.beginPath();x.moveTo(800,545);x.lineTo(800,1068);x.stroke();
-  const rows=Math.ceil(players.length/2),rowH=Math.min(53,Math.floor(500/Math.max(1,rows)));
+  const rows=Math.ceil(players.length/2),rowH=Math.min(58,Math.floor(510/Math.max(1,rows)));
+  const rosterStartY=570+Math.max(0,(500-rows*rowH)/2);
   players.forEach((p,i)=>{
-    const col=Math.floor(i/rows),row=i%rows,xx=122+col*710,yy=575+row*rowH;
-    if(row%2===0){x.fillStyle='rgba(255,255,255,.035)';rrect(x,xx-8,yy-22,650,44,10);x.fill();}
+    const col=Math.floor(i/rows),row=i%rows,xx=122+col*710,yy=rosterStartY+row*rowH;
+    if(row%2===0){x.fillStyle='rgba(255,255,255,.045)';rrect(x,xx-8,yy-24,650,48,10);x.fill();}
     const accent=col===0?'#b9dfc4':'#d8c276';
-    x.fillStyle=accent;x.beginPath();x.arc(xx+22,yy,17,0,Math.PI*2);x.fill();
-    x.fillStyle='#10291d';x.textAlign='center';x.textBaseline='middle';x.font="800 17px 'Manrope',Arial,sans-serif";x.fillText(p.num||String(i+1),xx+22,yy+1);
-    x.fillStyle='#f4f7f3';x.textAlign='left';x.font="700 31px 'Barlow Condensed',Arial,sans-serif";
-    fitFont(x,p.name,575,31,700,"'Barlow Condensed',Arial,sans-serif");x.fillText(p.name,xx+55,yy,575);
+    x.fillStyle=accent;x.beginPath();x.arc(xx+23,yy,19,0,Math.PI*2);x.fill();
+    x.fillStyle='#10291d';x.textAlign='center';x.textBaseline='middle';x.font="800 19px 'Manrope',Arial,sans-serif";x.fillText(p.num||String(i+1),xx+23,yy+1);
+    x.fillStyle='#f4f7f3';x.textAlign='left';x.font="700 38px 'Barlow Condensed',Arial,sans-serif";
+    fitFont(x,p.name,575,38,700,"'Barlow Condensed',Arial,sans-serif");x.fillText(p.name,xx+62,yy,575);
   });
   x.fillStyle='rgba(225,238,227,.68)';x.textAlign='center';x.textBaseline='middle';
   x.font="700 18px 'Manrope',Arial,sans-serif";x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1150);
