@@ -3958,7 +3958,7 @@ document.addEventListener('click', async e => {
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
-  if (TEST_MODE && ['sharewa','copyig','shareig','markdone'].includes(act)) { toast('Le azioni di pubblicazione social sono disattivate nella simulazione.'); return; }
+  if (TEST_MODE && ['copyig','shareig','markdone'].includes(act)) { toast('Le azioni di pubblicazione social sono disattivate nella simulazione.'); return; }
   switch (act) {
     case 'refreshAnalytics': if (!TEST_MODE) await loadAnalytics(); break;
     case 'login': $('#authDlg').showModal(); break;
@@ -4013,9 +4013,23 @@ document.addEventListener('click', async e => {
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
-      const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
-      const shareText = so.text + '\n\nSegui la partita su SANTA Live: ' + matchUrl;
-      window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
+      const matchUrl = TEST_MODE
+        ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/index.html?test=1&view=public'
+        : (S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html');
+      const shareText = (TEST_MODE ? '⚠️ TEST SANTA LIVE — CONTENUTO DIMOSTRATIVO, NON UFFICIALE ⚠️\n\n' : '') + so.text + '\n\n#SANTALive\n\nSegui la partita su SANTA Live: ' + matchUrl;
+      const waUrl = 'https://wa.me/?text=' + encodeURIComponent(shareText);
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Condividi su WhatsApp', text: shareText });
+        } catch (err) {
+          if (err?.name !== 'AbortError') {
+            console.warn('Condivisione nativa non disponibile:', err);
+            window.open(waUrl, '_blank', 'noopener');
+          }
+        }
+      } else {
+        window.open(waUrl, '_blank', 'noopener');
+      }
       break;
     }
     case 'copyig': {
