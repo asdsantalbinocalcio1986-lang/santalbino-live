@@ -7,6 +7,7 @@ const regia = fs.readFileSync('regia.html', 'utf8');
 const testMigration = fs.readFileSync('supabase/migrations/20261120133534_isolated_test_match_mode.sql', 'utf8');
 const testGrantMigration = fs.readFileSync('supabase/migrations/20261120133845_tighten_test_state_grants.sql', 'utf8');
 const testRpcGrantMigration = fs.readFileSync('supabase/migrations/20261120133923_restrict_test_state_rpc_to_authenticated.sql', 'utf8');
+const storageMigration = fs.readFileSync('supabase/migrations/20261121160000_restrict_santalbino_media_to_admins.sql', 'utf8');
 const sql = fs.readFileSync('supabase-phase1-security.sql', 'utf8');
 const home = fs.readFileSync('home.html', 'utf8');
 const preview = fs.readFileSync('preview.html', 'utf8');
@@ -108,6 +109,9 @@ assert.match(testGrantMigration, /revoke all on table public\.live_test_state fr
 assert.match(testGrantMigration, /grant select on table public\.live_test_state to anon, authenticated/i);
 assert.match(testRpcGrantMigration, /revoke all on function public\.save_santalbino_test_state\(bigint, jsonb\) from public, anon/i);
 assert.match(testRpcGrantMigration, /grant execute on function public\.save_santalbino_test_state\(bigint, jsonb\) to authenticated/i);
+assert.match(storageMigration, /drop policy if exists \"Authenticated upload santalbino media\" on storage\.objects/i);
+assert.match(storageMigration, /drop policy if exists \"Authenticated update santalbino media\" on storage\.objects/i);
+assert.match(storageMigration, /drop policy if exists \"Authenticated delete santalbino media\" on storage\.objects/i);
 
 const regiaScripts = [...regia.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 let regiaChecked = 0;
