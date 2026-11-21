@@ -3146,11 +3146,8 @@ async function renderConvocatiGraphic() {
   const detailText=details.join('   •   ')||'DETTAGLI PARTITA DA DEFINIRE';
   let detailFont=25;
   while(detailFont>18){x.font=`700 ${detailFont}px 'Manrope',Arial,sans-serif`;if(x.measureText(detailText).width<=1360)break;detailFont--;}
-  if(x.measureText(detailText).width<=1360){x.fillText(detailText,800,361,1360);}
-  else{
-    const lines=details,lh=detailFont+8;x.font=`700 ${detailFont}px 'Manrope',Arial,sans-serif`;
-    lines.slice(0,2).forEach((line,i)=>x.fillText(line,800,361+(i-(Math.min(lines.length,2)-1)/2)*lh,1360));
-  }
+  // Il limite massimo del canvas riduce il testo in modo proporzionale senza perdere alcun dettaglio.
+  x.fillText(detailText,800,361,1360);
   // Pannello convocati: contrasto elevato, righe ariose e numerazione uniforme.
   x.fillStyle='rgba(2,13,9,.76)';rrect(x,76,455,1448,650,26);x.fill();
   x.strokeStyle='rgba(210,230,214,.13)';x.lineWidth=2;rrect(x,76,455,1448,650,26);x.stroke();
