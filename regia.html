@@ -66,7 +66,7 @@
   .standings-frame iframe{height:940px}
 }
 @media(max-width:600px){#graphicEditorPreview [style*="grid-template-columns:minmax(0,1fr) 76px 76px"]{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}#graphicEditorPreview input{min-width:0;max-width:100%}#editorDragFrame{touch-action:none;max-width:100%}}
-</style><meta name="theme-color" content="#0b3b22"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
+</style><meta name="theme-color" content="#0b3b22"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600;700;800;900&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
   --bg:#eef2ec; --surface:#ffffff; --surface2:#e4eae2; --ink:#10201a; --muted:#56655c; --line:#d3dcd1;
@@ -2590,7 +2590,7 @@ let lastGraphicTextItems=[];
 async function renderMatchGraphic(ev) {
   if(document.fonts&&document.fonts.ready) await document.fonts.ready;
   const W=1080,H=1350,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-  const x=canvas.getContext('2d'),FB="'Manrope',sans-serif",FD="'Barlow Condensed',sans-serif";
+  const x=canvas.getContext('2d'),FB="'Inter',sans-serif",FD="'Inter',sans-serif";
   const capturedTextItems=[],nativeFillText=x.fillText.bind(x);
   const templateKey='event_'+ev.type,templateConfig=graphicEditorConfig().templates[templateKey]||{},templateElements=templateConfig.elements||{},fontStyle=Object.assign({},graphicEditorStyle('event'),templateConfig);
   x.fillText=function(text,tx,ty,...args){
@@ -2598,7 +2598,7 @@ async function renderMatchGraphic(ev) {
     const value=cfg.text!==undefined?String(cfg.text):String(text),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0;
     capturedTextItems.push({index,text:value,original:String(text),x:Number(tx)||0,y:Number(ty)||0,dx,dy});
     const originalFont=x.font,match=originalFont.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\\s+(.+)$/);
-    if(match){const size=Math.max(12,Math.min(180,Number(match[2])*(Number(fontStyle.fontScale)||1)));const family=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||match[3];x.font=match[1]+size+'px '+family;}
+    if(match){const size=Math.max(12,Math.min(180,Number(match[2])*(Number(fontStyle.fontScale)||1)));const family=({Inter:"'Inter',sans-serif",Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||match[3];x.font=match[1]+size+'px '+family;}
     const align=x.textAlign||'start',measure=x.measureText(value).width,available=align==='center'?Math.max(20,2*Math.min(Number(tx)||0,W-(Number(tx)||0))-48):align==='right'?Math.max(20,(Number(tx)||0)-42):Math.max(20,W-(Number(tx)||0)-42);
     if(measure>available){const m=x.font.match(/^(.*?)(\\d+(?:\\.\\d+)?)px(.*)$/);if(m){let size=Number(m[2]);while(x.measureText(value).width>available&&size>11){size-=1;x.font=m[1]+size+'px'+m[3];}}}
     const baseline=Math.max(28,Math.min(H-28,(Number(ty)||0)+dy));
@@ -2714,7 +2714,7 @@ async function renderMatchGraphic(ev) {
     {text:String(teamName('away')||'').toUpperCase(),cx:815}
   ];
   const teamLabelWidth=350,teamLabelLineHeight=30,maxTeamLabelLines=2;
-  const teamLabelFamily=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||FD;
+  const teamLabelFamily=({Inter:"'Inter',sans-serif",Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||FD;
   const teamLabelScale=Number(fontStyle.fontScale)||1;
   let teamLabelFontSize=26,teamLabelLines=[];
   while(teamLabelFontSize>=14){
@@ -3669,11 +3669,14 @@ function regiaHtml() {
 
 function graphicEditorConfig() {
   S.media=S.media||{};
-  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1},templates:{}};
+  const base={global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Inter',fontScale:1},templates:{}};
   S.media.graphicEditor=Object.assign(base,S.media.graphicEditor||{});
   S.media.graphicEditor.global=Object.assign({},base.global,S.media.graphicEditor.global||{});
   S.media.graphicEditor.global.sponsorPos=Object.assign({},base.global.sponsorPos,S.media.graphicEditor.global.sponsorPos||{});
   S.media.graphicEditor.templates=S.media.graphicEditor.templates||{};
+  // Migrazione del vecchio font predefinito: le grafiche esistenti passano a Inter.
+  if(S.media.graphicEditor.global.fontFamily==='Manrope')S.media.graphicEditor.global.fontFamily='Inter';
+  Object.values(S.media.graphicEditor.templates).forEach(t=>{if(t&&t.fontFamily==='Manrope')t.fontFamily='Inter';});
   return S.media.graphicEditor;
 }
 function graphicEditorStyle(layout) {
@@ -3681,7 +3684,7 @@ function graphicEditorStyle(layout) {
   return Object.assign({},cfg.global,cfg.templates[key]||{});
 }
 function applyGraphicTypography(ctx,layout,width,height){
-  const style=graphicEditorStyle(layout),native=ctx.fillText.bind(ctx),family=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[style.fontFamily],elements=graphicEditorConfig().templates[layout]?.elements||{},captured=[];
+  const style=graphicEditorStyle(layout),native=ctx.fillText.bind(ctx),family=({Inter:"'Inter',sans-serif",Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[style.fontFamily],elements=graphicEditorConfig().templates[layout]?.elements||{},captured=[];
   lastGraphicTextItems=captured;
   ctx.fillText=function(text,x,y,maxWidth){
     const index=captured.length,cfg=elements[String(index)]||{},value=cfg.text!==undefined?String(cfg.text):String(text??''),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0,xx=(Number(x)||0)+dx,original=ctx.font,m=original.match(/^(.*?)(\d+(?:\.\d+)?)px\s+(.+)$/);
@@ -3708,7 +3711,7 @@ function graphicEditorHtml() {
     <div class="row2"><label class="f"><span>Colore principale</span><input type="color" value="${esc(v.accent)}" data-editor="accent"></label>
     <label class="f"><span>Velatura scura · ${v.overlay}%</span><input type="range" min="0" max="35" value="${Number(v.overlay)||0}" data-editor="overlay"></label></div>
     <label class="f"><span>Spessore bordo · ${v.border}px</span><input type="range" min="0" max="12" value="${Number(v.border)||0}" data-editor="border"></label>
-    <label class="f"><span>Famiglia carattere</span><select data-editor="fontFamily"><option value="Manrope" ${v.fontFamily==='Manrope'?'selected':''}>Manrope</option><option value="Barlow" ${v.fontFamily==='Barlow'?'selected':''}>Barlow Condensed</option><option value="Arial" ${v.fontFamily==='Arial'?'selected':''}>Arial</option><option value="Georgia" ${v.fontFamily==='Georgia'?'selected':''}>Georgia</option></select></label>
+    <label class="f"><span>Famiglia carattere</span><select data-editor="fontFamily"><option value="Inter" ${v.fontFamily==='Inter'?'selected':''}>Inter</option><option value="Manrope" ${v.fontFamily==='Manrope'?'selected':''}>Manrope</option><option value="Barlow" ${v.fontFamily==='Barlow'?'selected':''}>Barlow Condensed</option><option value="Arial" ${v.fontFamily==='Arial'?'selected':''}>Arial</option><option value="Georgia" ${v.fontFamily==='Georgia'?'selected':''}>Georgia</option></select></label>
     <label class="f"><span>Dimensione caratteri · ${Math.round((Number(v.fontScale)||1)*100)}%</span><input type="range" min="70" max="130" step="5" value="${Math.round((Number(v.fontScale)||1)*100)}" data-editor="fontScale"></label>
 
     <label class="check"><input type="checkbox" data-editor="sponsor" ${v.sponsor!==false?'checked':''}> Mostra uno sponsor casuale, se presente in Libreria</label>
@@ -3968,7 +3971,7 @@ document.addEventListener('click', async e => {
     case 'editorSave': commit(true); toast('Impostazioni grafiche salvate'); break;
      case 'editorBack': L.rtab='live'; saveL(); renderMain(); break;
     case 'editorPreview': await openGraphicEditorPreview(); break;
-    case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Manrope',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
+    case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Inter',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
     case 'retry': publishNow(); break;
     case 'archiveMatch': await archiveCurrentMatch(); break;
     case 'deleteArchivedMatch': await deleteArchivedMatch(a.dataset.id); break;
