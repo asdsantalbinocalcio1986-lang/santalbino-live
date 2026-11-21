@@ -3972,7 +3972,8 @@ document.addEventListener('click', async e => {
     case 'sharePublicWa': {
       const caption = $('#publicShareText')?.value || '';
       const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
-      window.open('https://wa.me/?text=' + encodeURIComponent(caption + '\n\nSegui la partita su SANTA Live: ' + matchUrl), '_blank', 'noopener');
+      const waUrl = 'https://wa.me/?text=' + encodeURIComponent(caption + '\n\nSegui la partita su SANTA Live: ' + matchUrl);
+      window.location.href = waUrl;
       break;
     }
     case 'sharePublicFb': {
