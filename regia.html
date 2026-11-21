@@ -3096,7 +3096,67 @@ async function renderMatchDayGraphic() {
   await addSponsorToGraphic(canvas,'matchday');
   return canvas;
 }
-async function renderConvocatiGraphic() {
+async function renderConvocatiGraphicLegacy() {
+  const players = parseRoster(S.convocati);
+  if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
+  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const x=canvas.getContext('2d'); applyGraphicTypography(x,'convocati',W,H); const clubLogo=await loadGraphicImage(S.logos[side]);
+  const bg=x.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#17633d'); bg.addColorStop(.55,'#0b3424'); bg.addColorStop(1,'#061b13');
+  x.fillStyle=bg; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(255,255,255,.08)'; x.lineWidth=2;
+  for(let k=0;k<10;k++){x.beginPath();x.moveTo(k*W/9,0);x.lineTo(k*W/9,H);x.stroke();}
+  x.fillStyle='rgba(0,0,0,.68)'; x.fillRect(0,0,W,300);
+  if(clubLogo){
+    const scale=Math.min(205/clubLogo.width,205/clubLogo.height),w=clubLogo.width*scale,h=clubLogo.height*scale;
+    x.fillStyle='#fff';rrect(x,85,38,220,220,26);x.fill();
+    x.drawImage(clubLogo,95+(200-w)/2,48+(200-h)/2,w,h);
+  }
+  x.textAlign='left';x.textBaseline='middle';x.fillStyle='#e3c66d';x.font='900 32px Arial,sans-serif';x.fillText('ASD SANT’ALBINO TERME',350,92);
+  x.fillStyle='#fff';x.font='900 86px Arial,sans-serif';x.fillText('I CONVOCATI',350,190);
+  x.fillStyle='rgba(255,255,255,.78)';x.font='700 23px Arial,sans-serif';
+  const opponent=teamName(other(side));
+  x.fillText((teamName(side)+'  vs  '+opponent).toUpperCase(),350,250);
+  const meta=[fmtDate(m.date),m.time].filter(Boolean).join(' · ');
+  const details=[meta,(m.comp||'').toUpperCase(),(m.venue||'').toUpperCase()].filter(Boolean);
+  x.fillStyle='rgba(0,0,0,.48)';rrect(x,85,330,1430,100,20);x.fill();
+  x.fillStyle='#d8efdf';x.textAlign='center';x.textBaseline='middle';
+  // Mantieni tutti i dettagli dentro il fumetto: distribuisci il testo su due righe
+  // quando necessario e riduci gradualmente il font per le diciture più lunghe.
+  const detailText=details.length?details.join('     |     '):'DETTAGLI PARTITA DA DEFINIRE';
+  const detailMaxWidth=1320;
+  let detailFont=25,detailLines=[];
+  const wrapDetails=()=>{
+    x.font=`800 ${detailFont}px Arial,sans-serif`;
+    const lines=[''];
+    detailText.split(/\s+/).forEach(word=>{
+      const current=lines[lines.length-1],candidate=current?current+' '+word:word;
+      if(current&&x.measureText(candidate).width>detailMaxWidth) lines.push(word);
+      else lines[lines.length-1]=candidate;
+    });
+    return lines;
+  };
+  detailLines=wrapDetails();
+  while(detailLines.length>2&&detailFont>16){detailFont--;detailLines=wrapDetails();}
+  const detailLineHeight=detailFont+7;
+  const detailStartY=382-((detailLines.length-1)*detailLineHeight/2);
+  detailLines.forEach((line,index)=>x.fillText(line,800,detailStartY+index*detailLineHeight,detailMaxWidth));
+  x.fillStyle='rgba(0,0,0,.62)';rrect(x,85,475,1430,625,24);x.fill();
+  x.fillStyle='#e3c66d';x.font='900 30px Arial,sans-serif';x.textAlign='left';x.fillText('ELENCO UFFICIALE',125,530);
+  x.fillStyle='rgba(255,255,255,.65)';x.font='700 20px Arial,sans-serif';x.textAlign='right';x.fillText(players.length+' CONVOCATI',1475,530);
+  const rows=Math.ceil(players.length/2), rowH=Math.min(76,Math.floor(500/Math.max(1,rows)));
+  players.forEach((p,i)=>{
+    const col=Math.floor(i/rows),row=i%rows,xx=130+col*710,yy=600+row*rowH;
+    x.fillStyle=col===0?'#b8e7c8':'#e3c66d';x.beginPath();x.arc(xx+24,yy-5,22,0,Math.PI*2);x.fill();
+    x.fillStyle='#08291d';x.font='900 19px Arial,sans-serif';x.textAlign='center';x.fillText(p.num||String(i+1),xx+24,yy);
+    x.fillStyle='#fff';x.textAlign='left';fitFont(x,p.name,620,31,800,'Arial,sans-serif');x.fillText(p.name,xx+62,yy);
+  });
+  x.fillStyle='rgba(255,255,255,.75)';x.font='800 20px Arial,sans-serif';x.textAlign='center';x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1155);
+  await addSponsorToGraphic(canvas,'convocati');
+  return canvas;
+}
+async function renderConvocatiGraphicPremium() {
   const players = parseRoster(S.convocati);
   if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
   const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
@@ -3168,6 +3228,10 @@ async function renderConvocatiGraphic() {
   x.font="700 18px 'Manrope',Arial,sans-serif";x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1150);
   await addSponsorToGraphic(canvas,'convocati');
   return canvas;
+}
+async function renderConvocatiGraphic() {
+  // Il nuovo design è riservato alla Partita di prova; le gare ufficiali mantengono il renderer stabile.
+  return TEST_MODE ? renderConvocatiGraphicPremium() : renderConvocatiGraphicLegacy();
 }
 async function openConvocatiGraphic() {
   beginSponsorGraphic();
