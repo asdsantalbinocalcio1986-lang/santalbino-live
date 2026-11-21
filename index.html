@@ -3345,7 +3345,22 @@ async function openGraphic(id) {
   try {
     const url = await cardUrl(ev);
     if (graphicId !== id || !dlg.open) return;
-    dlg.innerHTML = `<div class="sheethead"><h2>${esc(describe(ev, scoreAt(S.events.indexOf(ev))).title)}</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="${url}" alt="Grafica ${esc(ev.type)}"><button class="btn primary block" type="button" data-a="savegraphic">Salva immagine</button>`;
+    const eventIndex = S.events.indexOf(ev);
+    const eventCaption = buildText(ev, scoreAt(eventIndex));
+    const publicCaption = /#SANTALive/i.test(eventCaption) ? eventCaption : eventCaption + '\n\n#SANTALive';
+    dlg.innerHTML = `<div class="sheethead"><h2>${esc(describe(ev, scoreAt(eventIndex)).title)}</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div>
+      <img class="graphic-preview" src="${url}" alt="Grafica ${esc(ev.type)}">
+      <button class="btn primary block" type="button" data-a="savegraphic">Salva immagine</button>
+      <div class="card" style="margin-top:12px">
+        <h3>Condividi il post</h3>
+        <label class="f"><span>Testo del post</span><textarea id="publicShareText" rows="5" readonly>${esc(publicCaption)}</textarea></label>
+        <div class="row2 stack">
+          <button class="btn" type="button" data-a="copyPublicPost">Copia testo</button>
+          <button class="btn" type="button" data-a="sharePublicWa">Condividi su WhatsApp</button>
+        </div>
+        <button class="btn primary block" style="margin-top:8px" type="button" data-a="sharePublicFb">Condividi su Facebook</button>
+        <p class="small muted" style="margin-bottom:0">WhatsApp riceve il testo già pronto. Facebook apre la finestra di condivisione: incolla il testo copiato nella descrizione del post.</p>
+      </div>`;
   } catch (err) {
     dlg.innerHTML = `<div class="sheethead"><h2>Immagine non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">${esc(err?.message || 'Errore nella generazione della grafica.')}</p>`;
   }
@@ -3919,7 +3934,7 @@ document.addEventListener('click', async e => {
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
-  if (TEST_MODE && ['sharewa','copyig','shareig','markdone'].includes(act)) { toast('Le azioni di pubblicazione social sono disattivate nella simulazione.'); return; }
+  if (TEST_MODE && ['sharewa','copyig','shareig','markdone','sharePublicWa','sharePublicFb','copyPublicPost'].includes(act)) { toast('Le azioni di pubblicazione social sono disattivate nella simulazione.'); return; }
   switch (act) {
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
@@ -3953,6 +3968,21 @@ document.addEventListener('click', async e => {
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
+    case 'copyPublicPost': await copyText($('#publicShareText')?.value || ''); break;
+    case 'sharePublicWa': {
+      const caption = $('#publicShareText')?.value || '';
+      const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
+      window.open('https://wa.me/?text=' + encodeURIComponent(caption + '\n\nSegui la partita su SANTA Live: ' + matchUrl), '_blank', 'noopener');
+      break;
+    }
+    case 'sharePublicFb': {
+      const caption = $('#publicShareText')?.value || '';
+      const matchUrl = S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
+      window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank', 'noopener');
+      await copyText(caption);
+      toast('Testo copiato: incollalo nella descrizione del post Facebook.');
+      break;
+    }
     case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s || 'both'); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
     case 'viewMatchResult': if (S.clock.phase !== 'ft') { toast('Il MATCH RESULT è disponibile dopo il fischio finale'); break; } await openMatchResult(); break;
