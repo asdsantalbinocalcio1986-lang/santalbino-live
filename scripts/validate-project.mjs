@@ -62,6 +62,16 @@ assert.match(html, /const STATE_TABLE = TEST_MODE \? ['"]live_test_state['"] : [
 assert.match(html, /const SAVE_RPC = TEST_MODE \? ['"]save_santalbino_test_state['"] : ['"]save_santalbino_live_state['"]/);
 assert.match(html, /const expectedRev = remoteRev;\s*S\.rev = expectedRev \+ 1;/, 'La pubblicazione deve normalizzare la revisione dopo più modifiche ravvicinate');
 assert.match(regia, /const expectedRev = remoteRev;\s*S\.rev = expectedRev \+ 1;/, 'La regia deve normalizzare la revisione prima del salvataggio');
+assert.match(html, /const sizes=\{event:\{w:430,h:100,bottom:125\},phase:\{w:430,h:100,bottom:125\},formation:\{w:470,h:120,bottom:20\},matchday:\{w:430,h:90,bottom:20\},convocati:\{w:430,h:100,bottom:30\}\}/, 'Gli sponsor devono avere dimensioni e fascia inferiore dedicate');
+assert.match(regia, /const sizes=\{event:\{w:430,h:100,bottom:125\},phase:\{w:430,h:100,bottom:125\},formation:\{w:470,h:120,bottom:20\},matchday:\{w:430,h:90,bottom:20\},convocati:\{w:430,h:100,bottom:30\}\}/, 'La regia deve mantenere il layout sponsor coerente');
+assert.match(html, /p=\{x:\(canvas\.width-slot\.w\)\/2,y:canvas\.height-slot\.h-slot\.bottom,w:slot\.w,h:slot\.h\}/, 'Lo sponsor deve essere centrato orizzontalmente');
+assert.match(regia, /p=\{x:\(canvas\.width-slot\.w\)\/2,y:canvas\.height-slot\.h-slot\.bottom,w:slot\.w,h:slot\.h\}/, 'Lo sponsor della regia deve essere centrato orizzontalmente');
+assert.match(html, /return\{x:\(w-s\.w\)\/2,y:h-s\.h-s\.bottom,w:s\.w,h:s\.h\}/, 'L’anteprima editor deve coincidere con la posizione dello sponsor');
+assert.match(regia, /return\{x:\(w-s\.w\)\/2,y:h-s\.h-s\.bottom,w:s\.w,h:s\.h\}/, 'L’anteprima editor della regia deve coincidere con la posizione dello sponsor');
+assert.match(html, /W = 1600, H = 1120, canvas = document\.createElement\('canvas'\)/, 'Il Match Day deve riservare una fascia sponsor inferiore');
+assert.match(regia, /W = 1600, H = 1120, canvas = document\.createElement\('canvas'\)/, 'Il Match Day della regia deve riservare una fascia sponsor inferiore');
+assert.match(html, /W=1600, H=1320, canvas=document\.createElement\('canvas'\)/, 'La grafica convocati deve riservare una fascia sponsor inferiore');
+assert.match(regia, /W=1600, H=1320, canvas=document\.createElement\('canvas'\)/, 'La grafica convocati della regia deve riservare una fascia sponsor inferiore');
 assert.ok(html.includes("L.fbUrl = L.fbUrl || 'https://www.facebook.com/share/1CLqXZn5YS/'"), 'Il link Facebook ufficiale deve essere predefinito');
 assert.ok(regia.includes("L.fbUrl = L.fbUrl || 'https://www.facebook.com/share/1CLqXZn5YS/'"), 'Il link Facebook ufficiale deve essere predefinito nella regia');
 assert.ok(html.includes("hashtag: '#SANTALive'"), 'L’hashtag ufficiale deve essere il valore predefinito');
