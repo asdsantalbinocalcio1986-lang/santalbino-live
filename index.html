@@ -3976,7 +3976,20 @@ document.addEventListener('click', async e => {
         : (S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html');
       const shareText = (TEST_MODE ? '⚠️ TEST SANTA LIVE — CONTENUTO DIMOSTRATIVO, NON UFFICIALE ⚠️\n\n' : '') + caption + '\n\nSegui la partita su SANTA Live: ' + matchUrl;
       const waUrl = 'https://wa.me/?text=' + encodeURIComponent(shareText);
-      window.open(waUrl, '_blank', 'noopener');
+      // Su Android preferisci il pannello di condivisione nativo: evita i blocchi
+      // dei popup e permette di scegliere direttamente WhatsApp.
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Condividi su WhatsApp', text: shareText });
+        } catch (err) {
+          if (err?.name !== 'AbortError') {
+            console.warn('Condivisione nativa non disponibile:', err);
+            window.open(waUrl, '_blank', 'noopener');
+          }
+        }
+      } else {
+        window.open(waUrl, '_blank', 'noopener');
+      }
       break;
     }
     case 'sharePublicFb': {
