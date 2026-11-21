@@ -3096,7 +3096,7 @@ async function renderMatchDayGraphic() {
   await addSponsorToGraphic(canvas,'matchday');
   return canvas;
 }
-async function renderConvocatiGraphic() {
+async function renderConvocatiGraphicLegacy() {
   const players = parseRoster(S.convocati);
   if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
   const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
@@ -3155,6 +3155,83 @@ async function renderConvocatiGraphic() {
   x.fillStyle='rgba(255,255,255,.75)';x.font='800 20px Arial,sans-serif';x.textAlign='center';x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1155);
   await addSponsorToGraphic(canvas,'convocati');
   return canvas;
+}
+async function renderConvocatiGraphicPremium() {
+  const players = parseRoster(S.convocati);
+  if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
+  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const x=canvas.getContext('2d'); applyGraphicTypography(x,'convocati',W,H);
+  const clubLogo=await loadGraphicImage(S.logos[side]);
+  // Fondo editoriale: verde profondo, luce centrale e segni del campo appena accennati.
+  const bg=x.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#123f2b');bg.addColorStop(.48,'#09291d');bg.addColorStop(1,'#06170f');
+  x.fillStyle=bg;x.fillRect(0,0,W,H);
+  const glow=x.createRadialGradient(1180,420,30,1180,420,850);
+  glow.addColorStop(0,'rgba(67,139,88,.22)');glow.addColorStop(1,'rgba(4,18,12,0)');
+  x.fillStyle=glow;x.fillRect(0,0,W,H);
+  x.save();x.strokeStyle='rgba(220,242,224,.055)';x.lineWidth=3;
+  x.beginPath();x.arc(800,690,420,0,Math.PI*2);x.stroke();
+  x.beginPath();x.moveTo(800,270);x.lineTo(800,1110);x.stroke();
+  x.strokeRect(65,285,1470,820);x.restore();
+  // Testata più pulita: stemma senza riquadro bianco aggiunto e tipografia sportiva coerente.
+  const header=x.createLinearGradient(0,0,W,0);
+  header.addColorStop(0,'rgba(2,13,9,.94)');header.addColorStop(1,'rgba(2,13,9,.72)');
+  x.fillStyle=header;x.fillRect(0,0,W,275);
+  x.fillStyle='#c9b36a';x.fillRect(350,62,5,165);
+  if(clubLogo){
+    const maxW=190,maxH=190,k=Math.min(maxW/clubLogo.width,maxH/clubLogo.height);
+    const w=clubLogo.width*k,h=clubLogo.height*k;
+    x.save();x.shadowColor='rgba(0,0,0,.35)';x.shadowBlur=28;x.drawImage(clubLogo,105+(190-w)/2,38+(190-h)/2,w,h);x.restore();
+  }else{
+    x.fillStyle='rgba(255,255,255,.08)';rrect(x,105,38,190,190,24);x.fill();
+    x.fillStyle='#d7e8d9';x.textAlign='center';x.textBaseline='middle';x.font="800 42px 'Barlow Condensed',Arial,sans-serif";
+    x.fillText("S.A.T.",200,132);
+  }
+  x.textAlign='left';x.textBaseline='middle';
+  x.fillStyle='#d5bd70';x.font="800 27px 'Manrope',Arial,sans-serif";
+  x.fillText("ASD SANT’ALBINO TERME",390,78);
+  x.fillStyle='#fff';x.font="900 92px 'Barlow Condensed',Arial,sans-serif";
+  x.fillText('I CONVOCATI',385,160);
+  x.fillStyle='rgba(240,247,241,.78)';x.font="700 25px 'Manrope',Arial,sans-serif";
+  const opponent=teamName(other(side));
+  const matchup=(teamName(side)+'  VS  '+opponent).toUpperCase();
+  fitFont(x,matchup,1040,25,700,"'Manrope',Arial,sans-serif");
+  x.fillText(matchup,390,220,1040);
+  // Informazioni partita in una fascia dedicata, con testo centrato e righe controllate.
+  x.fillStyle='rgba(3,18,12,.78)';rrect(x,76,305,1448,112,20);x.fill();
+  x.strokeStyle='rgba(201,179,106,.42)';x.lineWidth=2;rrect(x,76,305,1448,112,20);x.stroke();
+  const details=[[fmtDate(m.date),m.time].filter(Boolean).join(' · '),(m.comp||'').toUpperCase(),(m.venue||'').toUpperCase()].filter(Boolean);
+  x.textAlign='center';x.textBaseline='middle';x.fillStyle='#e4eee6';
+  const detailText=details.join('   •   ')||'DETTAGLI PARTITA DA DEFINIRE';
+  let detailFont=25;
+  while(detailFont>18){x.font=`700 ${detailFont}px 'Manrope',Arial,sans-serif`;if(x.measureText(detailText).width<=1360)break;detailFont--;}
+  // Il limite massimo del canvas riduce il testo in modo proporzionale senza perdere alcun dettaglio.
+  x.fillText(detailText,800,361,1360);
+  // Pannello convocati: contrasto elevato, righe ariose e numerazione uniforme.
+  x.fillStyle='rgba(2,13,9,.76)';rrect(x,76,455,1448,650,26);x.fill();
+  x.strokeStyle='rgba(210,230,214,.13)';x.lineWidth=2;rrect(x,76,455,1448,650,26);x.stroke();
+  x.textAlign='left';x.fillStyle='#d8c276';x.font="800 32px 'Manrope',Arial,sans-serif";x.fillText('ELENCO UFFICIALE',122,510);
+  x.textAlign='right';x.fillStyle='rgba(232,241,234,.62)';x.font="700 19px 'Manrope',Arial,sans-serif";x.fillText(players.length+' CONVOCATI',1475,510);
+  x.strokeStyle='rgba(255,255,255,.12)';x.beginPath();x.moveTo(800,545);x.lineTo(800,1068);x.stroke();
+  const rows=Math.ceil(players.length/2),rowH=Math.min(53,Math.floor(500/Math.max(1,rows)));
+  players.forEach((p,i)=>{
+    const col=Math.floor(i/rows),row=i%rows,xx=122+col*710,yy=575+row*rowH;
+    if(row%2===0){x.fillStyle='rgba(255,255,255,.035)';rrect(x,xx-8,yy-22,650,44,10);x.fill();}
+    const accent=col===0?'#b9dfc4':'#d8c276';
+    x.fillStyle=accent;x.beginPath();x.arc(xx+22,yy,17,0,Math.PI*2);x.fill();
+    x.fillStyle='#10291d';x.textAlign='center';x.textBaseline='middle';x.font="800 17px 'Manrope',Arial,sans-serif";x.fillText(p.num||String(i+1),xx+22,yy+1);
+    x.fillStyle='#f4f7f3';x.textAlign='left';x.font="700 31px 'Barlow Condensed',Arial,sans-serif";
+    fitFont(x,p.name,575,31,700,"'Barlow Condensed',Arial,sans-serif");x.fillText(p.name,xx+55,yy,575);
+  });
+  x.fillStyle='rgba(225,238,227,.68)';x.textAlign='center';x.textBaseline='middle';
+  x.font="700 18px 'Manrope',Arial,sans-serif";x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1150);
+  await addSponsorToGraphic(canvas,'convocati');
+  return canvas;
+}
+async function renderConvocatiGraphic() {
+  // Il nuovo design è riservato alla Partita di prova; le gare ufficiali mantengono il renderer stabile.
+  return TEST_MODE ? renderConvocatiGraphicPremium() : renderConvocatiGraphicLegacy();
 }
 async function openConvocatiGraphic() {
   beginSponsorGraphic();
