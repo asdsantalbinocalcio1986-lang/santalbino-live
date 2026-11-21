@@ -25,6 +25,7 @@ for (const file of ['home.html', 'preview.html']) {
   assert.ok(pageChecked >= 1, 'Script inline mancante o non verificabile in ' + file);
 }
 new vm.Script(fs.readFileSync('sw.js', 'utf8'), { filename: 'sw.js' });
+assert.match(sw, /santa-live-shell-v21/, 'La cache PWA deve essere aggiornata quando cambia l’app');
 const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 assert.ok(manifest.icons?.some(icon => icon.src.split('?')[0] === './santa-live-icon.svg' && icon.sizes === '192x192'), 'Icona PWA SVG 192px mancante');
 assert.ok(manifest.icons?.some(icon => icon.src.split('?')[0] === './santa-live-icon.svg' && icon.sizes === '512x512'), 'Icona PWA SVG 512px mancante');
