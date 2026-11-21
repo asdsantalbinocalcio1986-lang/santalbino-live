@@ -3222,8 +3222,9 @@ async function renderConvocatiGraphicPremium() {
     const accent=col===0?'#b9dfc4':'#d8c276';
     x.fillStyle=accent;x.beginPath();x.arc(xx+23,yy,19,0,Math.PI*2);x.fill();
     x.fillStyle='#10291d';x.textAlign='center';x.textBaseline='middle';x.font="800 19px 'Manrope',Arial,sans-serif";x.fillText(p.num||String(i+1),xx+23,yy+1);
-    x.fillStyle='#f4f7f3';x.textAlign='left';x.font="700 38px 'Barlow Condensed',Arial,sans-serif";
-    fitFont(x,p.name,575,38,700,"'Barlow Condensed',Arial,sans-serif");x.fillText(p.name,xx+62,yy,575);
+    // Nome centrato nella propria colonna; il badge numerico resta allineato a sinistra.
+    x.fillStyle='#f4f7f3';x.textAlign='center';x.font="700 38px 'Barlow Condensed',Arial,sans-serif";
+    fitFont(x,p.name,575,38,700,"'Barlow Condensed',Arial,sans-serif");x.fillText(p.name,xx+355,yy,575);
   });
   x.fillStyle='rgba(225,238,227,.68)';x.textAlign='center';x.textBaseline='middle';
   x.font="700 18px 'Manrope',Arial,sans-serif";x.fillText('FORZA GIALLOVERDI  ·  ASD SANT’ALBINO TERME',800,1150);
