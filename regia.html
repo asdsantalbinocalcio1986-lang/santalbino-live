@@ -1351,7 +1351,7 @@ html.santa-test-mode [data-a="archiveCurrentMatch"],html.santa-test-mode [data-a
     if(root && !root.textContent.trim()) show('Lo script principale non ha avviato l’interfaccia','La pagina è stata caricata, ma il contenuto non è stato disegnato. Controllare caricamento degli script e console del browser.');
   },5000);
 })();
-</script><script type="application/json" id="app-state">{"rev":4,"match":{"home":"ASD Sant'Albino Terme","away":"","comp":"Terza Categoria Toscana · Girone A","venue":"","date":"","ourSide":"home","hashtag":"#SantAlbinoTerme"},"logos":{"home":"./assets/logo-home.png","away":"./assets/logo-away.png"},"rosters":{"home":"","away":""},"clock":{"phase":"pre","t0":0},"mvp":{"link":"","ourOnly":false,"votes":{},"tpl":"","raw":false},"events":[]}</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script><script src="./config.js"></script><script id="app-js">
+</script><script type="application/json" id="app-state">{"rev":4,"match":{"home":"ASD Sant'Albino Terme","away":"","comp":"Terza Categoria Toscana · Girone A","venue":"","date":"","ourSide":"home","hashtag":"#SANTALive"},"logos":{"home":"./assets/logo-home.png","away":"./assets/logo-away.png"},"rosters":{"home":"","away":""},"clock":{"phase":"pre","t0":0},"mvp":{"link":"","ourOnly":false,"votes":{},"tpl":"","raw":false},"events":[]}</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script><script src="./config.js"></script><script id="app-js">
 'use strict';
 const TEST_PARAMS = new URLSearchParams(window.location.search);
 const TEST_MODE = TEST_PARAMS.get('test') === '1';
@@ -1369,7 +1369,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SANTALive', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
@@ -1396,8 +1396,9 @@ let S = (() => {
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
 const CARD_TYPES = ['goal', 'foul', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
-let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
+let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: 'https://www.facebook.com/share/1CLqXZn5YS/', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
+L.fbUrl = L.fbUrl || 'https://www.facebook.com/share/1CLqXZn5YS/';
 // Ogni apertura dell'app riparte dalla schermata iniziale, senza alterare gli altri dati locali.
 L.tab = 'cron';
 L.rtab = 'live';
@@ -1624,7 +1625,7 @@ function lineupText(side) {
   return `📋 FORMAZIONE ${teamName(side).toUpperCase()}\n` + st.join('\n') + (bn.length ? '\n\nIn panchina: ' + bn.join(', ') : '') + (S.match.hashtag ? `\n\n${S.match.hashtag}` : '');
 }
 function fbLink() {
-  const u = (L.fbUrl || '').trim(); if (!u) return 'https://www.facebook.com/';
+  const u = (L.fbUrl || '').trim(); if (!u) return 'https://www.facebook.com/share/1CLqXZn5YS/';
   return /^https?:\/\//i.test(u) ? u : 'https://www.facebook.com/' + u.replace(/^\/+/, '');
 }
 
@@ -2239,13 +2240,15 @@ async function publishNow() {
   if (!db || !CAN_EDIT) return;
   if (publishing) { publishPending = true; return; }
   publishing = true; publishPending = false;
+  const expectedRev = remoteRev;
+  S.rev = expectedRev + 1;
   const snapshot = JSON.parse(JSON.stringify(S));
   const snapshotRev = Number(snapshot.rev || 0);
   setSync('sending'); window.__santalbinoSaving = true;
   let error = null;
   try {
     const result = await db.rpc(SAVE_RPC, {
-      p_expected_rev: remoteRev,
+      p_expected_rev: expectedRev,
       p_state: snapshot
     });
     error = result.error;
@@ -2362,8 +2365,8 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const slot=sizes[layout]||sizes.event,p={x:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const sizes={event:{w:430,h:100,bottom:125},phase:{w:430,h:100,bottom:125},formation:{w:470,h:120,bottom:20},matchday:{w:430,h:90,bottom:20},convocati:{w:430,h:100,bottom:30}};
+  const slot=sizes[layout]||sizes.event,p={x:(canvas.width-slot.w)/2,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
   const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
   const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
@@ -2448,7 +2451,7 @@ async function renderPhaseCard(ev) {
   // Footer ancorato, separato dalla zona marcatori.
   x.fillStyle=accent;x.fillRect(62,1250,956,4);
   x.fillStyle='#fff';x.textAlign='left';x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1290);
-  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 21px ${FB}`;x.fillText(S.match.hashtag||'#SantAlbinoTerme',1002,1290);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 21px ${FB}`;x.fillText(S.match.hashtag||'#SANTALive',1002,1290);
   await addSponsorToGraphic(c,'phase');
   return c;
 }
@@ -2863,8 +2866,8 @@ async function renderMatchGraphic(ev) {
     x.restore();
   }
   // Footer isolato dal pannello contenuti.
-  x.fillStyle=accent;x.fillRect(62,1215,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1265);
-  x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SantAlbinoTerme';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1265);
+  x.fillStyle=accent;x.fillRect(62,1240,956,4);x.textAlign='left';x.fillStyle='#fff';x.font=`800 21px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1290);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.72)';x.font=`600 19px ${FB}`;const tag=S.match.hashtag||'#SANTALive';fitFont(x,tag,430,19,600,FB);x.fillText(tag,1002,1290);
   
   lastGraphicTextItems=capturedTextItems;
   await addSponsorToGraphic(canvas,['kickoff','halftime','fulltime'].includes(ev.type)?'phase':'event');
@@ -3019,7 +3022,7 @@ async function openLineupGraphic(side = 'both') {
 }
 
 async function renderMatchDayGraphic() {
-  const m = S.match, W = 1600, H = 1000, canvas = document.createElement('canvas');
+  const m = S.match, W = 1600, H = 1120, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'matchday',W,H);
   const [homeLogo, awayLogo] = await Promise.all([loadGraphicImage(S.logos.home), loadGraphicImage(S.logos.away)]);
@@ -3099,7 +3102,7 @@ async function renderMatchDayGraphic() {
 async function renderConvocatiGraphic() {
   const players = parseRoster(S.convocati);
   if (!players.length) throw new Error('Inserisci e salva prima la lista dei convocati.');
-  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1200, canvas=document.createElement('canvas');
+  const side=S.match.ourSide||'home', m=S.match, W=1600, H=1320, canvas=document.createElement('canvas');
   canvas.width=W; canvas.height=H;
   const x=canvas.getContext('2d'); applyGraphicTypography(x,'convocati',W,H); const clubLogo=await loadGraphicImage(S.logos[side]);
   const bg=x.createLinearGradient(0,0,W,H);
@@ -3718,8 +3721,8 @@ function graphicEditorHtml() {
     <p class="small muted">Le modifiche al testo e alla posizione vengono salvate nel template della tipologia selezionata e non nel singolo evento.</p></div>`;
 }
 function editorSponsorSlot(layout,w,h) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const s=sizes[layout]||sizes.event;return{x:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
+  const sizes={event:{w:430,h:100,bottom:125},phase:{w:430,h:100,bottom:125},formation:{w:470,h:120,bottom:20},matchday:{w:430,h:90,bottom:20},convocati:{w:430,h:100,bottom:30}};
+  const s=sizes[layout]||sizes.event;return{x:(w-s.w)/2,y:h-s.h-s.bottom,w:s.w,h:s.h};
 }async function renderEditorCanvas(layout) {
   if(layout==='matchday')return renderMatchDayGraphic();
   if(layout==='convocati')return renderConvocatiGraphic();
@@ -3822,7 +3825,7 @@ function settingsHtml() {
   const m = S.match;
   return `<div class="card"><h2>Partita</h2>${I('s-home', 'Squadra di casa', m.home)}${I('s-away', 'Squadra ospite', m.away, 'Nome della squadra avversaria')}
     <label class="f"><span>La nostra squadra</span><select id="s-our"><option value="home" ${m.ourSide === 'home' ? 'selected' : ''}>Gioca in casa</option><option value="away" ${m.ourSide === 'away' ? 'selected' : ''}>Gioca in trasferta</option></select></label>
-    ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-time', 'Ora', m.time || '', '', 'time')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
+    ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-time', 'Ora', m.time || '', '', 'time')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SANTALive')}
     ${I('s-standings', 'Link esterno alla classifica in tempo reale', m.standingsUrl || '', 'https://...') }<p class="small muted" style="margin-top:-5px">Il collegamento viene salvato online e resta disponibile nella pagina pubblica anche dopo l’azzeramento della partita. Puoi modificarlo o cancellarlo in qualsiasi momento.</p>
     <button class="btn primary block" data-a="savematch">Salva e aggiorna la pagina live</button></div>
   <div class="card"><h2>Loghi</h2><p class="small muted" style="margin-top:0">Compaiono nella pagina live e nelle immagini degli eventi. Meglio un logo quadrato o con sfondo trasparente.</p>
