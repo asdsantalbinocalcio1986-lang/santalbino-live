@@ -3559,12 +3559,12 @@ function convocatiPublicHtml() {
 }
 function publicHtml() {
   const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni']];
-  if(parseRoster(S.convocati).length)tabs.push(['convocati','Convocati']);
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
-  return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+  const convocatiPanel = parseRoster(S.convocati).length ? convocatiPublicHtml() : '';
+  return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
