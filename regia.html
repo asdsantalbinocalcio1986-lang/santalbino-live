@@ -2362,8 +2362,9 @@ function beginSponsorGraphic() {
   activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const slot=sizes[layout]||sizes.event,p={x:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  // Eventi e fasi condividono una fascia sponsor integrata nel footer, sempre centrata.
+  const sizes={event:{w:520,h:78,bottom:104,center:true},phase:{w:520,h:78,bottom:104,center:true},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
+  const slot=sizes[layout]||sizes.event,p={x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
   const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
   p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
   const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
@@ -2374,6 +2375,22 @@ async function addSponsorToGraphic(canvas, layout) {
   if(!activeSponsorGraphicUrl){const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];}
   if(!activeSponsorGraphicUrl)return canvas;
   const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
+  if(layout==='event'||layout==='phase'){
+    // Fascia scura semi-trasparente: niente cartellino bianco, il logo resta protagonista.
+    x.save();
+    x.fillStyle='rgba(2,13,7,.78)';rrect(x,p.x,p.y,p.w,p.h,15);x.fill();
+    x.strokeStyle='rgba(183,243,107,.42)';x.lineWidth=1.5;rrect(x,p.x+.75,p.y+.75,p.w-1.5,p.h-1.5,14);x.stroke();
+    x.fillStyle='rgba(200,239,120,.86)';x.textAlign='center';x.textBaseline='middle';
+    x.font='700 '+Math.max(9,Math.round(p.h*.145))+'px Inter,sans-serif';
+    x.fillText('CON IL SUPPORTO DI',p.x+p.w/2,p.y+p.h*.19);
+    const padX=p.w*.08,padTop=p.h*.31,padBottom=p.h*.07;
+    const scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
+    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
+    x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
+    x.restore();
+    return canvas;
+  }
+  // Le altre tipologie mantengono il trattamento già esistente.
   x.save();x.shadowColor='rgba(0,0,0,.24)';x.shadowBlur=14;x.shadowOffsetY=4;
   x.fillStyle='#fff';rrect(x,p.x,p.y,p.w,p.h,16);x.fill();x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
   x.strokeStyle='rgba(10,35,23,.34)';x.lineWidth=2.5;rrect(x,p.x,p.y,p.w,p.h,16);x.stroke();
@@ -3677,6 +3694,12 @@ function graphicEditorConfig() {
   // Migrazione del vecchio font predefinito: le grafiche esistenti passano a Inter.
   if(S.media.graphicEditor.global.fontFamily==='Manrope')S.media.graphicEditor.global.fontFamily='Inter';
   Object.values(S.media.graphicEditor.templates).forEach(t=>{if(t&&t.fontFamily==='Manrope')t.fontFamily='Inter';});
+  // Posizione sponsor aggiornata: fascia centrata in basso per eventi e fasi.
+  if(S.media.graphicEditor.sponsorLayoutVersion!==2){
+    S.media.graphicEditor.templates.event=Object.assign({},S.media.graphicEditor.templates.event||{},{sponsorPos:{x:0,y:0,scale:1}});
+    S.media.graphicEditor.templates.phase=Object.assign({},S.media.graphicEditor.templates.phase||{},{sponsorPos:{x:0,y:0,scale:1}});
+    S.media.graphicEditor.sponsorLayoutVersion=2;
+  }
   return S.media.graphicEditor;
 }
 function graphicEditorStyle(layout) {
@@ -3721,8 +3744,8 @@ function graphicEditorHtml() {
     <p class="small muted">Le modifiche al testo e alla posizione vengono salvate nel template della tipologia selezionata e non nel singolo evento.</p></div>`;
 }
 function editorSponsorSlot(layout,w,h) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const s=sizes[layout]||sizes.event;return{x:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
+  const sizes={event:{w:520,h:78,bottom:104,center:true},phase:{w:520,h:78,bottom:104,center:true},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
+  const s=sizes[layout]||sizes.event;return{x:s.center?(w-s.w)/2:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
 }async function renderEditorCanvas(layout) {
   if(layout==='matchday')return renderMatchDayGraphic();
   if(layout==='convocati')return renderConvocatiGraphic();
