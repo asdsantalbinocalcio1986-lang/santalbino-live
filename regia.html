@@ -3887,13 +3887,17 @@ function renderSheet() {
 function refreshPreview() { if (!textManual && draft) { const ev = draftEvent(); $('#fText').value = buildText(ev, scoreOf([...S.events, ev])); } }
 
 /* ================= finestra di pubblicazione social ================= */
-let postId = null, postUrl = '';
+let postId = null, postUrl = '', postBlob = null;
 async function openPost(id) {
   const ev = S.events.find(e => e.id === id); if (!ev) return;
-  postId = id; const d = $('#postDlg'), isCard = CARD_TYPES.includes(ev.type);
+  postId = id; postBlob = null; const d = $('#postDlg'), isCard = CARD_TYPES.includes(ev.type);
   d.innerHTML = '<p class="muted">Preparo il post…</p>'; if (!d.open) d.showModal();
   try {
-    postUrl = isCard ? await cardUrl(ev) : '';
+    if (isCard) {
+      const canvas = await renderCard(ev);
+      postUrl = canvas.toDataURL('image/jpeg', .96);
+      postBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .96));
+    } else postUrl = '';
     const so = socialOf(id);
     d.innerHTML = `<div class="sheethead"><h2>Condividi evento</h2><button type="button" class="btn sm" data-a="postclose">Chiudi</button></div>
       ${isCard ? `<img class="thumb" style="max-height:44dvh;margin:0 auto 10px" src="${postUrl}" alt="Immagine dell'evento"><p class="small muted" style="margin-top:0;text-align:center">Su telefono puoi anche tenere premuto sull’immagine per salvarla.</p>` : ''}
@@ -4018,18 +4022,26 @@ document.addEventListener('click', async e => {
         : (S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html');
       const shareText = (TEST_MODE ? '⚠️ TEST SANTA LIVE — CONTENUTO DIMOSTRATIVO, NON UFFICIALE ⚠️\n\n' : '') + so.text + '\n\n#SANTALive\n\nSegui la partita su SANTA Live: ' + matchUrl;
       const waUrl = 'https://wa.me/?text=' + encodeURIComponent(shareText);
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: 'Condividi su WhatsApp', text: shareText });
-        } catch (err) {
-          if (err?.name !== 'AbortError') {
-            console.warn('Condivisione nativa non disponibile:', err);
-            window.open(waUrl, '_blank', 'noopener');
+      const ev2 = S.events.find(x => x.id === postId);
+      if (postBlob && ev2 && navigator.share) {
+        const file = new File([postBlob], 'santalbino-evento.jpg', { type: 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: 'ASD Sant’Albino Terme · SANTA Live', text: shareText, url: matchUrl });
+          } catch (err) {
+            if (err?.name !== 'AbortError') {
+              console.error('Condivisione immagine WhatsApp:', err);
+              await saveBlob(postBlob, 'santalbino-evento.jpg');
+              window.open(waUrl, '_blank', 'noopener');
+              toast('Il dispositivo non ha accettato immagine e testo insieme: immagine salvata, allegala su WhatsApp');
+            }
           }
+          break;
         }
-      } else {
-        window.open(waUrl, '_blank', 'noopener');
       }
+      if (postBlob) await saveBlob(postBlob, 'santalbino-evento.jpg');
+      window.open(waUrl, '_blank', 'noopener');
+      if (postBlob) toast('Immagine salvata: allegala al messaggio WhatsApp già pronto');
       break;
     }
     case 'copyig': {
