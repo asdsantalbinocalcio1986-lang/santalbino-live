@@ -61,7 +61,7 @@ assert.match(html, /rpc\(['"]cast_santalbino_mvp_vote['"]/);
 assert.match(html, /rpc\(['"]get_santalbino_mvp_vote_counts['"]/);
 assert.match(html, /async function refreshMvpVotes\(\)\s*\{\s*if \(TEST_MODE \|\| !db \|\| !CAN_EDIT\) return;/, 'I conteggi MVP non devono essere richiesti da visitatori anonimi o dalla simulazione');
 assert.match(html, /const STATE_TABLE = TEST_MODE \? ['"]live_test_state['"] : ['"]live_state['"]/);
-assert.match(html, /const convocatiPanel = parseRoster\\(S\\.convocati\\)\\.length/, 'I convocati salvati devono essere visibili direttamente nella pagina pubblica');
+assert.ok(html.includes("const convocatiPanel = parseRoster(S.convocati).length ? convocatiPublicHtml() : ''"), 'I convocati salvati devono essere visibili direttamente nella pagina pubblica');
 assert.match(html, /const SAVE_RPC = TEST_MODE \? ['"]save_santalbino_test_state['"] : ['"]save_santalbino_live_state['"]/);
 assert.match(html, /const expectedRev = remoteRev;\s*S\.rev = expectedRev \+ 1;/, 'La pubblicazione deve normalizzare la revisione dopo più modifiche ravvicinate');
 assert.match(regia, /const expectedRev = remoteRev;\s*S\.rev = expectedRev \+ 1;/, 'La regia deve normalizzare la revisione prima del salvataggio');
