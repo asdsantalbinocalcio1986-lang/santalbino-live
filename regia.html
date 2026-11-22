@@ -2492,7 +2492,7 @@ async function renderPhaseCard(ev) {
 
 // Unico template grafico per ogni contenuto condiviso: griglia fissa, aree separate e testi contenuti.
 function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
-  const words = String(text || '').split(/\\s+/).filter(Boolean);
+  const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = []; let line = '';
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
@@ -2504,7 +2504,7 @@ function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
     const clipped = lines.slice(0, maxLines);
     let last = clipped[maxLines - 1];
     while (last && ctx.measureText(last + '…').width > maxWidth) last = last.slice(0, -1);
-    clipped[maxLines - 1] = last.replace(/[\\s.,;:]+$/, '') + '…';
+    clipped[maxLines - 1] = last.replace(/[\s.,;:]+$/, '') + '…';
     return clipped;
   }
   return lines;
@@ -2634,7 +2634,7 @@ async function renderMatchGraphic(ev) {
     const index=capturedTextItems.length,key=String(index),cfg=templateElements[key]||{};
     const value=cfg.text!==undefined?String(cfg.text):String(text),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0;
     capturedTextItems.push({index,text:value,original:String(text),x:Number(tx)||0,y:Number(ty)||0,dx,dy});
-    const originalFont=x.font,match=originalFont.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\\s+(.+)$/);
+    const originalFont=x.font,match=originalFont.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\s+(.+)$/);
     if(match){const size=Math.max(12,Math.min(180,Number(match[2])*(Number(fontStyle.fontScale)||1)));const family=({Inter:"'Inter',sans-serif",Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||match[3];x.font=match[1]+size+'px '+family;}
     const align=x.textAlign||'start',measure=x.measureText(value).width,available=align==='center'?Math.max(20,2*Math.min(Number(tx)||0,W-(Number(tx)||0))-48):align==='right'?Math.max(20,(Number(tx)||0)-42):Math.max(20,W-(Number(tx)||0)-42);
     if(measure>available){const m=x.font.match(/^(.*?)(\\d+(?:\\.\\d+)?)px(.*)$/);if(m){let size=Number(m[2]);while(x.measureText(value).width>available&&size>11){size-=1;x.font=m[1]+size+'px'+m[3];}}}
@@ -2979,7 +2979,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
       const w = img.width * scale, h = img.height * scale;
       x.drawImage(img, cx - w / 2, cy - h / 2, w, h);
     } else {
-      const initials = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
+      const initials = name.replace(/^ASD\s+/i, '').split(/\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
       x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.font = '900 42px Arial,sans-serif'; x.fillText(initials, cx, cy);
     }
@@ -3168,7 +3168,7 @@ async function renderMatchDayGraphic() {
   const logo = (img,name,cx) => {
     x.fillStyle='#fff'; rrect(x,cx-100,32,200,200,26); x.fill();
     if(img){ const k=Math.min(180/img.width,180/img.height),w=img.width*k,h=img.height*k; x.drawImage(img,cx-w/2,42+(180-h)/2,w,h); }
-    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
+    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
     x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),470,31,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,270);
   };
   logo(homeLogo,teamName('home'),330); logo(awayLogo,teamName('away'),1270);
@@ -3712,7 +3712,6 @@ function buildMatchReport() {
     const at = minuteText(ev);
     const prefix = at ? at.charAt(0).toUpperCase() + at.slice(1) + ', ' : '';
     const player = cleanName(ev.player);
-    const side = eventSide(ev);
     switch (ev.type) {
       case 'goal': {
         const current = scoreAt(S.events.indexOf(ev));
@@ -3730,7 +3729,7 @@ function buildMatchReport() {
       case 'injury':
         return prefix + 'il gioco viene interrotto per consentire i soccorsi a ' + (player || 'un giocatore') + '.';
       case 'note': {
-        const note = String(ev.note || '').replace(/#[\\p{L}\\p{N}_]+/gu, '').replace(/[\\u{1F300}-\\u{1FAFF}]/gu, '').replace(/\\s{2,}/g, ' ').trim();
+        const note = String(ev.note || '').replace(/#[\p{L}\p{N}_]+/gu, '').replace(/[\u{1F300}-\u{1FAFF}]/gu, '').replace(/\s{2,}/g, ' ').trim();
         return note ? prefix + note.replace(/[.!?]*$/, '.') : '';
       }
       default:
@@ -3759,7 +3758,6 @@ function buildMatchReport() {
     const flushFlow = () => {
       if (!flow.length) return;
       const side = eventSide(flow[0].event);
-      const labelSide = sideLabel(side);
       const phrases = flow.map(x => eventPhrase(x.event)).filter(Boolean);
       if (phrases.length) {
         const intro = side === 'home' ? 'I padroni di casa cercano di rendersi pericolosi' :
