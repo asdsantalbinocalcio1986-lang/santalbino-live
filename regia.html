@@ -1369,7 +1369,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SANTALive', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
@@ -1624,7 +1624,7 @@ function lineupText(side) {
   return `📋 FORMAZIONE ${teamName(side).toUpperCase()}\n` + st.join('\n') + (bn.length ? '\n\nIn panchina: ' + bn.join(', ') : '') + (S.match.hashtag ? `\n\n${S.match.hashtag}` : '');
 }
 function fbLink() {
-  const u = (L.fbUrl || '').trim(); if (!u) return 'https://www.facebook.com/';
+  const u = (L.fbUrl || '').trim(); if (!u) return 'https://www.facebook.com/share/1CLqXZn5YS/';
   return /^https?:\/\//i.test(u) ? u : 'https://www.facebook.com/' + u.replace(/^\/+/, '');
 }
 
@@ -2239,13 +2239,16 @@ async function publishNow() {
   if (!db || !CAN_EDIT) return;
   if (publishing) { publishPending = true; return; }
   publishing = true; publishPending = false;
+  // Allinea la revisione locale a quella remota prima di chiamare la RPC.
+  const expectedRev = Number(remoteRev || 0);
+  S.rev = expectedRev + 1;
   const snapshot = JSON.parse(JSON.stringify(S));
   const snapshotRev = Number(snapshot.rev || 0);
   setSync('sending'); window.__santalbinoSaving = true;
   let error = null;
   try {
     const result = await db.rpc(SAVE_RPC, {
-      p_expected_rev: remoteRev,
+      p_expected_rev: expectedRev,
       p_state: snapshot
     });
     error = result.error;
@@ -2448,7 +2451,7 @@ async function renderPhaseCard(ev) {
   // Footer ancorato, separato dalla zona marcatori.
   x.fillStyle=accent;x.fillRect(62,1250,956,4);
   x.fillStyle='#fff';x.textAlign='left';x.font=`800 23px ${FB}`;x.fillText('ASD SANT’ALBINO TERME',78,1290);
-  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 21px ${FB}`;x.fillText(S.match.hashtag||'#SantAlbinoTerme',1002,1290);
+  x.textAlign='right';x.fillStyle='rgba(255,255,255,.68)';x.font=`600 21px ${FB}`;x.fillText(S.match.hashtag||'#SANTALive',1002,1290);
   await addSponsorToGraphic(c,'phase');
   return c;
 }
