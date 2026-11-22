@@ -3754,16 +3754,42 @@ function buildMatchReport() {
 
   function halfParagraph(items, label) {
     const output = [];
+    const mentions = { home: 0, away: 0, unknown: 0 };
     let flow = [];
+    const naturalJoin = list => list.length < 2 ? (list[0] || '') :
+      list.length === 2 ? list[0] + ' e ' + list[1] :
+      list.slice(0, -1).join(', ') + ' e ' + list[list.length - 1];
     const flushFlow = () => {
       if (!flow.length) return;
       const side = eventSide(flow[0].event);
-      const phrases = flow.map(x => eventPhrase(x.event)).filter(Boolean);
-      if (phrases.length) {
-        const intro = side === 'home' ? 'I padroni di casa cercano di rendersi pericolosi' :
-          side === 'away' ? 'Gli ospiti provano a farsi vedere in avanti' : 'La partita prosegue con iniziative da entrambe le parti';
-        output.push(intro + ': ' + phrases.join('; ') + '.');
+      const key = side || 'unknown';
+      const count = mentions[key]++;
+      const intro = side === 'home'
+        ? ['I padroni di casa cercano di rendersi pericolosi', 'La squadra di casa continua a spingere', 'I termali insistono in avanti'][Math.min(count, 2)]
+        : side === 'away'
+          ? ['Gli ospiti rispondono', 'La formazione ospite prova a replicare', 'La squadra ospite torna a farsi vedere'][Math.min(count, 2)]
+          : 'La partita prosegue con iniziative da entrambe le parti';
+      const attacks = flow.filter(x => x.event.type !== 'corner').map(x => eventPhrase(x.event)).filter(Boolean);
+      const corners = flow.filter(x => x.event.type === 'corner');
+      const clauses = [];
+      if (attacks.length) clauses.push(intro + ': ' + naturalJoin(attacks) + '.');
+      if (corners.length) {
+        const directions = { destra: 0, sinistra: 0 };
+        corners.forEach(x => {
+          const dir = String(x.event.cornerSide || '').toLowerCase();
+          if (dir === 'destra' || dir === 'sinistra') directions[dir]++;
+        });
+        const detail = [];
+        if (directions.destra) detail.push(directions.destra + (directions.destra === 1 ? ' dalla destra' : ' dalla destra'));
+        if (directions.sinistra) detail.push(directions.sinistra + (directions.sinistra === 1 ? ' dalla sinistra' : ' dalla sinistra'));
+        const directionText = detail.length ? ', ' + naturalJoin(detail) : '';
+        const cornerText = corners.length === 1
+          ? 'un calcio d’angolo' + (directionText ? directionText : '')
+          : corners.length + ' calci d’angolo' + directionText;
+        clauses.push((attacks.length ? (side === 'home' ? 'La pressione dei padroni di casa' : side === 'away' ? 'Gli ospiti' : 'La pressione') : intro) +
+          (attacks.length ? ' porta a ' : ' conquistano ') + cornerText + '.');
       }
+      if (clauses.length) output.push(clauses.join(' '));
       flow = [];
     };
     items.forEach(item => {
@@ -3782,18 +3808,17 @@ function buildMatchReport() {
     });
     flushFlow();
     if (!output.length) return label + ' non registra episodi di particolare rilievo.';
-    return label + ' ' + output.join(' ');
+    return label + ', ' + output.join(' ');
   }
 
   const winnerSide = homeGoals === awayGoals ? '' : homeGoals > awayGoals ? 'home' : 'away';
-  let opening = homeGoals === awayGoals
-    ? 'La sfida tra ' + home + ' e ' + away + ' termina in parità, con il risultato di ' + scoreText(homeGoals, awayGoals) + '.'
-    : 'La sfida tra ' + home + ' e ' + away + ' si chiude con la vittoria di ' + (winnerSide === 'home' ? home : away) + ' per ' + scoreText(homeGoals, awayGoals) + '.';
   const details = [];
   if (S.match.comp) details.push('valida per ' + S.match.comp);
   if (fmtDate(S.match.date)) details.push('disputata il ' + fmtDate(S.match.date));
-  if (S.match.venue) details.push('al ' + S.match.venue);
-  if (details.length) opening += ' La partita, ' + details.join(', ') + '.';
+  if (S.match.venue) details.push('giocata al ' + S.match.venue);
+  let opening = homeGoals === awayGoals
+    ? 'La sfida tra ' + home + ' e ' + away + (details.length ? ', ' + details.join(' e ') : '') + ' termina in parità, con il risultato di ' + scoreText(homeGoals, awayGoals) + '.'
+    : 'La sfida tra ' + home + ' e ' + away + (details.length ? ', ' + details.join(' e ') : '') + ' si chiude con la vittoria di ' + (winnerSide === 'home' ? home : away) + ' per ' + scoreText(homeGoals, awayGoals) + '.';
 
   const firstText = halfParagraph(firstHalf, 'Nella prima frazione');
   const secondText = halfParagraph(secondHalf, 'Nella ripresa');
