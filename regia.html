@@ -4171,7 +4171,15 @@ function renderSheet() {
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
     ${editingEventId ? '' : '<label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>'}
     <button type="button" class="btn primary block" data-sub="go">${editingEventId ? 'Salva modifiche evento' : 'Registra evento'}</button></form>`;
-  refreshPreview(); if (keepText !== null && $('#fText')) $('#fText').value = keepText;
+  // L'anteprima Facebook appartiene solo alla creazione di un nuovo evento.
+  // In modifica non esiste #fText e non va avviato alcun aggiornamento social.
+  if (!editingEventId) {
+    refreshPreview();
+    if (keepText !== null) {
+      const preview = $('#fText');
+      if (preview) preview.value = keepText;
+    }
+  }
 }
 function refreshPreview() {
   const preview = $('#fText');
