@@ -3663,86 +3663,159 @@ function proclaim() {
 function buildMatchReport() {
   const [homeGoals, awayGoals] = scoreOf(S.events);
   const home = teamName('home'), away = teamName('away');
-  const meta = [S.match.comp, fmtDate(S.match.date), S.match.venue].filter(Boolean).join(', ');
-  const ignored = ['kickoff', 'halftime', 'secondhalf', 'fulltime', 'mvp'];
-
   const numberWords = ['zero','uno','due','tre','quattro','cinque','sei','sette','otto','nove','dieci'];
-  const scoreText = (n) => numberWords[n] || String(n);
-  function minuteText(ev) {
-    const value = String(ev.min || '').trim();
-    if (!value) return '';
-    const match = value.match(/^(\d+)(?:\s*\+\s*(\d+))?/);
-    if (!match) return 'Al minuto ' + value + ', ';
-    return 'Al minuto ' + match[1] + (match[2] ? ' più ' + match[2] : '') + ', ';
-  }
-  function sentence(ev, index) {
+  const numberText = n => numberWords[n] || String(n);
+  const scoreText = (h, a) => numberText(h) + ' a ' + numberText(a);
+  const sideLabel = side => side === 'home' ? 'i padroni di casa' : side === 'away' ? 'gli ospiti' : 'le due squadre';
+  const minuteValue = ev => {
+    const m = String(ev.min || '').trim().match(/^(\d+)(?:\s*\+\s*(\d+))?/);
+    return m ? { base: Number(m[1]), extra: Number(m[2] || 0) } : null;
+  };
+  const minuteText = ev => {
+    const m = minuteValue(ev);
+    if (!m) return '';
+    return 'al minuto ' + m.base + (m.extra ? ' più ' + m.extra : '');
+  };
+  const eventSide = ev => ev.team === 'home' || ev.team === 'away' ? ev.team : '';
+  const cleanName = value => String(value || '').trim();
+  const eventPhrase = ev => {
+    const player = cleanName(ev.player);
     const at = minuteText(ev);
-    const player = (ev.player || '').trim();
-    const who = player || 'la squadra';
+    const prefix = at ? at + ' ' : '';
+    switch (ev.type) {
+      case 'shot':
+        if (ev.kind === 'fuori') return prefix + (player || 'La squadra') + ' prova la conclusione, ma il pallone termina fuori';
+        if (ev.kind === 'in_porta') {
+          const detail = describeShot(ev).replace(/^Tiro\s*/i, '').toLowerCase();
+          return prefix + (player || 'La squadra') + ' trova lo specchio della porta' + (detail ? ' con una conclusione ' + detail : '');
+        }
+        return prefix + (player || 'La squadra') + ' tenta la conclusione';
+      case 'save':
+        return prefix + (player || 'Il portiere') + (ev.kind === 'complicata' ? ' si rende protagonista di un intervento difficile' : ' neutralizza la conclusione');
+      case 'crossbar':
+        return prefix + 'la conclusione di ' + (player || 'un attaccante') + ' si stampa sulla traversa';
+      case 'miss':
+        return prefix + (player || 'La squadra') + ' si rende pericoloso' + (player ? ' con una buona occasione' : ' con una buona occasione');
+      case 'corner':
+        return prefix + 'arriva un calcio d’angolo' + (ev.cornerSide ? ' dalla ' + (String(ev.cornerSide).toLowerCase() === 'destra' ? 'destra' : 'sinistra') : '');
+      case 'foul':
+        return prefix + 'l’arbitro fischia un fallo' + (player ? ' a carico di ' + player : '');
+      case 'freekick':
+        return prefix + 'viene assegnato un calcio di punizione' + (ev.freeKickZone ? ' ' + freeKickZoneLabel(ev.freeKickZone).toLowerCase() : '') + (player ? ', affidato a ' + player : '');
+      case 'offside':
+        return prefix + 'viene segnalata una posizione di fuorigioco' + (player ? ' di ' + player : '');
+      default:
+        return '';
+    }
+  };
+  const majorEvent = ev => {
+    const at = minuteText(ev);
+    const prefix = at ? at.charAt(0).toUpperCase() + at.slice(1) + ', ' : '';
+    const player = cleanName(ev.player);
+    const side = eventSide(ev);
     switch (ev.type) {
       case 'goal': {
-        const current = scoreAt(index);
-        if (ev.kind === 'autogol') return at + (player || 'Un giocatore') + ' devia il pallone nella propria porta. Il punteggio cambia e vede ora ' + scoreText(current[0]) + ' a ' + scoreText(current[1]) + '.';
+        const current = scoreAt(S.events.indexOf(ev));
+        const team = sideLabel(scoringSide(ev));
+        if (ev.kind === 'autogol') return prefix + (player || 'un giocatore') + ' devia il pallone nella propria porta, portando ' + team + ' in vantaggio. Il punteggio diventa ' + scoreText(current[0], current[1]) + '.';
         const how = ev.kind === 'rigore' ? ' dal dischetto' : ev.kind === 'punizione' ? ' direttamente su calcio di punizione' : ev.kind === 'testa' ? ' con un colpo di testa' : '';
-        return at + (player || 'La squadra') + ' trova la via della rete' + how + (ev.assist ? ', dopo l’assist di ' + ev.assist : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0]) + ' a ' + scoreText(current[1]) + '.';
+        return prefix + (player || 'un giocatore') + ' porta in rete ' + team + how + (ev.assist ? ', su assist di ' + ev.assist : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
       }
-      case 'red': return at + (player || 'Un giocatore') + ' viene espulso' + (ev.kind === 'doppio' ? ' dopo la seconda ammonizione' : '') + '.';
-      case 'yellow': return at + 'arriva un’ammonizione per ' + (player || 'un giocatore') + '.';
-      case 'sub': return at + 'si procede a una sostituzione: ' + (ev.inn || 'un giocatore') + ' prende il posto di ' + (ev.out || 'un compagno') + '.';
-      case 'shot':
-        return at + (player || 'La squadra') + (ev.kind === 'fuori' ? ' cerca la conclusione, ma il pallone termina fuori.' : ev.kind === 'in_porta' ? ' trova lo specchio della porta e costringe la difesa a intervenire: ' + describeShot(ev).toLowerCase() + '.' : ' prova la conclusione.');
-      case 'save': return at + (player || 'Il portiere') + ' si oppone alla conclusione' + (ev.kind === 'complicata' ? ' con un intervento particolarmente impegnativo' : ' e blocca o respinge il pallone') + '.';
-      case 'crossbar': return at + 'la conclusione di ' + who + ' si stampa sulla traversa.';
-      case 'miss': return at + 'si presenta una buona occasione per ' + who + ', che però non riesce a concretizzarla.';
-      case 'foul': return at + 'l’arbitro fischia un fallo' + (player ? ' commesso da ' + player : '') + (ev.kind === 'rigore' && ev.foulInArea !== false ? ' e indica il dischetto' : ev.handball ? ' per un tocco di mano' : '') + '.';
-      case 'corner': return at + 'la partita riprende con un calcio d’angolo' + (ev.cornerSide ? ' dalla parte ' + ev.cornerSide : '') + '.';
-      case 'freekick': return at + 'viene assegnato un calcio di punizione' + (ev.freeKickZone ? ' nella zona ' + freeKickZoneLabel(ev.freeKickZone).toLowerCase() : '') + (player ? ', con ' + player sul pallone' : '') + '.';
-      case 'offside': return at + 'viene segnalata una posizione di fuorigioco' + (player ? ' a ' + player : '') + '.';
-      case 'injury': return at + 'il gioco si ferma per permettere i soccorsi' + (player ? ' a ' + player : ' a un giocatore') + '.';
-      case 'note': return ev.note ? at + ev.note.trim().replace(/[.!?]*$/, '.') : '';
-      default: return '';
+      case 'yellow':
+        return prefix + 'il direttore di gara estrae il cartellino giallo nei confronti di ' + (player || 'un giocatore') + '.';
+      case 'red':
+        return prefix + (player || 'un giocatore') + ' viene espulso' + (ev.kind === 'doppio' ? ' per doppia ammonizione' : ' con un cartellino rosso diretto') + '.';
+      case 'sub':
+        return prefix + 'cambio in campo: ' + (ev.inn || 'un giocatore') + ' entra al posto di ' + (ev.out || 'un compagno') + '.';
+      case 'injury':
+        return prefix + 'il gioco viene interrotto per consentire i soccorsi a ' + (player || 'un giocatore') + '.';
+      case 'note':
+        return ev.note ? prefix + ev.note.trim().replace(/[.!?]*$/, '.') : '';
+      default:
+        return '';
     }
+  };
+
+  const events = S.events.map((event, index) => ({ event, index }));
+  const breakIndex = events.findIndex(x => x.event.type === 'halftime' || x.event.type === 'secondhalf');
+  const minuteNumber = ev => {
+    const m = minuteValue(ev);
+    return m ? m.base + m.extra / 100 : null;
+  };
+  const firstHalf = breakIndex >= 0
+    ? events.slice(0, breakIndex)
+    : events.filter(x => minuteNumber(x.event) === null || minuteNumber(x.event) <= 45.99);
+  const secondHalf = breakIndex >= 0
+    ? events.slice(breakIndex + 1)
+    : events.filter(x => minuteNumber(x.event) > 45.99);
+  const minorTypes = ['shot','save','crossbar','miss','corner','foul','freekick','offside'];
+  const majorTypes = ['goal','yellow','red','sub','injury','note'];
+
+  function halfParagraph(items, label) {
+    const output = [];
+    let flow = [];
+    const flushFlow = () => {
+      if (!flow.length) return;
+      const side = eventSide(flow[0].event);
+      const labelSide = sideLabel(side);
+      const phrases = flow.map(x => eventPhrase(x.event)).filter(Boolean);
+      if (phrases.length) {
+        const intro = side === 'home' ? 'I padroni di casa cercano di rendersi pericolosi' :
+          side === 'away' ? 'Gli ospiti provano a farsi vedere in avanti' : 'La partita prosegue con iniziative da entrambe le parti';
+        output.push(intro + ': ' + phrases.join('; ') + '.');
+      }
+      flow = [];
+    };
+    items.forEach(item => {
+      const ev = item.event;
+      if (['kickoff','halftime','secondhalf','fulltime','mvp'].includes(ev.type)) return;
+      if (minorTypes.includes(ev.type)) {
+        if (flow.length && eventSide(flow[0].event) !== eventSide(ev)) flushFlow();
+        flow.push(item);
+        return;
+      }
+      flushFlow();
+      if (majorTypes.includes(ev.type)) {
+        const text = majorEvent(ev);
+        if (text) output.push(text);
+      }
+    });
+    flushFlow();
+    if (!output.length) return label + ' non registra episodi di particolare rilievo.';
+    return label + ' ' + output.join(' ');
   }
 
-  const indexed = S.events.map((event, index) => ({ event, index }));
-  const breakIndex = indexed.findIndex(x => x.event.type === 'halftime' || x.event.type === 'secondhalf');
-  function minuteOf(ev) {
-    const m = String(ev.min || '').match(/^(\d+)(?:\s*\+\s*(\d+))?/);
-    return m ? Number(m[1]) + Number(m[2] || 0) / 100 : null;
+  let opening;
+  if (homeGoals === awayGoals) {
+    opening = 'Termina in parità la sfida tra ' + home + ' e ' + away + ', con il risultato di ' + scoreText(homeGoals, awayGoals) + '.';
+  } else {
+    const winner = homeGoals > awayGoals ? home : away;
+    const loser = homeGoals > awayGoals ? away : home;
+    opening = 'Una sconfitta per ' + loser + ', superata da ' + winner + ' con il risultato di ' + scoreText(homeGoals, awayGoals) + '.';
   }
-  const first = breakIndex >= 0 ? indexed.slice(0, breakIndex) : indexed.filter(x => minuteOf(x.event) === null || minuteOf(x.event) <= 45);
-  const second = breakIndex >= 0 ? indexed.slice(breakIndex + 1) : indexed.filter(x => minuteOf(x.event) > 45);
-  function halfText(items, opening) {
-    const lines = items.filter(x => !ignored.includes(x.event.type)).map(x => sentence(x.event, x.index)).filter(Boolean);
-    if (!lines.length) return opening + ' non offre occasioni o episodi da segnalare.';
-    return opening + ' ' + lines.join(' ');
-  }
+  const meta = [S.match.comp, fmtDate(S.match.date), S.match.venue].filter(Boolean);
+  if (meta.length) opening += ' La gara, valida per ' + (S.match.comp || 'la competizione'), 
+    opening = opening.replace('La gara, valida per ' + (S.match.comp || 'la competizione'), 'La gara si è disputata' + (S.match.venue ? ' al ' + S.match.venue : '') + (fmtDate(S.match.date) ? ' il ' + fmtDate(S.match.date) : '') + (S.match.comp ? ', per ' + S.match.comp : '') + '.');
+  const firstText = halfParagraph(firstHalf, 'Nella prima frazione');
+  const secondText = halfParagraph(secondHalf, 'Nella ripresa');
 
-  const opening = 'La partita tra ' + home + ' e ' + away + (meta ? ', disputata ' + meta : '') + ' si conclude ' +
-    (homeGoals === awayGoals ? 'in parità' : 'con la vittoria di ' + (homeGoals > awayGoals ? home : away)) +
-    ', con il risultato di ' + scoreText(homeGoals) + ' a ' + scoreText(awayGoals) + '.';
-  const firstText = halfText(first, 'La prima parte dell’incontro');
-  const secondText = halfText(second, 'Nella ripresa');
   const closing = homeGoals === awayGoals
-    ? 'Il confronto termina così in equilibrio, con le due squadre che si dividono la posta.'
-    : 'Al fischio finale il risultato premia ' + (homeGoals > awayGoals ? home : away) + '.';
-
+    ? 'Al fischio finale le due squadre si dividono la posta.'
+    : 'Nonostante il tentativo di rimonta, il risultato non cambia e al fischio finale ' + (homeGoals > awayGoals ? 'gli ospiti' : 'i padroni di casa') + ' possono festeggiare la vittoria.';
   const mvp = S.events.find(e => e.type === 'mvp');
-  const mvpLine = mvp ? '\n\nUna menzione speciale va a ' + mvp.player + ', scelto come migliore in campo' + (mvp.votes ? ' con ' + mvp.votes + ' voti' : '') + '.' : '';
+  const mvpLine = mvp ? '\n\nUna menzione speciale va a ' + cleanName(mvp.player) + ', scelto come migliore in campo' + (mvp.votes ? ' con ' + mvp.votes + ' voti' : '') + '.' : '';
 
-  const lineupSections = ['home', 'away'].map(side => {
+  const lineupSections = ['home','away'].map(side => {
     const players = parseRoster(S.rosters[side]);
+    if (!players.length) return teamName(side) + ': formazione non inserita.';
     const starters = players.filter(p => p.starter);
     const bench = players.filter(p => !p.starter);
     const format = p => (p.num ? p.num + ' ' : '') + p.name;
-    return [
-      'Formazione di ' + teamName(side),
-      starters.length ? 'Titolari: ' + starters.map(format).join(', ') + '.' : 'Titolari non inseriti.',
-      bench.length ? 'A disposizione: ' + bench.map(format).join(', ') + '.' : ''
-    ].filter(Boolean).join('\n');
+    return teamName(side) + ': ' + (starters.length ? 'titolari ' + starters.map(format).join(', ') : 'titolari non inseriti') +
+      (bench.length ? '. A disposizione ' + bench.map(format).join(', ') : '') + '.';
   });
-  const lineups = 'Formazioni\n\n' + lineupSections.join('\n\n');
-  return opening + '\n\n' + firstText + '\n\n' + secondText + ' ' + closing + mvpLine + '\n\n' + lineups;
+  return opening + '\n\n' + firstText + '\n\n' + secondText + ' ' + closing + mvpLine +
+    '\n\nLe formazioni\n\n' + lineupSections.join('\n\n');
 }
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
