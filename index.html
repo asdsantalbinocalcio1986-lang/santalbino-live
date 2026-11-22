@@ -2287,13 +2287,14 @@ function addEvent(ev, opts = {}) {
   if (ev._img) setEvOne(ev.id, ev._img, ev._raw); delete ev._img; delete ev._raw;
   if (!S.match.date) S.match.date = new Date().toISOString().slice(0, 10);
   S.events.push(ev);
+  S.match.chronicleDraft = '';
   if (ev.type === 'fulltime') refreshMvpVotes();
   if (opts.post) stash.set('open-post', ev.id);
   commit(true); renderMain();
   return ev;
 }
 function addPhase(type, min, extra = {}) { addEvent(Object.assign({ type, team: S.match.ourSide, min: min ?? curMinute() }, extra), { post: true }); }
-function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; saveL(); commit(true); renderMain(); }
+function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; S.match.chronicleDraft = ''; saveL(); commit(true); renderMain(); }
 
 /* ================= immagini degli eventi ================= */
 const loadImg = src => new Promise(r => { if (!src) return r(null); const i = new Image(); if(/^https?:/i.test(src)) i.crossOrigin='anonymous'; i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
@@ -3401,10 +3402,10 @@ function buildChronicleDraft() {
     const score = scoreAt(index), team = teamName(e.team);
     let sentence = '';
     switch (e.type) {
-      case 'kickoff': paragraphs.push('**Primo tempo**'); sentence = 'L’arbitro fischia l’inizio della partita. Le due squadre sono in campo e la gara prende il via.'; break;
-      case 'halftime': paragraphs.push('**Intervallo**'); sentence = 'Si chiude il primo tempo. Il risultato parziale è ' + scoreLabel(score) + '.'; break;
-      case 'secondhalf': paragraphs.push('**Secondo tempo**'); sentence = 'Le squadre tornano in campo: inizia la ripresa.'; break;
-      case 'fulltime': paragraphs.push('**Finale**'); sentence = 'Arriva il triplice fischio: la partita termina ' + scoreLabel(score) + '.'; break;
+      case 'kickoff': paragraphs.push('PRIMO TEMPO'); sentence = 'L’arbitro fischia l’inizio della partita. Le due squadre sono in campo e la gara prende il via.'; break;
+      case 'halftime': paragraphs.push('INTERVALLO'); sentence = 'Si chiude il primo tempo. Il risultato parziale è ' + scoreLabel(score) + '.'; break;
+      case 'secondhalf': paragraphs.push('SECONDO TEMPO'); sentence = 'Le squadre tornano in campo: inizia la ripresa.'; break;
+      case 'fulltime': paragraphs.push('FINALE'); sentence = 'Arriva il triplice fischio: la partita termina ' + scoreLabel(score) + '.'; break;
       case 'goal': sentence = e.kind === 'autogol'
         ? 'Autogol: ' + (e.player || 'un giocatore') + ' (' + team + ') devia il pallone nella propria porta. Il risultato è ' + scoreLabel(score) + '.'
         : 'GOL ' + team.toUpperCase() + '! ' + (e.player || 'Un giocatore') + ' trova la rete' + (e.kind === 'rigore' ? ' dal dischetto' : e.kind === 'punizione' ? ' su calcio di punizione' : e.kind === 'testa' ? ' con un colpo di testa' : '') + (e.assist ? ', su assist di ' + e.assist : '') + '. ' + scoreLabel(score) + '.';
@@ -4170,7 +4171,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
