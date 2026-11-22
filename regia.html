@@ -4103,12 +4103,31 @@ function settingsHtml() {
 let armedNew = false;
 
 /* ================= finestra evento ================= */
-let draft = null, textManual = false;
+let draft = null, textManual = false, sheetHistoryEntry = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
+function pushSheetHistory() {
+  if (sheetHistoryEntry) return;
+  history.pushState({ santaliveSheet: true }, '', location.href);
+  sheetHistoryEntry = true;
+}
+function closeSheet() {
+  const sh = $('#sheet');
+  if (sh?.open) sh.close();
+  if (sheetHistoryEntry) {
+    sheetHistoryEntry = false;
+    if (history.state?.santaliveSheet) history.back();
+  }
+}
+window.addEventListener('popstate', () => {
+  if (!sheetHistoryEntry) return;
+  sheetHistoryEntry = false;
+  const sh = $('#sheet');
+  if (sh?.open) sh.close();
+});
 function openSheet(type) {
   editingEventId = null;
   draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', possibleSubs: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '', foulInArea: false, handball: false };
-  textManual = false; renderSheet(); $('#sheet').showModal();
+  textManual = false; renderSheet(); $('#sheet').showModal(); pushSheetHistory();
 }
 function editEvent(id) {
   const ev = S.events.find(item => item.id === id); if (!ev) return;
@@ -4116,7 +4135,7 @@ function editEvent(id) {
   const one = L.evOne?.[id] || {};
   draft = Object.assign({img: one.img || '', raw: !!one.raw, assist:'', out:'', inn:'', possibleSubs:'', note:'', shotZone:'', freeKickZone:'', cornerSide:'', foulInArea:false, handball:false}, ev);
   draft.img = one.img || ''; draft.raw = !!one.raw; draft.min = String(ev.min ?? '');
-  textManual = false; renderSheet(); $('#sheet').showModal();
+  textManual = false; renderSheet(); $('#sheet').showModal(); pushSheetHistory();
 }
 function draftEvent() {
   const d = draft, t = d.team;
@@ -4152,9 +4171,15 @@ function renderSheet() {
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
     ${editingEventId ? '' : '<label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>'}
     <button type="button" class="btn primary block" data-sub="go">${editingEventId ? 'Salva modifiche evento' : 'Registra evento'}</button></form>`;
-  refreshPreview(); if (keepText !== null) $('#fText').value = keepText;
+  refreshPreview(); if (keepText !== null && $('#fText')) $('#fText').value = keepText;
 }
-function refreshPreview() { if (!textManual && draft) { const ev = draftEvent(); $('#fText').value = buildText(ev, scoreOf([...S.events, ev])); } }
+function refreshPreview() {
+  const preview = $('#fText');
+  if (!textManual && draft && preview) {
+    const ev = draftEvent();
+    preview.value = buildText(ev, scoreOf([...S.events, ev]));
+  }
+}
 
 /* ================= finestra di pubblicazione social ================= */
 let postId = null, postUrl = '', postBlob = null;
@@ -4521,7 +4546,7 @@ function wireSheet() {
   const sh = $('#sheet');
   sh.addEventListener('click', e => {
     if (e.target.matches('[data-evimg-one-rm]')) { draft.img = ''; draft.raw = false; renderSheet(); return; }
-    if (e.target.id === 'sheetClose') { sh.close(); return; }
+    if (e.target.id === 'sheetClose') { closeSheet(); return; }
     const tb = e.target.closest('[data-team]'); if (tb) { draft.team = tb.dataset.team; draft.player = draft.assist = draft.out = draft.inn = ''; draft.freeKickZone = ''; draft.cornerSide = ''; renderSheet(); return; }
     const foulArea = e.target.closest('[data-foul-area]'); if (foulArea && draft?.type === 'foul') { draft.foulInArea = foulArea.dataset.foulArea === 'yes'; if (!draft.foulInArea) draft.kind = 'normal'; textManual = false; renderSheet(); return; }
     const foulHandball = e.target.closest('[data-foul-handball]'); if (foulHandball && draft?.type === 'foul') { draft.handball = foulHandball.dataset.foulHandball === 'yes'; textManual = false; renderSheet(); return; }
@@ -4541,7 +4566,7 @@ function wireSheet() {
         if (ev._img) setEvOne(original.id, ev._img, ev._raw);
         delete updated._img; delete updated._raw;
         S.events[index] = updated; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true;
-        editingEventId = null; sh.close(); commit(true); renderMain(); toast('Evento aggiornato: risultato, timeline e cronaca saranno ricalcolati');
+        editingEventId = null; closeSheet(); commit(true); renderMain(); toast('Evento aggiornato: risultato, timeline e cronaca saranno ricalcolati');
       } else {
         sh.close();
         const made = addEvent(ev, { post: true });
