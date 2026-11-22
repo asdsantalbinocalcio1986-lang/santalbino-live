@@ -3686,8 +3686,9 @@ function buildMatchReport() {
       case 'shot':
         if (ev.kind === 'fuori') return prefix + (player || 'La squadra') + ' prova la conclusione, ma il pallone termina fuori';
         if (ev.kind === 'in_porta') {
-          const detail = describeShot(ev).replace(/^Tiro\s*/i, '').toLowerCase();
-          return prefix + (player || 'La squadra') + ' trova lo specchio della porta' + (detail ? ' con una conclusione ' + detail : '');
+          const detail = describeShot(ev).replace(/^Tiro\s*/i, '');
+          const detailText = detail ? detail.charAt(0).toLowerCase() + detail.slice(1) : '';
+          return prefix + (player || 'La squadra') + ' trova lo specchio della porta' + (detailText ? ' con una conclusione ' + detailText : '');
         }
         return prefix + (player || 'La squadra') + ' tenta la conclusione';
       case 'save':
