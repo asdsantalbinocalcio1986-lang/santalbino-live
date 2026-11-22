@@ -3737,19 +3737,17 @@ function buildMatchReport() {
     ].filter(Boolean).join('\n');
   });
   const lineups = `FORMAZIONI\n\n${lineupSections.join('\n\n')}`;
-  return [
-    'RESOCONTO FINALE',
-    title,
-    meta,
-    '',
-    firstParagraph,
-    secondParagraph,
-    conclusion + mvpLine,
-    '',
-    lineups,
-    '',
-    S.match.hashtag || ''
-  ].filter((value, index, array) => value !== '' || (index > 0 && array[index - 1] !== '')).join('\n').trim();
+  return `RESOCONTO FINALE
+${title}
+${meta}
+
+${firstParagraph}
+
+${secondParagraph} ${conclusion}${mvpLine}
+
+${lineups}
+
+${S.match.hashtag || ''}`.trim();
 }
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
