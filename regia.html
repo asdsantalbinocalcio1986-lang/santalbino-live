@@ -3673,7 +3673,7 @@ function buildMatchReport() {
     if (!value) return '';
     const match = value.match(/^(\d+)(?:\s*\+\s*(\d+))?/);
     if (!match) return 'Al minuto ' + value + ', ';
-    return 'Al ' + match[1] + (match[2] ? ' più ' + match[2] : '') + ' minuto, ';
+    return 'Al minuto ' + match[1] + (match[2] ? ' più ' + match[2] : '') + ', ';
   }
   function sentence(ev, index) {
     const at = minuteText(ev);
@@ -3718,7 +3718,6 @@ function buildMatchReport() {
     return opening + ' ' + lines.join(' ');
   }
 
-  const result = ' ' + scoreText(homeGoals) + ' a ' + scoreText(awayGoals);
   const opening = 'La partita tra ' + home + ' e ' + away + (meta ? ', disputata ' + meta : '') + ' si conclude ' +
     (homeGoals === awayGoals ? 'in parità' : 'con la vittoria di ' + (homeGoals > awayGoals ? home : away)) +
     ', con il risultato di' + result + '.';
