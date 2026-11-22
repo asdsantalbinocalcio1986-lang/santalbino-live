@@ -1368,7 +1368,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '', chronicleDraft: '', chroniclePublished: '', chroniclePublishedAt: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
@@ -3243,7 +3243,7 @@ function timelineHtml() {
         ${d.main ? `<div class="tl-main">${esc(d.main)}</div>` : ''}<div class="tl-sub">${d.sub}</div>${CARD_TYPES.includes(e.type) ? `<button class="btn sm tl-image-btn" type="button" data-a="viewgraphic" data-id="${esc(e.id)}">Apri immagine</button>` : ''}</div></li>`;
   }).join('');
   const graphic = matchTimelineHtml();
-  return `${graphic ? `<section class="match-timeline-public"><h2>Andamento della partita</h2>${graphic}</section><h2>Cronaca</h2>` : ''}<ul class="tl-list">${items}</ul>`;
+  return `${chroniclePublicHtml()}${graphic ? `<section class="match-timeline-public"><h2>Andamento della partita</h2>${graphic}</section><h2>Eventi della partita</h2>` : ''}<ul class="tl-list">${items}</ul>`;
 }
 function statsHtml() {
   const cnt = (t, s) => S.events.filter(e => e.type === t && e.team === s).length;
@@ -3388,6 +3388,48 @@ function proclaim() {
   const key = $('#m-win').value, side = key.split('|')[0], name = key.split('|').slice(1).join('|'), n = mvpVoteCounts[key] || S.mvp.votes[key] || 0;
   S.events = S.events.filter(e => e.type !== 'mvp');
   addEvent({ type: 'mvp', team: side, min: '', player: name, votes: n }, { post: true });
+}
+
+/* ================= cronaca narrativa automatica ================= */
+function buildChronicleDraft() {
+  const events = S.events.map((event, index) => ({ event, index })).filter(({event}) => event.type !== 'mvp');
+  if (!events.length) return '';
+  const paragraphs = [];
+  const scoreLabel = score => teamName('home') + ' ' + score[0] + '-' + score[1] + ' ' + teamName('away');
+  const minuteLabel = e => e.min ? e.min + '′ – ' : '';
+  for (const {event:e,index} of events) {
+    const score = scoreAt(index), team = teamName(e.team);
+    let sentence = '';
+    switch (e.type) {
+      case 'kickoff': paragraphs.push('**Primo tempo**'); sentence = 'L’arbitro fischia l’inizio della partita. Le due squadre sono in campo e la gara prende il via.'; break;
+      case 'halftime': paragraphs.push('**Intervallo**'); sentence = 'Si chiude il primo tempo. Il risultato parziale è ' + scoreLabel(score) + '.'; break;
+      case 'secondhalf': paragraphs.push('**Secondo tempo**'); sentence = 'Le squadre tornano in campo: inizia la ripresa.'; break;
+      case 'fulltime': paragraphs.push('**Finale**'); sentence = 'Arriva il triplice fischio: la partita termina ' + scoreLabel(score) + '.'; break;
+      case 'goal': sentence = e.kind === 'autogol'
+        ? 'Autogol: ' + (e.player || 'un giocatore') + ' (' + team + ') devia il pallone nella propria porta. Il risultato è ' + scoreLabel(score) + '.'
+        : 'GOL ' + team.toUpperCase() + '! ' + (e.player || 'Un giocatore') + ' trova la rete' + (e.kind === 'rigore' ? ' dal dischetto' : e.kind === 'punizione' ? ' su calcio di punizione' : e.kind === 'testa' ? ' con un colpo di testa' : '') + (e.assist ? ', su assist di ' + e.assist : '') + '. ' + scoreLabel(score) + '.';
+        break;
+      case 'shot': sentence = e.kind === 'fuori' ? (e.player || team) + ' prova la conclusione, ma il tiro termina fuori.' : e.kind === 'in_porta' ? (e.player || team) + ' calcia verso la porta: conclusione nello specchio.' : (e.player || team) + ' tenta la conclusione per ' + team + '.'; break;
+      case 'save': sentence = 'Intervento del portiere ' + (e.player ? e.player + ' (' + team + ')' : 'di ' + team) + ': ' + (e.kind === 'facile' ? 'parata senza particolari difficoltà' : 'una parata importante') + '.'; break;
+      case 'miss': sentence = 'Occasione per ' + team + (e.player ? ' con ' + e.player : '') + ': ' + String(e.kind || 'azione pericolosa').toLowerCase() + '.'; break;
+      case 'crossbar': sentence = 'La conclusione di ' + (e.player || team) + ' si stampa sulla traversa!'; break;
+      case 'corner': sentence = 'Calcio d’angolo per ' + team + (e.cornerSide ? ' dalla ' + e.cornerSide : '') + '.'; break;
+      case 'freekick': sentence = 'Calcio di punizione per ' + team + (e.player ? ', battuto da ' + e.player : '') + (e.freeKickZone ? ' (' + freeKickZoneLabel(e.freeKickZone) + ')' : '') + '.'; break;
+      case 'foul': sentence = e.kind === 'rigore' && e.foulInArea !== false ? 'Calcio di rigore assegnato a ' + team + ' per un fallo in area.' : 'L’arbitro fischia un fallo a favore di ' + team + (e.player ? ': ' + e.player + ' è coinvolto nell’azione' : '') + '.'; break;
+      case 'yellow': sentence = 'Cartellino giallo per ' + (e.player || 'un giocatore') + ' (' + team + ').'; break;
+      case 'red': sentence = 'Espulsione per ' + (e.player || 'un giocatore') + ' (' + team + ')' + (e.kind === 'doppio' ? ' per doppia ammonizione' : '') + ': la squadra prosegue in inferiorità numerica.'; break;
+      case 'sub': sentence = 'Cambio per ' + team + ': entra ' + (e.inn || 'un giocatore') + ' ed esce ' + (e.out || 'un compagno') + '.'; break;
+      case 'offside': sentence = 'Segnalato fuorigioco a ' + team + (e.player ? ' per ' + e.player : '') + '.'; break;
+      case 'injury': sentence = 'Gioco interrotto per un infortunio a ' + (e.player || 'un giocatore') + ' (' + team + ').'; break;
+      case 'note': sentence = String(e.note || '').trim(); break;
+    }
+    if (sentence) paragraphs.push(minuteLabel(e) + sentence);
+  }
+  return paragraphs.join('\n\n');
+}
+function chroniclePublicHtml() {
+  const text = String(S.match.chroniclePublished || '').trim();
+  return text ? '<section class="card published-chronicle"><h2>Cronaca della partita</h2><div class="chronicle-copy">' + esc(text).replace(/\n/g, '<br>') + '</div></section>' : '';
 }
 
 /* ================= resoconto automatico di fine partita ================= */
@@ -3641,7 +3683,7 @@ function regiaHtml() {
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('');
-  else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
+  else if (t === 'social') body = `<div class="card"><h2>Cronaca narrativa</h2><p class="small muted">Testo generato dagli eventi registrati. Puoi modificarlo e salvarlo come bozza; la pagina pubblica lo mostrerà soltanto dopo la tua pubblicazione esplicita.</p><label class="f"><span>Testo della cronaca</span><textarea id="chronicleEditor" rows="18">${esc(S.match.chronicleDraft || buildChronicleDraft())}</textarea></label><div class="row2 stack"><button class="btn" data-a="saveChronicleDraft">Salva bozza</button><button class="btn" data-a="regenerateChronicle">Rigenera dagli eventi</button></div><button class="btn primary block" data-a="publishChronicle">Pubblica cronaca sulla pagina live</button><p class="small muted">${S.match.chroniclePublished ? 'Una cronaca è attualmente pubblicata. La nuova versione la sostituirà soltanto quando premi Pubblica.' : 'Nessuna cronaca narrativa è attualmente pubblicata.'}</p></div><div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Resoconto finale completo</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca eventi</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();
@@ -4073,6 +4115,9 @@ document.addEventListener('click', async e => {
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
     case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
+    case 'saveChronicleDraft': { const value=$('#chronicleEditor')?.value.trim()||''; if(!value){toast('La bozza è vuota');break;} S.match.chronicleDraft=value; commit(true); toast('Bozza della cronaca salvata: non è pubblica'); break; }
+    case 'regenerateChronicle': { const value=buildChronicleDraft(); const editor=$('#chronicleEditor'); if(editor)editor.value=value; S.match.chronicleDraft=value; commit(true); toast('Bozza rigenerata dagli eventi registrati'); break; }
+    case 'publishChronicle': { const value=$('#chronicleEditor')?.value.trim()||''; if(!value){toast('Scrivi o genera prima la cronaca');break;} if(!confirm('Pubblicare questa cronaca sulla pagina pubblica SANTA Live?'))break; S.match.chronicleDraft=value; S.match.chroniclePublished=value; S.match.chroniclePublishedAt=new Date().toISOString(); commit(true); toast('Cronaca pubblicata sulla pagina live'); renderMain(); break; }
     case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
     case 'rmmvptpl': S.mvp.tpl = ''; S.mvp.raw = false; commit(true); renderMain(); break;
