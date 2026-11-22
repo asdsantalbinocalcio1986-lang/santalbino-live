@@ -3720,7 +3720,7 @@ function buildMatchReport() {
 
   const opening = 'La partita tra ' + home + ' e ' + away + (meta ? ', disputata ' + meta : '') + ' si conclude ' +
     (homeGoals === awayGoals ? 'in parità' : 'con la vittoria di ' + (homeGoals > awayGoals ? home : away)) +
-    ', con il risultato di' + result + '.';
+    ', con il risultato di ' + scoreText(homeGoals) + ' a ' + scoreText(awayGoals) + '.';
   const firstText = halfText(first, 'La prima parte dell’incontro');
   const secondText = halfText(second, 'Nella ripresa');
   const closing = homeGoals === awayGoals
