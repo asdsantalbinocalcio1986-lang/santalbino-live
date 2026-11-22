@@ -3427,20 +3427,20 @@ function buildMatchReport() {
   return `RESOCONTO FINALE\n${title}\n${meta}\n\n${paragraphs.join('\n\n')}\n\n${lineups}\n\n${S.match.hashtag || ''}`.trim();
 }
 function buildMatchSummary() {
-  const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
+  const score = scoreOf(S.events), home = teamName('home'), away = teamName('away');
   const goals = S.events.filter(e => e.type === 'goal').slice().sort((x,y) => {
     const minute = e => { const m = String(e.min || '').match(/^(\d+)(?:\s*\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
     return minute(x) - minute(y);
   });
   const scorers = goals.length ? goals.map(e => {
     const scorer = e.player || 'Autore del gol';
-    const minute = e.min ? \` (\${e.min}′)\` : '';
+    const minute = e.min ? ' (' + e.min + '′)' : '';
     const own = e.kind === 'autogol' ? ' (autogol)' : '';
-    return \`\${scorer} – \${teamName(scoringSide(e))}\${minute}\${own}\`;
+    return scorer + ' – ' + teamName(scoringSide(e)) + minute + own;
   }) : [];
-  const result = \`\${home} \${h}-\${a} \${away}\`;
-  const scorerLine = scorers.length ? \`Marcatori: \${scorers.join('; ')}.\` : 'Marcatori: nessuno.';
-  return \`\${result}\n\${scorerLine}\`;
+  const result = home + ' ' + score[0] + '-' + score[1] + ' ' + away;
+  const scorerLine = scorers.length ? 'Marcatori: ' + scorers.join('; ') + '.' : 'Marcatori: nessuno.';
+  return result + '\n' + scorerLine;
 }
 async function renderMatchResultGraphic() {
   const [h, a] = scoreOf(S.events), W = 1600, H = 1200, canvas = document.createElement('canvas');
