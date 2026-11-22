@@ -3677,7 +3677,7 @@ function buildMatchReport() {
     return 'al minuto ' + m.base + (m.extra ? ' più ' + m.extra : '');
   };
   const eventSide = ev => ev.team === 'home' || ev.team === 'away' ? ev.team : '';
-  const cleanName = value => String(value || '').trim();
+  const cleanName = value => String(value || '').trim().toLocaleLowerCase('it').replace(/(^|[\\s'’-])([\\p{L}])/gu, (_, sep, letter) => sep + letter.toLocaleUpperCase('it'));
   const eventPhrase = ev => {
     const player = cleanName(ev.player);
     const at = minuteText(ev);
@@ -3779,15 +3779,20 @@ function buildMatchReport() {
           const dir = String(x.event.cornerSide || '').toLowerCase();
           if (dir === 'destra' || dir === 'sinistra') directions[dir]++;
         });
-        const detail = [];
-        if (directions.destra) detail.push(directions.destra + (directions.destra === 1 ? ' dalla destra' : ' dalla destra'));
-        if (directions.sinistra) detail.push(directions.sinistra + (directions.sinistra === 1 ? ' dalla sinistra' : ' dalla sinistra'));
-        const directionText = detail.length ? ', ' + naturalJoin(detail) : '';
+        const directionParts = [];
+        if (directions.destra) directionParts.push(directions.destra + (directions.destra === 1 ? ' dalla destra' : ' dalla destra'));
+        if (directions.sinistra) directionParts.push(directions.sinistra + (directions.sinistra === 1 ? ' dalla sinistra' : ' dalla sinistra'));
+        const directionsText = directionParts.length ? ' ' + naturalJoin(directionParts) : '';
+        const times = corners.map(x => minuteText(x.event)).filter(Boolean);
+        const timeText = times.length ? ', tra ' + naturalJoin(times) : '';
         const cornerText = corners.length === 1
-          ? 'un calcio d’angolo' + (directionText ? directionText : '')
-          : corners.length + ' calci d’angolo' + directionText;
-        clauses.push((attacks.length ? (side === 'home' ? 'La pressione dei padroni di casa' : side === 'away' ? 'Gli ospiti' : 'La pressione') : intro) +
-          (attacks.length ? ' porta a ' : ' conquistano ') + cornerText + '.');
+          ? 'un calcio d’angolo' + directionsText + (times.length ? ' al ' + times[0].replace(/^al /, '') : '')
+          : corners.length + ' calci d’angolo' + directionsText + timeText;
+        if (attacks.length) {
+          clauses.push((side === 'home' ? 'La pressione dei padroni di casa' : side === 'away' ? 'La risposta degli ospiti' : 'La pressione') + ' porta a ' + cornerText + '.');
+        } else {
+          clauses.push(intro + ': conquistano ' + cornerText + '.');
+        }
       }
       if (clauses.length) output.push(clauses.join(' '));
       flow = [];
@@ -3808,17 +3813,18 @@ function buildMatchReport() {
     });
     flushFlow();
     if (!output.length) return label + ' non registra episodi di particolare rilievo.';
-    return label + ', ' + output.join(' ');
+    const firstParagraph = output[0].charAt(0).toLowerCase() + output[0].slice(1);
+    return label + ', ' + [firstParagraph].concat(output.slice(1)).join(' ');
   }
 
   const winnerSide = homeGoals === awayGoals ? '' : homeGoals > awayGoals ? 'home' : 'away';
   const details = [];
   if (S.match.comp) details.push('valida per ' + S.match.comp);
   if (fmtDate(S.match.date)) details.push('disputata il ' + fmtDate(S.match.date));
-  if (S.match.venue) details.push('giocata al ' + S.match.venue);
+  if (S.match.venue) details.push('al ' + S.match.venue);
   let opening = homeGoals === awayGoals
-    ? 'La sfida tra ' + home + ' e ' + away + (details.length ? ', ' + details.join(' e ') : '') + ' termina in parità, con il risultato di ' + scoreText(homeGoals, awayGoals) + '.'
-    : 'La sfida tra ' + home + ' e ' + away + (details.length ? ', ' + details.join(' e ') : '') + ' si chiude con la vittoria di ' + (winnerSide === 'home' ? home : away) + ' per ' + scoreText(homeGoals, awayGoals) + '.';
+    ? 'La sfida tra ' + home + ' e ' + away + (details.length ? ', ' + details.join(', ') : '') + ' termina in parità, con il risultato di ' + scoreText(homeGoals, awayGoals) + '.'
+    : 'La sfida tra ' + home + ' e ' + away + (details.length ? ', ' + details.join(', ') : '') + ' si chiude con la vittoria di ' + (winnerSide === 'home' ? home : away) + ' per ' + scoreText(homeGoals, awayGoals) + '.';
 
   const firstText = halfParagraph(firstHalf, 'Nella prima frazione');
   const secondText = halfParagraph(secondHalf, 'Nella ripresa');
@@ -3835,7 +3841,7 @@ function buildMatchReport() {
     const starters = players.filter(p => p.starter);
     const bench = players.filter(p => !p.starter);
     const format = p => (p.num ? p.num + ' ' : '') + p.name;
-    return teamName(side) + ': ' + (starters.length ? 'titolari ' + starters.map(format).join(', ') : 'titolari non inseriti') +
+    return teamName(side) + ': ' + (starters.length ? 'titolari ' + starters.map(p => (p.num ? p.num + ' ' : '') + cleanName(p.name)).join(', ') : 'titolari non inseriti') +
       (bench.length ? '. A disposizione ' + bench.map(format).join(', ') : '') + '.';
   });
   return opening + '\n\n' + firstText + '\n\n' + secondText + ' ' + closing + mvpLine +
