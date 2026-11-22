@@ -3791,10 +3791,10 @@ function feedHtml(list) {
       ${editing ? `<textarea data-edtext rows="5">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
       <div class="meta"><span class="chip ${so.status}">${so.status === 'pubblicato' ? 'Su Facebook' : 'Da pubblicare'}</span>
       ${editing ? `<button class="btn sm primary" data-a="saveedit">Salva testo</button><button class="btn sm" data-a="canceledit">Annulla</button>`
-        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Modifica</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
+        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
   }).join('');
 }
-let editId = null, armedDel = null;
+let editId = null, armedDel = null, editingEventId = null;
 function matchTimelineHtml() {
   const actions = S.events
     .filter(e => !PHASE_EV[e.type] && e.type !== 'mvp' && ['home', 'away'].includes(e.team) && e.min !== '' && e.min != null)
@@ -4200,6 +4200,8 @@ document.addEventListener('click', async e => {
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
     case 'editevent': if (!CAN_EDIT || L.mode !== 'regia' || !ev) { toast('Modifica evento disponibile solo dalla regia'); break; } editEvent(ev.id); break;
+    case 'canceledit': editId = null; renderMain(); break;
+    case 'saveedit': socialOf(ev.id).text = $('[data-edtext]', row).value; saveL(); editId = null; renderMain(); break;
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
     case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s || 'both'); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
