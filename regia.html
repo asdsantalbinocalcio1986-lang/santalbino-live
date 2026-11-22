@@ -2964,10 +2964,10 @@ async function renderFormationGraphic(side = 'both') {
 
   const panelY = combined ? 270 : 300;
   const panelH = combined ? 1150 : 620;
-  const panelW = combined ? 840 : 1080;
+  const panelW = combined ? 840 : 1440;
   const panels = combined
     ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 920, accent: '#f0c56b' }]
-    : [{ key: selectedSides[0], x: 260, accent: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
+    : [{ key: selectedSides[0], x: 80, accent: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
 
   for (const panel of panels) {
     const team = teams[panel.key], px = panel.x;
