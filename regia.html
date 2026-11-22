@@ -3695,7 +3695,7 @@ function buildMatchReport() {
       case 'crossbar':
         return prefix + 'la conclusione di ' + (player || 'un attaccante') + ' si stampa sulla traversa';
       case 'miss':
-        return prefix + (player || 'La squadra') + ' si rende pericoloso' + (player ? ' con una buona occasione' : ' con una buona occasione');
+        return prefix + (player ? player + ' ha una buona occasione' : 'la squadra si rende pericolosa con una buona occasione');
       case 'corner':
         return prefix + 'arriva un calcio d’angolo' + (ev.cornerSide ? ' dalla ' + (String(ev.cornerSide).toLowerCase() === 'destra' ? 'destra' : 'sinistra') : '');
       case 'foul':
@@ -3717,9 +3717,9 @@ function buildMatchReport() {
       case 'goal': {
         const current = scoreAt(S.events.indexOf(ev));
         const team = sideLabel(scoringSide(ev));
-        if (ev.kind === 'autogol') return prefix + (player || 'un giocatore') + ' devia il pallone nella propria porta, portando ' + team + ' in vantaggio. Il punteggio diventa ' + scoreText(current[0], current[1]) + '.';
+        if (ev.kind === 'autogol') return prefix + (player || 'un giocatore') + ' devia il pallone nella propria porta e regala una rete a ' + team + '. Il punteggio diventa ' + scoreText(current[0], current[1]) + '.';
         const how = ev.kind === 'rigore' ? ' dal dischetto' : ev.kind === 'punizione' ? ' direttamente su calcio di punizione' : ev.kind === 'testa' ? ' con un colpo di testa' : '';
-        return prefix + (player || 'un giocatore') + ' porta in rete ' + team + how + (ev.assist ? ', su assist di ' + ev.assist : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
+        return prefix + (player || 'un giocatore') + ' firma la rete per ' + team + how + (ev.assist ? ', su assist di ' + ev.assist : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
       }
       case 'yellow':
         return prefix + 'il direttore di gara estrae il cartellino giallo nei confronti di ' + (player || 'un giocatore') + '.';
@@ -3729,8 +3729,10 @@ function buildMatchReport() {
         return prefix + 'cambio in campo: ' + (ev.inn || 'un giocatore') + ' entra al posto di ' + (ev.out || 'un compagno') + '.';
       case 'injury':
         return prefix + 'il gioco viene interrotto per consentire i soccorsi a ' + (player || 'un giocatore') + '.';
-      case 'note':
-        return ev.note ? prefix + ev.note.trim().replace(/[.!?]*$/, '.') : '';
+      case 'note': {
+        const note = String(ev.note || '').replace(/#[\\p{L}\\p{N}_]+/gu, '').replace(/[\\u{1F300}-\\u{1FAFF}]/gu, '').replace(/\\s{2,}/g, ' ').trim();
+        return note ? prefix + note.replace(/[.!?]*$/, '.') : '';
+      }
       default:
         return '';
     }
@@ -3785,23 +3787,22 @@ function buildMatchReport() {
     return label + ' ' + output.join(' ');
   }
 
-  let opening;
-  if (homeGoals === awayGoals) {
-    opening = 'Termina in parità la sfida tra ' + home + ' e ' + away + ', con il risultato di ' + scoreText(homeGoals, awayGoals) + '.';
-  } else {
-    const winner = homeGoals > awayGoals ? home : away;
-    const loser = homeGoals > awayGoals ? away : home;
-    opening = 'Una sconfitta per ' + loser + ', superata da ' + winner + ' con il risultato di ' + scoreText(homeGoals, awayGoals) + '.';
-  }
-  const meta = [S.match.comp, fmtDate(S.match.date), S.match.venue].filter(Boolean);
-  if (meta.length) opening += ' La gara, valida per ' + (S.match.comp || 'la competizione'), 
-    opening = opening.replace('La gara, valida per ' + (S.match.comp || 'la competizione'), 'La gara si è disputata' + (S.match.venue ? ' al ' + S.match.venue : '') + (fmtDate(S.match.date) ? ' il ' + fmtDate(S.match.date) : '') + (S.match.comp ? ', per ' + S.match.comp : '') + '.');
+  const winnerSide = homeGoals === awayGoals ? '' : homeGoals > awayGoals ? 'home' : 'away';
+  let opening = homeGoals === awayGoals
+    ? 'La sfida tra ' + home + ' e ' + away + ' termina in parità, con il risultato di ' + scoreText(homeGoals, awayGoals) + '.'
+    : 'La sfida tra ' + home + ' e ' + away + ' si chiude con la vittoria di ' + (winnerSide === 'home' ? home : away) + ' per ' + scoreText(homeGoals, awayGoals) + '.';
+  const details = [];
+  if (S.match.comp) details.push('valida per ' + S.match.comp);
+  if (fmtDate(S.match.date)) details.push('disputata il ' + fmtDate(S.match.date));
+  if (S.match.venue) details.push('al ' + S.match.venue);
+  if (details.length) opening += ' La partita, ' + details.join(', ') + '.';
+
   const firstText = halfParagraph(firstHalf, 'Nella prima frazione');
   const secondText = halfParagraph(secondHalf, 'Nella ripresa');
 
   const closing = homeGoals === awayGoals
     ? 'Al fischio finale le due squadre si dividono la posta.'
-    : 'Nonostante il tentativo di rimonta, il risultato non cambia e al fischio finale ' + (homeGoals > awayGoals ? 'gli ospiti' : 'i padroni di casa') + ' possono festeggiare la vittoria.';
+    : 'Nonostante il tentativo di rimonta, il risultato non cambia e al fischio finale ' + (winnerSide === 'home' ? 'i padroni di casa' : 'gli ospiti') + ' possono festeggiare la vittoria.';
   const mvp = S.events.find(e => e.type === 'mvp');
   const mvpLine = mvp ? '\n\nUna menzione speciale va a ' + cleanName(mvp.player) + ', scelto come migliore in campo' + (mvp.votes ? ' con ' + mvp.votes + ' voti' : '') + '.' : '';
 
