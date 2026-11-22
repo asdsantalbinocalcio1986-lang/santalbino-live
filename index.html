@@ -3899,11 +3899,11 @@ function renderSheet() {
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
   $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${editingEventId ? 'Modifica evento' : esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
-    <label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>
+    ${editingEventId ? '' : '<label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>'}
     <button type="button" class="btn primary block" data-sub="go">${editingEventId ? 'Salva modifiche evento' : 'Registra evento'}</button></form>`;
   refreshPreview(); if (keepText !== null) $('#fText').value = keepText;
 }
-function refreshPreview() { if (!textManual && draft) { const ev = draftEvent(); $('#fText').value = buildText(ev, scoreOf([...S.events, ev])); } }
+function refreshPreview() { if (!textManual && draft && $('#fText')) { const ev = draftEvent(); $('#fText').value = buildText(ev, scoreOf([...S.events, ev])); } }
 
 /* ================= finestra di pubblicazione social ================= */
 let postId = null, postUrl = '';
