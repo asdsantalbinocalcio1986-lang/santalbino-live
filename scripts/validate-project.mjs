@@ -103,6 +103,9 @@ for (const [index, attrs, body] of regiaScripts) {
   regiaChecked++;
 }
 assert.ok(regiaChecked >= 1, 'Script inline della regia mancante o non verificabile');
+assert.match(regia, /story \? 1080 : 1600[\s\S]*story \? 1920 : 1100/, 'La grafica singola deve supportare il formato Storie Instagram 9:16');
+assert.match(regia, /x\.textAlign = 'center';\s*fitFont\(x, p\.name/, 'I nomi dei giocatori nella grafica singola devono essere centrati');
+assert.match(regia, /previewLineupStory[\s\S]*instagram-story-1080x1920/, 'La regia deve consentire anteprima e salvataggio del formato Storie');
 
 
 
