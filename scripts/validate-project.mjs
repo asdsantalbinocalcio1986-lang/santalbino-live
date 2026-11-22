@@ -39,7 +39,7 @@ assert.match(html, /<img src="\$\{esc\(lg\)\}" alt="">/, 'I loghi devono essere 
 assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ht'; addPhase\('halftime', endMinute\)/, 'Il recupero del primo tempo deve essere conservato');
 assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ft'; addPhase\('fulltime', endMinute\)/, 'Il recupero del secondo tempo deve essere conservato');
 assert.match(html, /const scorerLine = scorers\.length \? 'Marcatori: '/, 'Il riepilogo MATCH RESULT deve preparare la riga dei marcatori');
-assert.match(html, /return result \+ '\\\\n' \+ scorerLine;/, 'Il riepilogo MATCH RESULT deve contenere risultato e marcatori');
+assert.ok(html.includes("return result + '\\n' + scorerLine;"), 'Il riepilogo MATCH RESULT deve contenere risultato e marcatori');
 assert.match(html, /if \(!S\.match\.pollId\) S\.match\.pollId = uid\(\);/);
 
 
