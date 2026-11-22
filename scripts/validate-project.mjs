@@ -38,7 +38,8 @@ assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
 assert.match(html, /<img src="\$\{esc\(lg\)\}" alt="">/, 'I loghi devono essere escapati negli attributi HTML');
 assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ht'; addPhase\('halftime', endMinute\)/, 'Il recupero del primo tempo deve essere conservato');
 assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ft'; addPhase\('fulltime', endMinute\)/, 'Il recupero del secondo tempo deve essere conservato');
-assert.match(html, /Per \$\{ourName\}, \$\{resultLabel\}/, 'Il mini riepilogo deve usare una frase grammaticalmente corretta');
+assert.match(html, /const scorerLine = scorers\.length \? 'Marcatori: '/, 'Il riepilogo MATCH RESULT deve preparare la riga dei marcatori');
+assert.match(html, /return result \+ '\\\\n' \+ scorerLine;/, 'Il riepilogo MATCH RESULT deve contenere risultato e marcatori');
 assert.match(html, /if \(!S\.match\.pollId\) S\.match\.pollId = uid\(\);/);
 
 
