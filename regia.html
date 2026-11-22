@@ -3661,30 +3661,74 @@ function proclaim() {
 
 /* ================= resoconto automatico di fine partita ================= */
 function buildMatchReport() {
-  const [h, a] = scoreOf(S.events), date = fmtDate(S.match.date), title = `${teamName('home')} ${h}-${a} ${teamName('away')}`;
+  const [h, a] = scoreOf(S.events), date = fmtDate(S.match.date);
+  const title = `${teamName('home')} ${h}-${a} ${teamName('away')}`;
   const meta = [S.match.comp, date, S.match.venue].filter(Boolean).join(' · ');
-  const goals = S.events.filter(e => e.type === 'goal').map(e => {
-    const side = scoringSide(e), name = e.player || 'un giocatore';
-    const method = e.kind === 'autogol' ? ' (autogol)' : e.kind === 'rigore' ? ' (su rigore)' : e.kind === 'punizione' ? ' (su punizione)' : e.kind === 'testa' ? ' (di testa)' : '';
-    return `${e.min ? e.min + '′ ' : ''}${name} (${teamName(side)})${method}`;
-  });
-  const opening = `Si chiude sul risultato di ${h}-${a} la partita tra ${teamName('home')} e ${teamName('away')}${meta ? ', valida per ' + meta : ''}.`;
-  const paragraphs = [opening];
-  if (goals.length) paragraphs.push(`Le reti: ${goals.join('; ')}.`);
-  else paragraphs.push('La gara si conclude senza reti.');
-  const details = S.events
-    .filter(e => !['goal','kickoff','halftime','secondhalf','fulltime','mvp'].includes(e.type))
-    .map(e => buildText(e, scoreAt(S.events.indexOf(e))).replace(/\n/g, ' '));
-  if (details.length) paragraphs.push(`Nel corso dell'incontro: ${details.join(' ')}`);
-  const mvp = S.events.find(e => e.type === 'mvp');
-  if (mvp) paragraphs.push(`Il pubblico ha scelto ${mvp.player} (${teamName(mvp.team)}) come migliore in campo${mvp.votes ? ', con ' + mvp.votes + ' voti' : ''}.`);
+  const secondHalfIndex = S.events.findIndex(e => e.type === 'secondhalf');
+  const firstHalf = secondHalfIndex >= 0
+    ? S.events.slice(0, secondHalfIndex)
+    : S.events.filter(e => {
+        const minute = Number(String(e.min || '').match(/^\d+/)?.[0] || 0);
+        return !minute || minute <= 45;
+      });
+  const secondHalf = secondHalfIndex >= 0
+    ? S.events.slice(secondHalfIndex + 1)
+    : S.events.filter(e => {
+        const minute = Number(String(e.min || '').match(/^\d+/)?.[0] || 0);
+        return minute > 45;
+      });
 
-  // Inserisce nel resoconto le rose effettivamente registrate nella regia.
+  function eventSentence(e) {
+    const minute = e.min ? `Al ${e.min}′, ` : '';
+    const team = teamName(e.team);
+    const player = e.player || '';
+    switch (e.type) {
+      case 'goal': {
+        const scorer = scoringSide(e);
+        const method = e.kind === 'autogol' ? ' con un’autorete'
+          : e.kind === 'rigore' ? ' dal dischetto'
+          : e.kind === 'punizione' ? ' su calcio di punizione'
+          : e.kind === 'testa' ? ' di testa' : '';
+        if (e.kind === 'autogol') return `${minute}${player ? player : 'Un giocatore'} devia il pallone nella propria porta: rete a favore di ${teamName(scorer)}.`;
+        return `${minute}${player || 'La squadra'} trova la rete per ${teamName(scorer)}${method}${e.assist ? `, su assist di ${e.assist}` : ''}.`;
+      }
+      case 'yellow': return `${minute}ammonizione per ${player || 'un giocatore'} di ${team}.`;
+      case 'red': return `${minute}espulsione per ${player || 'un giocatore'} di ${team}.`;
+      case 'sub': return `${minute}${team} cambia: ${e.inn || 'un giocatore'} prende il posto di ${e.out || 'un compagno'}.`;
+      case 'shot': return `${minute}${player ? player + ' (' + team + ')' : team} prova la conclusione: ${describeShot(e).toLowerCase()}.`;
+      case 'save': return `${minute}${player ? player + ' (' + team + ')' : team} è protagonista di ${e.kind === 'complicata' ? 'un intervento decisivo' : 'una parata'}.`;
+      case 'crossbar': return `${minute}la conclusione di ${player || team} si stampa sulla traversa.`;
+      case 'miss': return `${minute}${player ? player + ' (' + team + ')' : team} non concretizza una buona occasione.`;
+      case 'foul': return `${minute}fallo di ${player || team}${e.kind === 'rigore' && e.foulInArea !== false ? ', con calcio di rigore assegnato' : e.handball ? ', per un intervento di mano' : ''}.`;
+      case 'corner': return `${minute}calcio d’angolo per ${team}.`;
+      case 'freekick': return `${minute}calcio di punizione per ${team}.`;
+      case 'offside': return `${minute}segnalato fuorigioco a ${player || team}.`;
+      case 'injury': return `${minute}gioco momentaneamente fermo per soccorrere ${player || 'un giocatore'} di ${team}.`;
+      case 'note': return e.note ? `${minute}${e.note.trim().replace(/[.!?]*$/, '.')}` : '';
+      default: return '';
+    }
+  }
+
+  const narrative = events => events
+    .filter(e => !['kickoff','halftime','secondhalf','fulltime','mvp'].includes(e.type))
+    .map(eventSentence)
+    .filter(Boolean);
+  const firstFacts = narrative(firstHalf);
+  const secondFacts = narrative(secondHalf);
+  const firstParagraph = firstFacts.length
+    ? 'La prima frazione si sviluppa così: ' + firstFacts.join(' ')
+    : 'La prima frazione scorre senza episodi registrati dalla regia.';
+  const secondParagraph = secondFacts.length
+    ? 'Nella ripresa: ' + secondFacts.join(' ')
+    : 'Nel secondo tempo non risultano altri episodi registrati dalla regia.';
+  const conclusion = `Al triplice fischio il risultato premia ${h === a ? 'l’equilibrio tra le due squadre' : (S.match.ourSide === 'home' ? h > a : a > h) ? teamName(S.match.ourSide) : teamName(other(S.match.ourSide))}, con il punteggio finale di ${h}-${a}.`;
+  const mvp = S.events.find(e => e.type === 'mvp');
+  const mvpLine = mvp ? ` Il riconoscimento di migliore in campo va a ${mvp.player} (${teamName(mvp.team)})${mvp.votes ? `, scelto con ${mvp.votes} voti` : ''}.` : '';
+
   const lineupSections = ['home', 'away'].map(side => {
     const players = parseRoster(S.rosters[side]);
     if (!players.length) return `FORMAZIONE ${teamName(side).toUpperCase()}\nFormazione non inserita.`;
-    const starters = players.filter(p => p.starter);
-    const bench = players.filter(p => !p.starter);
+    const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
     const format = p => (p.num ? p.num + ' ' : '') + p.name;
     return [
       `FORMAZIONE ${teamName(side).toUpperCase()}`,
@@ -3693,7 +3737,17 @@ function buildMatchReport() {
     ].filter(Boolean).join('\n');
   });
   const lineups = `FORMAZIONI\n\n${lineupSections.join('\n\n')}`;
-  return `RESOCONTO FINALE\n${title}\n${meta}\n\n${paragraphs.join('\n\n')}\n\n${lineups}\n\n${S.match.hashtag || ''}`.trim();
+  return `RESOCONTO FINALE
+${title}
+${meta}
+
+${firstParagraph}
+
+${secondParagraph} ${conclusion}${mvpLine}
+
+${lineups}
+
+${S.match.hashtag || ''}`.trim();
 }
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
