@@ -3429,27 +3429,18 @@ function buildMatchReport() {
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
   const goals = S.events.filter(e => e.type === 'goal').slice().sort((x,y) => {
-    const minute = e => { const m = String(e.min || '').match(/^(\d+)(?:\s*\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
+    const minute = e => { const m = String(e.min || '').match(/^(\\d+)(?:\\s*\\+\\s*(\\d+))?/); return m ? Number(m[1]) + Number(m[2] || 0) / 100 : 999; };
     return minute(x) - minute(y);
   });
-  const goalText = goals.length ? goals.map(e => {
-    const scorer = e.player || 'Un giocatore';
-    const minute = e.min ? ` al ${e.min}′` : '';
+  const scorers = goals.length ? goals.map(e => {
+    const scorer = e.player || 'Autore del gol';
+    const minute = e.min ? ` (${e.min}′)` : '';
     const own = e.kind === 'autogol' ? ' (autogol)' : '';
-    return `${scorer} (${teamName(scoringSide(e))})${minute}${own}`;
+    return `${scorer} – ${teamName(scoringSide(e))}${minute}${own}`;
   }) : [];
-  const ourGoals = goals.filter(e => scoringSide(e) === S.match.ourSide).length;
-  const ourName = teamName(S.match.ourSide);
-  let outcome = h === a ? 'pareggio' : (S.match.ourSide === 'home' ? h > a : a > h) ? 'vittoria' : 'sconfitta';
-  const resultLabel = outcome === 'pareggio' ? 'è un pareggio' : outcome === 'vittoria' ? 'è una vittoria' : 'è una sconfitta';
-  const sentences = [`Per ${ourName}, ${resultLabel}: ${home} ${h}-${a} ${away}.`];
-  if (goalText.length) sentences.push(`A segno: ${goalText.join('; ')}.`);
-  else sentences.push(`Una partita senza reti: il risultato finale è ${h}-${a}.`);
-  const reds = S.events.filter(e => e.type === 'red');
-  if (reds.length) sentences.push('Nel corso della gara: ' + reds.map(e => `espulsione di ${e.player || 'un giocatore'} (${teamName(e.team)})${e.min ? ' al ' + e.min + '′' : ''}`).join('; ') + '.');
-  const meta = [S.match.comp, fmtDate(S.match.date)].filter(Boolean);
-  const footer = [meta.join(' · '), S.match.hashtag].filter(Boolean).join('\n\n');
-  return [sentences.join(' '), footer].filter(Boolean).join('\n\n');
+  const result = `${home} ${h}-${a} ${away}`;
+  const scorerLine = scorers.length ? `Marcatori: ${scorers.join('; ')}.` : 'Marcatori: nessuno.';
+  return `${result}\\n${scorerLine}`;
 }
 async function renderMatchResultGraphic() {
   const [h, a] = scoreOf(S.events), W = 1600, H = 1200, canvas = document.createElement('canvas');
