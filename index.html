@@ -1601,7 +1601,7 @@ function convocatiRegiaHtml() {
     <p class="small muted" style="margin-top:0">Inserisci i convocati, uno per riga. I nominativi saranno riportati nella grafica MATCH DAY, ma non nel testo del post.</p>
     <label class="f"><span>Giocatori convocati · uno per riga</span><textarea data-convocati rows="14" placeholder="Rossi&#10;Bianchi&#10;Verdi&#10;...">${esc(S.convocati)}</textarea></label>
     <div class="small muted" style="margin:-6px 0 12px">${count} giocatori inseriti</div>
-    <button class="btn primary block" data-a="saveconvocati">Salva bozza convocati</button></div>publicationControlsHtml()
+    <button class="btn primary block" data-a="saveconvocati">Salva bozza convocati</button></div>${publicationControlsHtml()}
     <div class="card"><h2>Grafica convocati</h2>
       <p class="small muted" style="margin-top:0">Crea un’immagine dedicata con il logo del Sant’Albino, i dati essenziali della gara e l’elenco completo dei convocati.</p>
       <button class="btn primary block" data-a="viewConvocatiGraphic">Genera grafica convocati</button>
@@ -3699,7 +3699,7 @@ function publicHtml() {
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
-  const convocatiPanel = parseRoster(S.convocati).length ? convocatiPublicHtml() : '';
+  const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
   return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
