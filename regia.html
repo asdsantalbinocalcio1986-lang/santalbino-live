@@ -3040,13 +3040,16 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
     x.fillStyle = panel.accent;
     x.beginPath(); x.arc(dividerX, panelY + 78, 6, 0, Math.PI * 2); x.fill();
 
+    // Le due colonne restano simmetriche rispetto al centro del pannello
+    // (e quindi alla filigrana), ma tutti i testi sono allineati a sinistra.
+    const columnTextInset = story ? 22 : 18;
     const drawColumnTitle = (label, count, cx, width, color) => {
-      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.textAlign = 'left'; x.textBaseline = 'middle';
       x.fillStyle = color; x.font = story ? '900 32px Arial,sans-serif' : '900 27px Arial,sans-serif';
-      x.fillText(label, cx + width / 2, panelY + (story ? 58 : 42));
+      x.fillText(label, cx + columnTextInset, panelY + (story ? 58 : 42));
       x.fillStyle = 'rgba(255,255,255,.72)';
       x.font = story ? '700 23px Arial,sans-serif' : '700 18px Arial,sans-serif';
-      x.fillText(String(count) + ' giocatori', cx + width / 2, panelY + (story ? 102 : 72));
+      x.fillText(String(count) + ' giocatori', cx + columnTextInset, panelY + (story ? 102 : 72));
     };
     drawColumnTitle('TITOLARI', starters.length, innerX, leftW, panel.accent);
     drawColumnTitle('RISERVE', bench.length, rightX, rightW, '#d5dce0');
@@ -3055,8 +3058,8 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
       if (!list.length) {
         x.fillStyle = 'rgba(255,255,255,.65)';
         x.font = story ? 'italic 23px Arial,sans-serif' : 'italic 19px Arial,sans-serif';
-        x.textAlign = 'center';
-        x.fillText('Nessuna riserva indicata', left + width / 2, contentTop + 34);
+        x.textAlign = 'left';
+        x.fillText('Nessuna riserva indicata', left + columnTextInset, contentTop + 34);
         return;
       }
       const rowH = Math.min(story ? 108 : 48, Math.floor(contentH / Math.max(1, maxRows || list.length)));
@@ -3070,9 +3073,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
         const available = Math.max(20, width - numberSize - gap - 8);
         const fontSize = Math.max(story ? 19 : 16, Math.min(story ? 31 : 25, rowH * (story ? .36 : .56)));
         fitFont(x, p.name || '', available, fontSize, 700, 'Arial,sans-serif');
-        const nameWidth = Math.min(available, x.measureText(p.name || '').width);
-        const groupWidth = numberSize + gap + nameWidth;
-        const numberX = left + Math.max(0, (width - groupWidth) / 2) + radius;
+        const numberX = left + columnTextInset + radius;
         const textX = numberX + radius + gap;
         x.fillStyle = color;
         x.beginPath(); x.arc(numberX, yy, radius, 0, Math.PI * 2); x.fill();
