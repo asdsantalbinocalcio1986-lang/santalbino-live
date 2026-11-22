@@ -3073,20 +3073,23 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
   return canvas;
 }
 let lineupGraphicSide = 'both';
-async function openLineupGraphic(side = 'both') {
+let lineupGraphicFormat = 'standard';
+async function openLineupGraphic(side = 'both', format = 'standard') {
   beginSponsorGraphic();
   lineupGraphicSide = side;
+  lineupGraphicFormat = format;
   const dlg = $('#graphicDlg');
   const single = side === 'home' || side === 'away';
   dlg.innerHTML = '<div class="sheethead"><h2>' + (single ? 'Grafica formazione' : 'Grafica unica delle formazioni') + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione immagine…</p>';
   if (!dlg.open) dlg.showModal();
   try {
-    const canvas = await renderFormationGraphic(side), url = canvas.toDataURL('image/jpeg', .92);
-    if (lineupGraphicSide !== side || !dlg.open) return;
-    const title = single ? 'Formazione · ' + teamName(side) : 'Formazioni delle due squadre';
+    const canvas = await renderFormationGraphic(side, format), url = canvas.toDataURL('image/jpeg', .92);
+    if (lineupGraphicSide !== side || lineupGraphicFormat !== format || !dlg.open) return;
+    const title = (single ? 'Formazione · ' + teamName(side) : 'Formazioni delle due squadre') + (format === 'story' ? ' · Instagram Stories' : '');
     const alt = single ? 'Grafica della formazione di ' + teamName(side) : 'Grafica unica con entrambe le formazioni';
     const actionLabel = single ? 'Salva grafica formazione' : 'Salva immagine unica';
-    dlg.innerHTML = '<div class="sheethead"><h2>' + esc(title) + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="' + url + '" alt="' + esc(alt) + '"><button class="btn primary block" type="button" data-a="saveLineupGraphic" data-s="' + side + '">' + actionLabel + '</button>';
+    const formatAction = single ? '<button class="btn block" type="button" data-a="' + (format === 'story' ? 'previewLineupStandard' : 'previewLineupStory') + '" data-s="' + side + '">' + (format === 'story' ? 'Torna al formato standard' : 'Prova formato Storie Instagram') + '</button>' : '';
+    dlg.innerHTML = '<div class="sheethead"><h2>' + esc(title) + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="' + url + '" alt="' + esc(alt) + '">' + formatAction + '<button class="btn primary block" type="button" data-a="saveLineupGraphic" data-s="' + side + '" data-f="' + format + '">' + actionLabel + (format === 'story' ? ' · 9:16' : '') + '</button>';
   } catch (err) {
     dlg.innerHTML = '<div class="sheethead"><h2>Immagine non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nella generazione.') + '</p>';
   }
@@ -4157,9 +4160,11 @@ document.addEventListener('click', async e => {
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
     case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); const url=S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
+    case 'previewLineupStory': await openLineupGraphic(a.dataset.s || 'home', 'story'); break;
+    case 'previewLineupStandard': await openLineupGraphic(a.dataset.s || 'home', 'standard'); break;
     case 'saveConvocatiGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderConvocatiGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'convocati-santalbino.jpg'); },'image/jpeg',.97); break; }
     case 'saveMatchDayGraphic': { S.convocati = $('[data-convocati]')?.value ?? S.convocati; commit(true); const cv = await renderMatchDayGraphic(); cv.toBlob(blob => { if(blob) saveBlob(blob,'match-day.jpg'); },'image/jpeg',.97); break; }
-    case 'saveLineupGraphic': { const side = a.dataset.s || 'both'; const cv = await renderFormationGraphic(side); cv.toBlob(blob => { if (blob) saveBlob(blob, side === 'both' ? 'formazioni-entrambe-le-squadre.jpg' : 'formazione-' + side + '.jpg'); }, 'image/jpeg', .92); break; }
+    case 'saveLineupGraphic': { const side = a.dataset.s || 'both', format = a.dataset.f || 'standard'; const cv = await renderFormationGraphic(side, format); cv.toBlob(blob => { if (blob) saveBlob(blob, side === 'both' ? 'formazioni-entrambe-le-squadre.jpg' : 'formazione-' + side + (format === 'story' ? '-instagram-story-1080x1920' : '') + '.jpg'); }, 'image/jpeg', .94); break; }
     case 'graphicclose': $('#graphicDlg').close(); break;
     case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'edit': editId = ev.id; renderMain(); break;
