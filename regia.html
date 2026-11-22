@@ -2895,7 +2895,19 @@ async function renderFormationGraphic(side = 'both') {
   if (!selectedSides.every(key => ['home','away'].includes(key) && teams[key].players.length)) {
     throw new Error(side === 'both' ? 'Inserisci e salva le formazioni di entrambe le squadre per creare l’immagine unica.' : 'Inserisci e salva la formazione di questa squadra prima di creare la grafica.');
   }
-  const W = 1600, H = 1100, canvas = document.createElement('canvas');
+  const startersBySide = {
+    home: teams.home.players.filter(p => p.starter),
+    away: teams.away.players.filter(p => p.starter)
+  };
+  if (side === 'both' && !['home','away'].every(key => startersBySide[key].length >= 11)) {
+    throw new Error('Per creare la grafica unica inserisci gli 11 titolari di entrambe le squadre: servono 22 giocatori.');
+  }
+
+  // La grafica combinata usa un formato più alto e due colonne simmetriche.
+  // Mostra esattamente gli 11 titolari per squadra: 22 giocatori sempre visibili.
+  const combined = side === 'both';
+  const W = combined ? 1800 : 1600, H = combined ? 1250 : 1100;
+  const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'formation',W,H);
   const [background, homeLogo, awayLogo] = await Promise.all([
@@ -2937,36 +2949,57 @@ async function renderFormationGraphic(side = 'both') {
     fitFont(x, name.toUpperCase(), 500, 30, 800, 'Arial,sans-serif');
     x.fillText(name.toUpperCase(), cx, 190);
   };
-  if (side === 'both') {
-    drawLogo(homeLogo, teams.home.name, 400);
-    drawLogo(awayLogo, teams.away.name, 1200);
+  if (combined) {
+    drawLogo(homeLogo, teams.home.name, 450);
+    drawLogo(awayLogo, teams.away.name, 1350);
     x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.font = '900 68px Arial,sans-serif'; x.fillText('VS', W / 2, 86);
-    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI', W / 2, 190);
+    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI · 22 TITOLARI', W / 2, 190);
   } else {
     const key = selectedSides[0], team = teams[key], logo = key === 'home' ? homeLogo : awayLogo;
     drawLogo(logo, team.name, W / 2);
     x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONE UFFICIALE', W / 2, 235);
   }
-  const panelY = side === 'both' ? 270 : 300, panelH = side === 'both' ? 650 : 620;
-  const panelW = side === 'both' ? 735 : 1080;
-  const panels = side === 'both'
-    ? [{ key: 'home', x: 45, logo: '#b8e7c8' }, { key: 'away', x: 820, logo: '#f0c56b' }]
-    : [{ key: selectedSides[0], x: 260, logo: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
+
+  const panelY = combined ? 270 : 300;
+  const panelH = combined ? 820 : 620;
+  const panelW = combined ? 840 : 1080;
+  const panels = combined
+    ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 920, accent: '#f0c56b' }]
+    : [{ key: selectedSides[0], x: 260, accent: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
+
   for (const panel of panels) {
     const team = teams[panel.key], px = panel.x;
     x.fillStyle = 'rgba(0,0,0,.72)';
     rrect(x, px, panelY, panelW, panelH, 22); x.fill();
-    const starters = team.players.filter(p => p.starter);
-    const bench = team.players.filter(p => !p.starter);
+    const starters = combined ? startersBySide[panel.key] : team.players.filter(p => p.starter);
+    const bench = combined ? [] : team.players.filter(p => !p.starter);
     x.textAlign = 'left'; x.textBaseline = 'middle';
-    x.fillStyle = panel.logo; x.font = '900 27px Arial,sans-serif';
+    x.fillStyle = panel.accent; x.font = '900 29px Arial,sans-serif';
     x.fillText('TITOLARI', px + 34, panelY + 48);
-    x.fillStyle = '#fff'; x.font = '700 20px Arial,sans-serif';
-    x.fillText(starters.length + ' giocatori', px + panelW - 155, panelY + 48);
+    x.fillStyle = '#fff'; x.font = '700 21px Arial,sans-serif';
+    x.textAlign = 'right';
+    x.fillText(starters.length + ' giocatori', px + panelW - 34, panelY + 48);
+    x.textAlign = 'left';
+
+    if (combined) {
+      const listTop = panelY + 125;
+      const rowH = Math.min(54, Math.floor((panelH - 205) / 11));
+      starters.slice(0, 11).forEach((p, i) => {
+        const yy = listTop + i * rowH;
+        x.fillStyle = panel.accent;
+        x.beginPath(); x.arc(px + 48, yy, 19, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#08291d'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = '800 18px Arial,sans-serif'; x.fillText(p.num || '•', px + 48, yy + 1);
+        x.textAlign = 'left'; x.fillStyle = '#fff';
+        fitFont(x, p.name || '', panelW - 125, 31, 700, 'Arial,sans-serif');
+        x.fillText(p.name || '', px + 82, yy);
+      });
+      continue;
+    }
+
     const listTop = panelY + 95;
-    const benchTop = listTop + Math.max(1, starters.length) * 36 + 20;
     const totalRows = starters.length + bench.length;
     const rowH = Math.min(36, Math.floor((panelH - 185) / Math.max(1, totalRows)));
     const drawList = (list, top, color) => list.forEach((p, i) => {
@@ -2980,15 +3013,15 @@ async function renderFormationGraphic(side = 'both') {
       fitFont(x, p.name || '', panelW - 100, Math.max(15, rowH - 5), 700, 'Arial,sans-serif');
       x.fillText(p.name || '', px + 70, yy);
     });
-    drawList(starters, listTop, panel.logo);
+    drawList(starters, listTop, panel.accent);
     if (bench.length) {
       const sepY = Math.min(panelY + panelH - 115, listTop + starters.length * rowH + 18);
       x.strokeStyle = 'rgba(255,255,255,.20)'; x.lineWidth = 1;
       x.beginPath(); x.moveTo(px + 30, sepY); x.lineTo(px + panelW - 30, sepY); x.stroke();
-      x.fillStyle = panel.logo; x.font = '900 24px Arial,sans-serif'; x.textAlign = 'left';
+      x.fillStyle = panel.accent; x.font = '900 24px Arial,sans-serif'; x.textAlign = 'left';
       x.fillText('PANCHINA', px + 34, sepY + 30);
       x.fillStyle = 'rgba(255,255,255,.65)'; x.font = '700 18px Arial,sans-serif';
-      x.fillText(bench.length + ' giocatori', px + panelW - 155, sepY + 30);
+      x.textAlign = 'right'; x.fillText(bench.length + ' giocatori', px + panelW - 34, sepY + 30);
       drawList(bench, sepY + 70, '#d5dce0');
     } else {
       x.fillStyle = 'rgba(255,255,255,.58)'; x.font = 'italic 19px Arial,sans-serif';
@@ -3726,7 +3759,7 @@ function regiaHtml() {
     <h2>Timeline della partita</h2><div class="card"><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine.</p>${matchTimelineHtml() || '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>'}</div>`;
   else if (t === 'archive') body = archiveHtml();
   else if (t === 'convocati') body = convocatiRegiaHtml();
-  else if (t === 'lineup') body = ['home', 'away'].map(s => {
+  else if (t === 'lineup') body = '<div class="card"><h2>Grafica unica delle formazioni</h2><p class="small muted" style="margin-top:0">Un’unica immagine con gli 11 titolari di entrambe le squadre (22 giocatori), affiancati in due colonne.</p><button class="btn primary block" data-a="viewlineupgraphic" data-s="both" ' + (['home','away'].every(side => parseRoster(S.rosters[side]).filter(p => p.starter).length >= 11) ? '' : 'disabled') + '>Crea grafica unica · 22 giocatori</button></div>' + ['home', 'away'].map(s => {
     const pl = parseRoster(S.rosters[s]), ns = pl.filter(p => p.starter).length;
     return `<div class="card"><h2>${esc(teamName(s))}</h2>
       <label class="f"><span>Carica la foto o il PDF della distinta</span><input type="file" accept="image/*,.pdf,application/pdf" data-photo="${s}"><div class="small muted">Dopo il caricamento puoi avviare la lettura automatica dei nomi e dei numeri. Puoi sempre correggere manualmente il risultato.</div></label>
