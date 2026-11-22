@@ -2976,13 +2976,25 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
     rrect(x, px, panelY, panelW, panelH, story ? 34 : 22); x.fill();
     const starters = team.players.filter(p => p.starter);
     const bench = team.players.filter(p => !p.starter);
-    x.textAlign = 'left'; x.textBaseline = 'middle';
-    x.fillStyle = panel.accent; x.font = '900 29px Arial,sans-serif';
-    x.fillText('TITOLARI', px + 34, panelY + 48);
-    x.fillStyle = '#fff'; x.font = '700 21px Arial,sans-serif';
-    x.textAlign = 'right';
-    x.fillText(starters.length + ' giocatori', px + panelW - 34, panelY + 48);
-    x.textAlign = 'left';
+    // Filigrana: logo della squadra selezionata, discreto e confinato al pannello.
+    const watermarkLogo = panel.key === 'home' ? homeLogo : awayLogo;
+    if (watermarkLogo) {
+      const watermarkSize = story ? 620 : 460;
+      const watermarkScale = Math.min(watermarkSize / watermarkLogo.width, watermarkSize / watermarkLogo.height);
+      const watermarkW = watermarkLogo.width * watermarkScale;
+      const watermarkH = watermarkLogo.height * watermarkScale;
+      x.save();
+      x.globalAlpha = story ? .085 : .075;
+      x.drawImage(watermarkLogo, px + (panelW - watermarkW) / 2, panelY + (panelH - watermarkH) / 2, watermarkW, watermarkH);
+      x.restore();
+    }
+    x.textBaseline = 'middle';
+    if (combined) {
+      x.textAlign = 'left'; x.fillStyle = panel.accent; x.font = '900 29px Arial,sans-serif';
+      x.fillText('TITOLARI', px + 34, panelY + 48);
+      x.fillStyle = '#fff'; x.font = '700 21px Arial,sans-serif'; x.textAlign = 'right';
+      x.fillText(starters.length + ' giocatori', px + panelW - 34, panelY + 48);
+    }
 
     if (combined) {
       const totalRows = starters.length + bench.length;
@@ -3031,10 +3043,10 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
     const drawColumnTitle = (label, count, cx, width, color) => {
       x.textAlign = 'center'; x.textBaseline = 'middle';
       x.fillStyle = color; x.font = story ? '900 32px Arial,sans-serif' : '900 27px Arial,sans-serif';
-      x.fillText(label, cx + width / 2, panelY + (story ? 58 : 48));
+      x.fillText(label, cx + width / 2, panelY + (story ? 58 : 42));
       x.fillStyle = 'rgba(255,255,255,.72)';
       x.font = story ? '700 23px Arial,sans-serif' : '700 18px Arial,sans-serif';
-      x.fillText(String(count) + ' giocatori', cx + width / 2, panelY + (story ? 102 : 48));
+      x.fillText(String(count) + ' giocatori', cx + width / 2, panelY + (story ? 102 : 72));
     };
     drawColumnTitle('TITOLARI', starters.length, innerX, leftW, panel.accent);
     drawColumnTitle('RISERVE', bench.length, rightX, rightW, '#d5dce0');
@@ -3053,17 +3065,23 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
       const radius = Math.max(11, Math.min(15, rowH * .31));
       list.forEach((p, i) => {
         const yy = top + i * rowH + rowH / 2;
+        const gap = story ? 14 : 12;
+        const numberSize = radius * 2;
+        const available = Math.max(20, width - numberSize - gap - 8);
+        const fontSize = Math.max(story ? 19 : 16, Math.min(story ? 31 : 25, rowH * (story ? .36 : .56)));
+        fitFont(x, p.name || '', available, fontSize, 700, 'Arial,sans-serif');
+        const nameWidth = Math.min(available, x.measureText(p.name || '').width);
+        const groupWidth = numberSize + gap + nameWidth;
+        const numberX = left + Math.max(0, (width - groupWidth) / 2) + radius;
+        const textX = numberX + radius + gap;
         x.fillStyle = color;
-        x.beginPath(); x.arc(left + radius, yy, radius, 0, Math.PI * 2); x.fill();
+        x.beginPath(); x.arc(numberX, yy, radius, 0, Math.PI * 2); x.fill();
         x.fillStyle = '#08291d'; x.textAlign = 'center'; x.textBaseline = 'middle';
         x.font = story ? '900 20px Arial,sans-serif' : '800 15px Arial,sans-serif';
-        x.fillText(p.num || '•', left + radius, yy + 1);
-        x.fillStyle = '#fff';
-        const textX = left + radius * 2 + (story ? 10 : 12);
-        const available = width - (textX - left) - 4;
-        x.textAlign = 'center';
-        fitFont(x, p.name || '', available, Math.max(story ? 19 : 16, Math.min(story ? 31 : 25, rowH * (story ? .36 : .56))), 700, 'Arial,sans-serif');
-        x.fillText(p.name || '', textX + available / 2, yy);
+        x.fillText(p.num || '•', numberX, yy + 1);
+        x.fillStyle = '#fff'; x.textAlign = 'left';
+        fitFont(x, p.name || '', available, fontSize, 700, 'Arial,sans-serif');
+        x.fillText(p.name || '', textX, yy);
       });
     };
     drawColumnList(starters, innerX, leftW, panel.accent, 11);
