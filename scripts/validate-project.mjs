@@ -107,6 +107,9 @@ assert.match(regia, /story \? 1080 : 1600[\s\S]*story \? 1920 : 1100/, 'La grafi
 assert.match(regia, /const watermarkLogo = panel\.key === 'home' \? homeLogo : awayLogo/, 'La grafica singola deve usare il logo della squadra come filigrana');
 assert.match(regia, /x\.fillText\(p\.name \|\| '', textX, yy\)/, 'I nomi devono essere collocati accanto ai numeri di maglia');
 assert.match(regia, /panelY \+ \(story \? 102 : 72\)/, 'Le intestazioni e i conteggi delle colonne devono avere righe separate');
+assert.match(regia, /const columnTextInset = story \? 22 : 18/, 'Le colonne devono mantenere un margine interno uniforme e simmetrico rispetto alla filigrana');
+assert.match(regia, /x\.textAlign = 'left'; x\.textBaseline = 'middle';[\s\S]*drawColumnTitle/, 'Titoli e conteggi delle colonne devono essere allineati a sinistra');
+assert.match(regia, /const numberX = left \+ columnTextInset \+ radius/, 'Numeri e nomi devono partire da un asse sinistro comune in ciascuna colonna');
 assert.match(regia, /previewLineupStory[\s\S]*instagram-story-1080x1920/, 'La regia deve consentire anteprima e salvataggio del formato Storie');
 
 
