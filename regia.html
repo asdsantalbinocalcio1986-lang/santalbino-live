@@ -3838,18 +3838,18 @@ function buildMatchReport() {
   const lineupSections = ['home','away'].map(side => {
     const players = parseRoster(S.rosters[side]);
     const teamHeading = teamName(side).toLocaleUpperCase('it');
-    if (!players.length) return teamHeading + '\\nFORMAZIONE NON INSERITA.';
+    if (!players.length) return teamHeading + '\nFORMAZIONE NON INSERITA.';
     const starters = players.filter(p => p.starter);
     const bench = players.filter(p => !p.starter);
     const format = p => (p.num ? p.num + ' ' : '') + String(p.name || '').toLocaleUpperCase('it');
     const starterText = starters.length
       ? 'TITOLARI: ' + starters.map(p => (p.num ? p.num + ' ' : '') + String(p.name || '').toLocaleUpperCase('it')).join(', ')
       : 'TITOLARI NON INSERITI';
-    return teamHeading + '\\n' + starterText +
-      (bench.length ? '\\nA DISPOSIZIONE: ' + bench.map(format).join(', ') : '');
+    return teamHeading + '\n' + starterText +
+      (bench.length ? '\nA DISPOSIZIONE: ' + bench.map(format).join(', ') : '');
   });
-  return opening + '\\n\\n' + firstText + '\\n\\n' + secondText + ' ' + closing + mvpLine +
-    '\\n\\n' + lineupSections.join('\\n\\n');
+  return opening + '\n\n' + firstText + '\n\n' + secondText + ' ' + closing + mvpLine +
+    '\n\n' + lineupSections.join('\n\n');
 }
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
