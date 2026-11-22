@@ -2903,10 +2903,10 @@ async function renderFormationGraphic(side = 'both') {
     throw new Error('Per creare la grafica unica inserisci gli 11 titolari di entrambe le squadre: servono 22 giocatori.');
   }
 
-  // La grafica combinata usa un formato più alto e due colonne simmetriche.
-  // Mostra esattamente gli 11 titolari per squadra: 22 giocatori sempre visibili.
+  // La grafica combinata include titolari e riserve di entrambe le squadre.
+  // Le due colonne si adattano al numero totale di nominativi.
   const combined = side === 'both';
-  const W = combined ? 1800 : 1600, H = combined ? 1250 : 1100;
+  const W = combined ? 1800 : 1600, H = combined ? 1750 : 1100;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'formation',W,H);
@@ -2963,7 +2963,7 @@ async function renderFormationGraphic(side = 'both') {
   }
 
   const panelY = combined ? 270 : 300;
-  const panelH = combined ? 820 : 620;
+  const panelH = combined ? 1450 : 620;
   const panelW = combined ? 840 : 1080;
   const panels = combined
     ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 920, accent: '#f0c56b' }]
@@ -2973,8 +2973,8 @@ async function renderFormationGraphic(side = 'both') {
     const team = teams[panel.key], px = panel.x;
     x.fillStyle = 'rgba(0,0,0,.72)';
     rrect(x, px, panelY, panelW, panelH, 22); x.fill();
-    const starters = combined ? startersBySide[panel.key] : team.players.filter(p => p.starter);
-    const bench = combined ? [] : team.players.filter(p => !p.starter);
+    const starters = team.players.filter(p => p.starter);
+    const bench = team.players.filter(p => !p.starter);
     x.textAlign = 'left'; x.textBaseline = 'middle';
     x.fillStyle = panel.accent; x.font = '900 29px Arial,sans-serif';
     x.fillText('TITOLARI', px + 34, panelY + 48);
@@ -2984,18 +2984,31 @@ async function renderFormationGraphic(side = 'both') {
     x.textAlign = 'left';
 
     if (combined) {
-      const listTop = panelY + 125;
-      const rowH = Math.min(54, Math.floor((panelH - 205) / 11));
-      starters.slice(0, 11).forEach((p, i) => {
-        const yy = listTop + i * rowH;
-        x.fillStyle = panel.accent;
-        x.beginPath(); x.arc(px + 48, yy, 19, 0, Math.PI * 2); x.fill();
+      const totalRows = starters.length + bench.length;
+      const rowH = Math.min(39, Math.floor((panelH - 300) / Math.max(1, totalRows)));
+      const rowRadius = Math.max(11, Math.min(16, Math.floor(rowH * .38)));
+      const drawCombinedList = (list, top, color) => list.forEach((p, i) => {
+        const yy = top + i * rowH;
+        x.fillStyle = color;
+        x.beginPath(); x.arc(px + 48, yy, rowRadius, 0, Math.PI * 2); x.fill();
         x.fillStyle = '#08291d'; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.font = '800 18px Arial,sans-serif'; x.fillText(p.num || '•', px + 48, yy + 1);
+        x.font = '800 16px Arial,sans-serif'; x.fillText(p.num || '•', px + 48, yy + 1);
         x.textAlign = 'left'; x.fillStyle = '#fff';
-        fitFont(x, p.name || '', panelW - 125, 31, 700, 'Arial,sans-serif');
+        fitFont(x, p.name || '', panelW - 125, Math.max(15, rowH - 7), 700, 'Arial,sans-serif');
         x.fillText(p.name || '', px + 82, yy);
       });
+      const listTop = panelY + 125;
+      drawCombinedList(starters, listTop, panel.accent);
+      if (bench.length) {
+        const sepY = listTop + starters.length * rowH + 17;
+        x.strokeStyle = 'rgba(255,255,255,.24)'; x.lineWidth = 1;
+        x.beginPath(); x.moveTo(px + 30, sepY); x.lineTo(px + panelW - 30, sepY); x.stroke();
+        x.fillStyle = panel.accent; x.font = '900 24px Arial,sans-serif'; x.textAlign = 'left';
+        x.fillText('PANCHINA', px + 34, sepY + 30);
+        x.fillStyle = 'rgba(255,255,255,.65)'; x.font = '700 18px Arial,sans-serif';
+        x.textAlign = 'right'; x.fillText(bench.length + ' giocatori', px + panelW - 34, sepY + 30);
+        drawCombinedList(bench, sepY + 66, '#d5dce0');
+      }
       continue;
     }
 
