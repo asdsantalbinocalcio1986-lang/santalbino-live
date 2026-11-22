@@ -149,7 +149,7 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .tab[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 
 /* timeline orizzontale sintetica della regia */
-.match-timeline{display:grid;grid-template-columns:68px minmax(0,1fr);grid-template-rows:1fr 1px 1fr;gap:0 10px;min-height:104px;padding:8px 4px;overflow:visible}
+.match-timeline{display:grid;grid-template-columns:68px minmax(0,1fr);grid-template-rows:1fr 1px 1fr;gap:0 10px;min-height:132px;padding:16px 8px;overflow:visible;background:var(--bg);border:1px solid var(--line);border-radius:14px}.regia-timeline-panel{border:2px solid var(--accent)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 16%,transparent)}.regia-timeline-panel h2{display:flex;align-items:center;gap:8px}.regia-timeline-panel .match-tl-track{height:3px}.regia-timeline-panel .match-tl-axis{height:4px;top:-1px}.regia-timeline-panel .match-tl-marker i{width:3px;height:13px}.regia-timeline-panel .match-tl-marker b{font-size:13px}
 .match-tl-lane{font:700 12px/1.1 var(--fd);letter-spacing:.04em;text-transform:uppercase;align-self:center}
 .santa-label{grid-column:1;grid-row:1;color:var(--accent)}
 .opponent-label{grid-column:1;grid-row:3;color:var(--c-sub)}
@@ -1489,7 +1489,7 @@ function describe(e, sc) {
     case 'foul': return { title: e.kind === 'rigore' && e.foulInArea !== false ? 'Fallo da rigore' : e.handball ? 'Fallo di mano' : 'Fallo', main: p || t, sub: e.kind === 'rigore' && e.foulInArea !== false ? esc(t) + ' · calcio di rigore assegnato' : e.handball ? esc(t) + ' · fallo di mano' : esc(t) + ' · fallo' };
     case 'yellow': return { title: 'Cartellino giallo', main: p || t, sub: esc(t) };
     case 'red': return { title: e.kind === 'doppio' ? 'Doppio giallo' : 'Espulsione', main: p || t, sub: esc(t) + ' · in dieci' };
-    case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}`, subRaw: true };
+    case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}${e.possibleSubs ? `<br><span class="small">Possibili alternative: ${esc(e.possibleSubs)}</span>` : ''}`, subRaw: true };
     case 'save': return { title: e.kind === 'facile' ? 'Parata' : 'Grande parata', main: p || t, sub: esc(t) };
     case 'shot': return { title: e.kind === 'fuori' ? 'Tiro fuori' : e.kind === 'in_porta' ? describeShot(e) : 'Tiro', main: p || t, sub: esc(t) };
     case 'crossbar': return { title: 'Traversa', main: p || t, sub: esc(t) };
@@ -1518,7 +1518,7 @@ function buildText(ev, sc) {
     case 'foul': { const penalty = ev.kind === 'rigore' && ev.foulInArea !== false; const label = penalty ? 'FALLO DA RIGORE' : ev.handball ? 'FALLO DI MANO' : 'FALLO'; x = `⚠️ ${m}${label}\n${p ? p + ' (' + t + ')' : t}${penalty ? '\nCalcio di rigore assegnato.' : ev.handball ? '\nFallo di mano.' : '\nFallo.'}`; break; }
     case 'yellow': x = `🟨 ${m}CARTELLINO GIALLO\n${p ? p + ' (' + t + ')' : t}`; break;
     case 'red': x = `🟥 ${m}ESPULSIONE\n${ev.kind === 'doppio' ? 'Doppio giallo' : 'Rosso diretto'}${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
-    case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
+    case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.${ev.possibleSubs ? `\nPossibili alternative: ${ev.possibleSubs}.` : ''}`; break;
     case 'save': x = `🧤 ${m}${ev.kind === 'facile' ? 'PARATA' : 'GRANDE PARATA'}\n${p ? 'di ' + p + ' (' + t + ')' : t}`; break;
     case 'shot': x = ev.kind === 'fuori' ? `⚽ ${m}TIRO FUORI\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : ev.kind === 'in_porta' ? `🎯 ${m}${describeShot(ev).toUpperCase()}\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : `⚽ ${m}TIRO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.`; break;
     case 'crossbar': x = `🥅 ${m}TRAVERSA!\n${p ? 'Colpita da ' + p + ' (' + t + ')' : t}.`; break;
@@ -3419,7 +3419,7 @@ function buildChronicleDraft() {
       case 'foul': sentence = e.kind === 'rigore' && e.foulInArea !== false ? 'Calcio di rigore assegnato a ' + team + ' per un fallo in area.' : 'L’arbitro fischia un fallo a favore di ' + team + (e.player ? ': ' + e.player + ' è coinvolto nell’azione' : '') + '.'; break;
       case 'yellow': sentence = 'Cartellino giallo per ' + (e.player || 'un giocatore') + ' (' + team + ').'; break;
       case 'red': sentence = 'Espulsione per ' + (e.player || 'un giocatore') + ' (' + team + ')' + (e.kind === 'doppio' ? ' per doppia ammonizione' : '') + ': la squadra prosegue in inferiorità numerica.'; break;
-      case 'sub': sentence = 'Cambio per ' + team + ': entra ' + (e.inn || 'un giocatore') + ' ed esce ' + (e.out || 'un compagno') + '.'; break;
+      case 'sub': sentence = 'Cambio per ' + team + ': entra ' + (e.inn || 'un giocatore') + ' ed esce ' + (e.out || 'un compagno') + '.' + (e.possibleSubs ? ' Tra le altre possibili sostituzioni: ' + e.possibleSubs + '.' : ''); break;
       case 'offside': sentence = 'Segnalato fuorigioco a ' + team + (e.player ? ' per ' + e.player : '') + '.'; break;
       case 'injury': sentence = 'Gioco interrotto per un infortunio a ' + (e.player || 'un giocatore') + ' (' + team + ').'; break;
       case 'note': sentence = String(e.note || '').trim(); break;
@@ -3623,10 +3623,10 @@ function feedHtml(list) {
       ${editing ? `<textarea data-edtext rows="5">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
       <div class="meta"><span class="chip ${so.status}">${so.status === 'pubblicato' ? 'Su Facebook' : 'Da pubblicare'}</span>
       ${editing ? `<button class="btn sm primary" data-a="saveedit">Salva testo</button><button class="btn sm" data-a="canceledit">Annulla</button>`
-        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Modifica</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
+        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
   }).join('');
 }
-let editId = null, armedDel = null;
+let editId = null, armedDel = null, editingEventId = null;
 function matchTimelineHtml() {
   const actions = S.events
     .filter(e => !PHASE_EV[e.type] && e.type !== 'mvp' && ['home', 'away'].includes(e.team) && e.min !== '' && e.min != null)
@@ -3670,7 +3670,7 @@ function regiaHtml() {
     ${S.clock.phase === 'ft' ? '<div class="card"><h2>MATCH RESULT</h2><p class="small muted" style="margin-top:0">Crea la grafica finale con loghi, risultato e marcatori. Il testo social viene preparato automaticamente dagli eventi registrati e resta modificabile prima della condivisione.</p><button class="btn primary block" data-a="viewMatchResult">Genera MATCH RESULT e post</button></div>' : ''}
     <div class="quick">${QUICK.map(([k, l]) => `<button class="qb ${k === 'goal' ? 'goal' : ''}" data-q="${k}"><span style="color:${k === 'goal' ? 'inherit' : COL[k]}">${IC[k]}</span>${l}</button>`).join('')}</div>
     <h2>Ultimi eventi</h2><div class="card">${feedHtml([...S.events].reverse().slice(0, 5))}</div>
-    <h2>Timeline della partita</h2><div class="card"><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine.</p>${matchTimelineHtml() || '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>'}</div>`;
+    <div class="card regia-timeline-panel"><h2>Timeline della partita</h2><p class="small muted" style="margin-top:0">Tutte le azioni registrate, in ordine cronologico dall'inizio alla fine. I marcatori sono più evidenti e distinti per squadra.</p>${matchTimelineHtml() || '<div class="empty">Le azioni con minuto registrato appariranno qui.</div>'}</div>`;
   else if (t === 'archive') body = archiveHtml();
   else if (t === 'convocati') body = convocatiRegiaHtml();
   else if (t === 'lineup') body = ['home', 'away'].map(s => {
@@ -3855,12 +3855,21 @@ let armedNew = false;
 let draft = null, textManual = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function openSheet(type) {
-  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '', foulInArea: false, handball: false };
+  editingEventId = null;
+  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', possibleSubs: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '', foulInArea: false, handball: false };
+  textManual = false; renderSheet(); $('#sheet').showModal();
+}
+function editEvent(id) {
+  const ev = S.events.find(item => item.id === id); if (!ev) return;
+  editingEventId = id;
+  const one = L.evOne?.[id] || {};
+  draft = Object.assign({img: one.img || '', raw: !!one.raw, assist:'', out:'', inn:'', possibleSubs:'', note:'', shotZone:'', freeKickZone:'', cornerSide:'', foulInArea:false, handball:false}, ev);
+  draft.img = one.img || ''; draft.raw = !!one.raw;
   textManual = false; renderSheet(); $('#sheet').showModal();
 }
 function draftEvent() {
   const d = draft, t = d.team;
-  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: d.min.trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), note: d.note.trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '', foulInArea: !!d.foulInArea, handball: !!d.handball };
+  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: String(d.min || '').trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), possibleSubs: String(d.possibleSubs || '').trim(), note: String(d.note || '').trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '', foulInArea: !!d.foulInArea, handball: !!d.handball };
 }
 function renderSheet() {
   const keepText = textManual && $('#fText') ? $('#fText').value : null;
@@ -3880,7 +3889,7 @@ function renderSheet() {
     case 'offside': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'red': fields = P('player', 'Giocatore') + SEL('kind', 'Motivo', [['diretto', 'Rosso diretto'], ['doppio', 'Doppio giallo']]); break;
     case 'miss': fields = P('player', 'Giocatore') + SEL('kind', 'Cosa è successo', MISS_KINDS); break;
-    case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra'); break;
+    case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra') + P('possibleSubs', 'Altre possibili sostituzioni (facoltativo)', 'Nomi separati da virgola'); break;
     case 'note': fields = `<label class="f"><span>Testo</span><textarea data-d="note" rows="3" placeholder="Es. Recupero di 3 minuti">${esc(d.note)}</textarea></label>`; break;
   }
   const teamHint = d.type === 'freekick' ? '<p class="small muted">Seleziona la squadra che ha subito il fallo.</p>' : d.type === 'corner' ? '<p class="small muted">Seleziona la squadra che ha guadagnato il calcio d’angolo.</p>' : '';
@@ -3888,10 +3897,10 @@ function renderSheet() {
   const imgBox = CARD_TYPES.includes(d.type) ? `<div class="f"><span>Immagine per questo evento (facoltativa)</span>${d.img ? `<img class="thumb" style="max-height:110px" src="${d.img}" alt="Immagine scelta">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${d.img ? 'Cambia immagine' : 'Scegli immagine'}<input type="file" accept="image/*" data-evimg-one hidden></label>${d.img ? '<button type="button" class="btn sm danger" data-evimg-one-rm>Togli</button>' : ''}</div>
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
-  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
+  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${editingEventId ? 'Modifica evento' : esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
     <label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>
-    <button type="button" class="btn primary block" data-sub="go">Registra evento</button></form>`;
+    <button type="button" class="btn primary block" data-sub="go">${editingEventId ? 'Salva modifiche evento' : 'Registra evento'}</button></form>`;
   refreshPreview(); if (keepText !== null) $('#fText').value = keepText;
 }
 function refreshPreview() { if (!textManual && draft) { const ev = draftEvent(); $('#fText').value = buildText(ev, scoreOf([...S.events, ev])); } }
@@ -4047,6 +4056,7 @@ document.addEventListener('click', async e => {
     case 'graphicclose': $('#graphicDlg').close(); break;
     case 'savegraphic': { const ev2 = S.events.find(x => x.id === graphicId); if (ev2) saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'edit': editId = ev.id; renderMain(); break;
+    case 'editevent': if (!CAN_EDIT || L.mode !== 'regia' || !ev) { toast('Modifica evento disponibile solo dalla regia'); break; } editEvent(ev.id); break;
     case 'canceledit': editId = null; renderMain(); break;
     case 'saveedit': socialOf(ev.id).text = $('[data-edtext]', row).value; saveL(); editId = null; renderMain(); break;
     case 'del': if (armedDel === ev.id) { armedDel = null; delEvent(ev.id); } else { armedDel = ev.id; renderMain(); setTimeout(() => { if (armedDel === ev.id) { armedDel = null; renderMain(); } }, 3500); } break;
@@ -4286,9 +4296,20 @@ function wireSheet() {
       if (draft?.type === 'shot' && !draft.shotZone) { toast('Seleziona prima il punto del tiro sulla porta'); return; }
       if (draft?.type === 'freekick' && !draft.freeKickZone) { toast('Seleziona prima la posizione del calcio di punizione'); return; }
       if (draft?.type === 'corner' && !draft.cornerSide) { toast('Seleziona prima il lato del calcio d’angolo'); return; }
-      const ev = draftEvent(), txt = $('#fText').value.trim(); sh.close();
-      const made = addEvent(ev, { post: true });
-      if (txt && txt !== buildText(made, scoreAt(S.events.indexOf(made)))) { socialOf(made.id).text = txt; saveL(); }
+      const ev = draftEvent(), txt = $('#fText').value.trim();
+      if (editingEventId) {
+        const index = S.events.findIndex(item => item.id === editingEventId);
+        if (index < 0) { toast('Evento non più disponibile: riapri la modifica'); return; }
+        const original = S.events[index], updated = Object.assign({}, original, ev, {id: original.id, ts: original.ts});
+        if (ev._img) setEvOne(original.id, ev._img, ev._raw);
+        delete updated._img; delete updated._raw;
+        S.events[index] = updated; S.match.chronicleDraft = '';
+        editingEventId = null; sh.close(); commit(true); renderMain(); toast('Evento aggiornato: risultato, timeline e cronaca saranno ricalcolati');
+      } else {
+        sh.close();
+        const made = addEvent(ev, { post: true });
+        if (txt && txt !== buildText(made, scoreAt(S.events.indexOf(made)))) { socialOf(made.id).text = txt; saveL(); }
+      }
     }
   });
   $('#postDlg').addEventListener('input', e => { if (e.target.id === 'postText') { socialOf(postId).text = e.target.value; saveL(); } });
