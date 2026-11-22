@@ -104,7 +104,9 @@ for (const [index, attrs, body] of regiaScripts) {
 }
 assert.ok(regiaChecked >= 1, 'Script inline della regia mancante o non verificabile');
 assert.match(regia, /story \? 1080 : 1600[\s\S]*story \? 1920 : 1100/, 'La grafica singola deve supportare il formato Storie Instagram 9:16');
-assert.match(regia, /x\.textAlign = 'center';\s*fitFont\(x, p\.name/, 'I nomi dei giocatori nella grafica singola devono essere centrati');
+assert.match(regia, /const watermarkLogo = panel\.key === 'home' \? homeLogo : awayLogo/, 'La grafica singola deve usare il logo della squadra come filigrana');
+assert.match(regia, /x\.fillText\(p\.name \|\| '', textX, yy\)/, 'I nomi devono essere collocati accanto ai numeri di maglia');
+assert.match(regia, /panelY \+ \(story \? 102 : 72\)/, 'Le intestazioni e i conteggi delle colonne devono avere righe separate');
 assert.match(regia, /previewLineupStory[\s\S]*instagram-story-1080x1920/, 'La regia deve consentire anteprima e salvataggio del formato Storie');
 
 
