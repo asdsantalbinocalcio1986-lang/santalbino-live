@@ -2434,7 +2434,7 @@ async function renderPhaseCard(ev) {
 
 // Unico template grafico per ogni contenuto condiviso: griglia fissa, aree separate e testi contenuti.
 function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
-  const words = String(text || '').split(/\\s+/).filter(Boolean);
+  const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = []; let line = '';
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
@@ -2446,7 +2446,7 @@ function wrapCanvasText(ctx, text, maxWidth, maxLines, lineHeight) {
     const clipped = lines.slice(0, maxLines);
     let last = clipped[maxLines - 1];
     while (last && ctx.measureText(last + '…').width > maxWidth) last = last.slice(0, -1);
-    clipped[maxLines - 1] = last.replace(/[\\s.,;:]+$/, '') + '…';
+    clipped[maxLines - 1] = last.replace(/[\s.,;:]+$/, '') + '…';
     return clipped;
   }
   return lines;
@@ -2576,7 +2576,7 @@ async function renderMatchGraphic(ev) {
     const index=capturedTextItems.length,key=String(index),cfg=templateElements[key]||{};
     const value=cfg.text!==undefined?String(cfg.text):String(text),dx=Number(cfg.dx)||0,dy=Number(cfg.dy)||0;
     capturedTextItems.push({index,text:value,original:String(text),x:Number(tx)||0,y:Number(ty)||0,dx,dy});
-    const originalFont=x.font,match=originalFont.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\\s+(.+)$/);
+    const originalFont=x.font,match=originalFont.match(/^(.*?)(\\d+(?:\\.\\d+)?)px\s+(.+)$/);
     if(match){const size=Math.max(12,Math.min(180,Number(match[2])*(Number(fontStyle.fontScale)||1)));const family=({Manrope:"'Manrope',sans-serif",Barlow:"'Barlow Condensed',sans-serif",Arial:'Arial,sans-serif',Georgia:'Georgia,serif'})[fontStyle.fontFamily]||match[3];x.font=match[1]+size+'px '+family;}
     const align=x.textAlign||'start',measure=x.measureText(value).width,available=align==='center'?Math.max(20,2*Math.min(Number(tx)||0,W-(Number(tx)||0))-48):align==='right'?Math.max(20,(Number(tx)||0)-42):Math.max(20,W-(Number(tx)||0)-42);
     if(measure>available){const m=x.font.match(/^(.*?)(\\d+(?:\\.\\d+)?)px(.*)$/);if(m){let size=Number(m[2]);while(x.measureText(value).width>available&&size>11){size-=1;x.font=m[1]+size+'px'+m[3];}}}
@@ -2874,7 +2874,10 @@ async function renderFormationGraphic(side = 'both') {
   if (!selectedSides.every(key => ['home','away'].includes(key) && teams[key].players.length)) {
     throw new Error(side === 'both' ? 'Inserisci e salva le formazioni di entrambe le squadre per creare l’immagine unica.' : 'Inserisci e salva la formazione di questa squadra prima di creare la grafica.');
   }
-  const W = 1600, H = 1100, canvas = document.createElement('canvas');
+
+  // Formato Instagram Story verticale: 1080 x 1920.
+  // Le colonne sono strette e alte, con titolari e panchina sempre leggibili.
+  const W = 1080, H = 1920, canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'formation',W,H);
   const [background, homeLogo, awayLogo] = await Promise.all([
@@ -2891,89 +2894,118 @@ async function renderFormationGraphic(side = 'both') {
     const grad = x.createLinearGradient(0, 0, W, H);
     grad.addColorStop(0, '#1b6845'); grad.addColorStop(1, '#08291d');
     x.fillStyle = grad; x.fillRect(0, 0, W, H);
-    x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 3;
+    x.strokeStyle = 'rgba(255,255,255,.10)'; x.lineWidth = 2;
     for (let k = 0; k < 10; k++) {
       x.beginPath(); x.moveTo(k * W / 9, 0); x.lineTo(k * W / 9, H); x.stroke();
     }
     x.beginPath(); x.arc(W / 2, H / 2, 260, 0, Math.PI * 2); x.stroke();
-    x.strokeRect(32, 32, W - 64, H - 64);
+    x.strokeRect(28, 28, W - 56, H - 56);
   }
-  x.fillStyle = 'rgba(2,13,9,.82)'; x.fillRect(0, 0, W, 245);
-  const drawLogo = (img, name, cx) => {
-    const size = 132, cy = 88;
-    x.fillStyle = 'rgba(255,255,255,.12)';
-    x.beginPath(); x.arc(cx, cy, 76, 0, Math.PI * 2); x.fill();
+
+  x.fillStyle = 'rgba(2,13,9,.82)'; x.fillRect(0, 0, W, side === 'both' ? 390 : 420);
+  const drawLogo = (img, name, cx, cy, size, maxNameWidth) => {
+    x.fillStyle = 'rgba(255,255,255,.13)';
+    x.beginPath(); x.arc(cx, cy, size * .58, 0, Math.PI * 2); x.fill();
     if (img) {
-      const scale = Math.min((size - 8) / img.width, (size - 8) / img.height);
+      const scale = Math.min((size - 10) / img.width, (size - 10) / img.height);
       const w = img.width * scale, h = img.height * scale;
       x.drawImage(img, cx - w / 2, cy - h / 2, w, h);
     } else {
-      const initials = name.replace(/^ASD\\s+/i, '').split(/\\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
+      const initials = name.replace(/^ASD\s+/i, '').split(/\s+/).map(v => v[0]).join('').slice(0, 3).toUpperCase() || 'FC';
       x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.font = '900 42px Arial,sans-serif'; x.fillText(initials, cx, cy);
+      x.font = '900 38px Arial,sans-serif'; x.fillText(initials, cx, cy);
     }
     x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    fitFont(x, name.toUpperCase(), 500, 30, 800, 'Arial,sans-serif');
-    x.fillText(name.toUpperCase(), cx, 190);
+    fitFont(x, name.toUpperCase(), maxNameWidth, 29, 800, 'Arial,sans-serif');
+    x.fillText(name.toUpperCase(), cx, cy + size * .78, maxNameWidth);
   };
+
   if (side === 'both') {
-    drawLogo(homeLogo, teams.home.name, 400);
-    drawLogo(awayLogo, teams.away.name, 1200);
+    drawLogo(homeLogo, teams.home.name, 285, 142, 112, 430);
+    drawLogo(awayLogo, teams.away.name, 795, 142, 112, 430);
     x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.font = '900 68px Arial,sans-serif'; x.fillText('VS', W / 2, 86);
-    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI', W / 2, 190);
+    x.font = '900 46px Arial,sans-serif'; x.fillText('VS', W / 2, 140);
+    x.fillStyle = '#fff'; x.font = '900 30px Arial,sans-serif';
+    x.fillText('FORMAZIONI UFFICIALI', W / 2, 350);
   } else {
     const key = selectedSides[0], team = teams[key], logo = key === 'home' ? homeLogo : awayLogo;
-    drawLogo(logo, team.name, W / 2);
+    drawLogo(logo, team.name, W / 2, 145, 132, 760);
     x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONE UFFICIALE', W / 2, 235);
+    x.font = '800 29px Arial,sans-serif'; x.fillText('FORMAZIONE UFFICIALE', W / 2, 390);
   }
-  const panelY = side === 'both' ? 270 : 300, panelH = side === 'both' ? 650 : 620;
-  const panelW = side === 'both' ? 735 : 1080;
-  const panels = side === 'both'
-    ? [{ key: 'home', x: 45, logo: '#b8e7c8' }, { key: 'away', x: 820, logo: '#f0c56b' }]
-    : [{ key: selectedSides[0], x: 260, logo: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
+
+  const panelY = side === 'both' ? 430 : 470;
+  const panelH = side === 'both' ? 1250 : 1190;
+  const panelW = side === 'both' ? 470 : 780;
+  const gap = side === 'both' ? 32 : 0;
+  const firstX = (W - (panelW * selectedSides.length + gap)) / 2;
+  const panels = selectedSides.map((key, index) => ({
+    key, x: firstX + index * (panelW + gap),
+    accent: key === 'home' ? '#b8e7c8' : '#f0c56b'
+  }));
+
   for (const panel of panels) {
     const team = teams[panel.key], px = panel.x;
-    x.fillStyle = 'rgba(0,0,0,.72)';
-    rrect(x, px, panelY, panelW, panelH, 22); x.fill();
     const starters = team.players.filter(p => p.starter);
     const bench = team.players.filter(p => !p.starter);
-    x.textAlign = 'left'; x.textBaseline = 'middle';
-    x.fillStyle = panel.logo; x.font = '900 27px Arial,sans-serif';
-    x.fillText('TITOLARI', px + 34, panelY + 48);
-    x.fillStyle = '#fff'; x.font = '700 20px Arial,sans-serif';
-    x.fillText(starters.length + ' giocatori', px + panelW - 155, panelY + 48);
-    const listTop = panelY + 95;
-    const benchTop = listTop + Math.max(1, starters.length) * 36 + 20;
+    x.fillStyle = 'rgba(0,0,0,.76)';
+    rrect(x, px, panelY, panelW, panelH, 24); x.fill();
+    x.strokeStyle = panel.accent; x.globalAlpha = .48; x.lineWidth = 2;
+    rrect(x, px, panelY, panelW, panelH, 24); x.stroke(); x.globalAlpha = 1;
+
+    const pad = side === 'both' ? 24 : 38;
+    const numberX = px + pad + 18;
+    const textX = px + pad + 48;
+    const contentW = panelW - pad * 2;
     const totalRows = starters.length + bench.length;
-    const rowH = Math.min(36, Math.floor((panelH - 185) / Math.max(1, totalRows)));
-    const drawList = (list, top, color) => list.forEach((p, i) => {
-      const yy = top + i * rowH;
-      if (yy > panelY + panelH - 35) return;
-      x.fillStyle = color;
-      x.beginPath(); x.arc(px + 45, yy, 13, 0, Math.PI * 2); x.fill();
-      x.fillStyle = '#08291d'; x.textAlign = 'center'; x.font = '800 15px Arial,sans-serif';
-      x.fillText(p.num || '•', px + 45, yy + 1);
-      x.textAlign = 'left'; x.fillStyle = '#fff';
-      fitFont(x, p.name || '', panelW - 100, Math.max(15, rowH - 5), 700, 'Arial,sans-serif');
-      x.fillText(p.name || '', px + 70, yy);
-    });
-    drawList(starters, listTop, panel.logo);
+    const rowH = Math.max(31, Math.min(side === 'both' ? 48 : 54, Math.floor((panelH - 210) / Math.max(1, totalRows + (bench.length ? .8 : 0)))));
+    let cursorY = panelY + 55;
+
+    x.textAlign = 'left'; x.textBaseline = 'middle';
+    x.fillStyle = panel.accent; x.font = '900 25px Arial,sans-serif';
+    x.fillText('TITOLARI', px + pad, cursorY);
+    x.fillStyle = '#fff'; x.textAlign = 'right'; x.font = '700 18px Arial,sans-serif';
+    x.fillText(String(starters.length), px + panelW - pad, cursorY);
+    cursorY += 42;
+
+    const drawList = (list, top, color, height) => {
+      list.forEach((p, i) => {
+        const yy = top + i * height;
+        x.fillStyle = color;
+        x.beginPath(); x.arc(numberX, yy, Math.min(16, height * .34), 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#08291d'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        fitFont(x, p.num || '•', 28, Math.min(18, height * .42), 800, 'Arial,sans-serif');
+        x.fillText(p.num || '•', numberX, yy);
+        x.fillStyle = '#fff'; x.textAlign = 'left';
+        fitFont(x, p.name || '', contentW - 54, Math.min(23, height * .52), 700, 'Arial,sans-serif');
+        x.fillText(p.name || '', textX, yy, contentW - 54);
+        if (i < list.length - 1) {
+          x.strokeStyle = 'rgba(255,255,255,.12)'; x.lineWidth = 1;
+          x.beginPath(); x.moveTo(px + pad, yy + height / 2); x.lineTo(px + panelW - pad, yy + height / 2); x.stroke();
+        }
+      });
+    };
+
+    drawList(starters, cursorY + rowH / 2, panel.accent, rowH);
+    cursorY += starters.length * rowH + 28;
     if (bench.length) {
-      const sepY = Math.min(panelY + panelH - 115, listTop + starters.length * rowH + 18);
-      x.strokeStyle = 'rgba(255,255,255,.20)'; x.lineWidth = 1;
-      x.beginPath(); x.moveTo(px + 30, sepY); x.lineTo(px + panelW - 30, sepY); x.stroke();
-      x.fillStyle = panel.logo; x.font = '900 24px Arial,sans-serif'; x.textAlign = 'left';
-      x.fillText('PANCHINA', px + 34, sepY + 30);
-      x.fillStyle = 'rgba(255,255,255,.65)'; x.font = '700 18px Arial,sans-serif';
-      x.fillText(bench.length + ' giocatori', px + panelW - 155, sepY + 30);
-      drawList(bench, sepY + 70, '#d5dce0');
+      x.strokeStyle = 'rgba(255,255,255,.28)'; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(px + pad, cursorY); x.lineTo(px + panelW - pad, cursorY); x.stroke();
+      cursorY += 34;
+      x.fillStyle = panel.accent; x.textAlign = 'left'; x.font = '900 22px Arial,sans-serif';
+      x.fillText('PANCHINA', px + pad, cursorY);
+      x.fillStyle = 'rgba(255,255,255,.72)'; x.textAlign = 'right'; x.font = '700 17px Arial,sans-serif';
+      x.fillText(String(bench.length), px + panelW - pad, cursorY);
+      cursorY += 26;
+      const remaining = panelY + panelH - 30 - cursorY;
+      const benchRowH = Math.max(27, Math.min(rowH, Math.floor(remaining / bench.length)));
+      drawList(bench, cursorY + benchRowH / 2, '#d5dce0', benchRowH);
     } else {
-      x.fillStyle = 'rgba(255,255,255,.58)'; x.font = 'italic 19px Arial,sans-serif';
-      x.fillText('Nessuna riserva indicata', px + 34, listTop + starters.length * rowH + 20);
+      x.fillStyle = 'rgba(255,255,255,.58)'; x.textAlign = 'left'; x.font = 'italic 17px Arial,sans-serif';
+      x.fillText('Nessuna riserva indicata', px + pad, cursorY + 8);
     }
   }
+
   await addSponsorToGraphic(canvas,'formation');
   return canvas;
 }
@@ -3014,7 +3046,7 @@ async function renderMatchDayGraphic() {
   const logo = (img,name,cx) => {
     x.fillStyle='#fff'; rrect(x,cx-100,32,200,200,26); x.fill();
     if(img){ const k=Math.min(180/img.width,180/img.height),w=img.width*k,h=img.height*k; x.drawImage(img,cx-w/2,42+(180-h)/2,w,h); }
-    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
+    else { x.fillStyle='#17633d'; x.font='900 48px Arial'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(name.split(/\s+/).map(z=>z[0]).join('').slice(0,3).toUpperCase(),cx,132); }
     x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle'; fitFont(x,name.toUpperCase(),470,31,900,'Arial,sans-serif'); x.fillText(name.toUpperCase(),cx,270);
   };
   logo(homeLogo,teamName('home'),330); logo(awayLogo,teamName('away'),1270);
