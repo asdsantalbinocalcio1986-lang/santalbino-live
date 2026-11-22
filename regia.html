@@ -3677,7 +3677,7 @@ function buildMatchReport() {
     return 'al minuto ' + m.base + (m.extra ? ' più ' + m.extra : '');
   };
   const eventSide = ev => ev.team === 'home' || ev.team === 'away' ? ev.team : '';
-  const cleanName = value => String(value || '').trim().toLocaleLowerCase('it').replace(/(^|[\\s'’-])([\\p{L}])/gu, (_, sep, letter) => sep + letter.toLocaleUpperCase('it'));
+  const cleanName = value => String(value || '').trim().toLocaleLowerCase('it').replace(/(^|[\s'’-])([\p{L}])/gu, (_, sep, letter) => sep + letter.toLocaleUpperCase('it'));
   const eventPhrase = ev => {
     const player = cleanName(ev.player);
     const at = minuteText(ev);
@@ -3779,15 +3779,14 @@ function buildMatchReport() {
           const dir = String(x.event.cornerSide || '').toLowerCase();
           if (dir === 'destra' || dir === 'sinistra') directions[dir]++;
         });
-        const directionParts = [];
-        if (directions.destra) directionParts.push(directions.destra + (directions.destra === 1 ? ' dalla destra' : ' dalla destra'));
-        if (directions.sinistra) directionParts.push(directions.sinistra + (directions.sinistra === 1 ? ' dalla sinistra' : ' dalla sinistra'));
-        const directionsText = directionParts.length ? ' ' + naturalJoin(directionParts) : '';
-        const times = corners.map(x => minuteText(x.event)).filter(Boolean);
-        const timeText = times.length ? ', tra ' + naturalJoin(times) : '';
-        const cornerText = corners.length === 1
-          ? 'un calcio d’angolo' + directionsText + (times.length ? ' al ' + times[0].replace(/^al /, '') : '')
-          : corners.length + ' calci d’angolo' + directionsText + timeText;
+        const directionText = directions.destra === corners.length ? ' dalla destra' :
+          directions.sinistra === corners.length ? ' dalla sinistra' :
+          (directions.destra || directions.sinistra) ? ' (' +
+            [directions.destra ? numberText(directions.destra) + ' dalla destra' : '',
+             directions.sinistra ? numberText(directions.sinistra) + ' dalla sinistra' : ''].filter(Boolean).join(' e ') + ')' : '';
+        const times = corners.map(x => minuteText(x.event).replace(/^al /, 'al ')).filter(Boolean);
+        const timeText = times.length ? ', rispettivamente ' + naturalJoin(times) : '';
+        const cornerText = (corners.length === 1 ? 'un calcio d’angolo' : numberText(corners.length) + ' calci d’angolo') + directionText + timeText;
         if (attacks.length) {
           clauses.push((side === 'home' ? 'La pressione dei padroni di casa' : side === 'away' ? 'La risposta degli ospiti' : 'La pressione') + ' porta a ' + cornerText + '.');
         } else {
