@@ -2906,7 +2906,7 @@ async function renderFormationGraphic(side = 'both') {
   // La grafica combinata include titolari e riserve di entrambe le squadre.
   // Le due colonne si adattano al numero totale di nominativi.
   const combined = side === 'both';
-  const W = combined ? 1800 : 1600, H = combined ? 1750 : 1100;
+  const W = combined ? 1800 : 1600, H = combined ? 1450 : 1100;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'formation',W,H);
@@ -2963,7 +2963,7 @@ async function renderFormationGraphic(side = 'both') {
   }
 
   const panelY = combined ? 270 : 300;
-  const panelH = combined ? 1450 : 620;
+  const panelH = combined ? 1150 : 620;
   const panelW = combined ? 840 : 1080;
   const panels = combined
     ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 920, accent: '#f0c56b' }]
