@@ -65,7 +65,7 @@
 @media (max-width:360px){
   .standings-frame iframe{height:940px}
 }
-@media(max-width:600px){#graphicEditorPreview [style*="grid-template-columns:minmax(0,1fr) 76px 76px"]{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}#graphicEditorPreview input{min-width:0;max-width:100%}#editorDragFrame{touch-action:none;max-width:100%}}
+@media(max-width:600px){#graphicEditorPreview [style*="grid-template-columns:minmax(0,1fr) 76px 76px"]{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}#graphicEditorPreview input{min-width:0;max-width:100%}#editorDragFrame{touch-action:none;max-width:100%}.tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}.tabs .tab{flex:0 0 auto;min-height:44px;white-space:nowrap}.btn,.tabs .tab{touch-action:manipulation}.row2.stack{grid-template-columns:minmax(0,1fr)!important}.ev .meta{flex-wrap:wrap}.sync{position:sticky;top:0;z-index:20}}
 </style><meta name="theme-color" content="#0b3b22"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
@@ -1368,6 +1368,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
+  publication: { published: null, pending: null, publishedAt: '' },
   match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SANTALive', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '', chronicleDraft: '', chroniclePublished: '', chroniclePublishedAt: '', chronicleNeedsReview: false },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
@@ -1389,8 +1390,10 @@ function testDefaults() {
 let S = (() => {
   let raw = {}; try { raw = JSON.parse($('#app-state').textContent) || {}; } catch (e) {}
   const d = defaults();
-  return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), events: raw.events || [] });
+  return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), events: raw.events || [] });
 })();
+S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
+if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
@@ -1598,7 +1601,7 @@ function convocatiRegiaHtml() {
     <p class="small muted" style="margin-top:0">Inserisci i convocati, uno per riga. I nominativi saranno riportati nella grafica MATCH DAY, ma non nel testo del post.</p>
     <label class="f"><span>Giocatori convocati · uno per riga</span><textarea data-convocati rows="14" placeholder="Rossi&#10;Bianchi&#10;Verdi&#10;...">${esc(S.convocati)}</textarea></label>
     <div class="small muted" style="margin:-6px 0 12px">${count} giocatori inseriti</div>
-    <button class="btn primary block" data-a="saveconvocati">Salva lista convocati</button></div>
+    <button class="btn primary block" data-a="saveconvocati">Salva bozza convocati</button></div>${publicationControlsHtml()}
     <div class="card"><h2>Grafica convocati</h2>
       <p class="small muted" style="margin-top:0">Crea un’immagine dedicata con il logo del Sant’Albino, i dati essenziali della gara e l’elenco completo dei convocati.</p>
       <button class="btn primary block" data-a="viewConvocatiGraphic">Genera grafica convocati</button>
@@ -2062,10 +2065,22 @@ async function initCaps() {
       console.warn('Connessione Realtime Sant\'Albino Live:', status, err || '');
     }
   });
+  window.addEventListener('offline', () => {
+    setSync('error', 'dispositivo offline: la bozza locale resta conservata');
+  });
   window.addEventListener('online', () => {
+    setSync('ok');
     realtimeNeedsResync = true;
     void refreshRemoteState('network-online');
   });
+  if (!window.__santalbinoConnectionWatch) {
+    window.__santalbinoConnectionWatch = setInterval(() => {
+      if (!document.hidden && navigator.onLine) {
+        realtimeNeedsResync = true;
+        void refreshRemoteState('periodic-connection-check');
+      }
+    }, 30000);
+  }
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       realtimeNeedsResync = true;
@@ -2101,7 +2116,10 @@ function migrateBundledLogos(state) {
   return changed;
 }
 function mergeState(raw) {
-  const d = defaults(); return Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
+  const d = defaults();
+  const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
+  if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
+  return state;
 }
 async function verifyAdminAccess() {
   if (!db || !authUser) { CAN_EDIT = false; return false; }
@@ -3297,11 +3315,60 @@ function statsHtml() {
   if (!S.events.length) return `<div class="empty"><h3>Nessun dato</h3>Le statistiche compaiono durante la partita.</div>`;
   return `<div class="card">` + rows.map(([l, a, b]) => { const t = (a + b) || 1; return `<div class="stat"><div class="stat-h"><b>${a}</b><span>${l}</span><b>${b}</b></div><div class="bars"><div class="bar l"><i style="width:${a / t * 100}%"></i></div><div class="bar r"><i style="width:${b / t * 100}%"></i></div></div></div>`; }).join('') + `</div>`;
 }
+function publicContent() {
+  const published = S.publication?.published;
+  return published && typeof published === 'object'
+    ? { rosters: Object.assign({home:'',away:''}, published.rosters || {}), convocati: published.convocati || '' }
+    : { rosters: S.rosters, convocati: S.convocati || '' };
+}
+function localDateTimeValue(value) {
+  if (!value) return '';
+  const d = new Date(value); if (!Number.isFinite(d.getTime())) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function publicationControlsHtml() {
+  const pending = S.publication?.pending;
+  const status = pending?.status === 'scheduled'
+    ? 'Pubblicazione programmata per '+new Date(pending.scheduledAt).toLocaleString('it-IT')
+    : pending?.status === 'draft' ? 'Bozza salvata: non visibile al pubblico' : 'Nessuna bozza o programmazione in attesa';
+  return '<div class="card"><h2>Pubblicazione contenuti</h2><p class="small muted">Le modifiche salvate come bozza non compaiono nella pagina pubblica. Puoi pubblicarle subito oppure programmarle: il database esegue la pubblicazione anche se la regia è chiusa.</p><p class="small" aria-live="polite"><b>'+esc(status)+'</b></p><label class="f"><span>Data e ora di pubblicazione</span><input id="contentScheduleAt" type="datetime-local" value="'+esc(localDateTimeValue(pending?.scheduledAt))+'"></label><div class="row2 stack"><button class="btn" data-a="saveContentDraft">Salva bozza</button><button class="btn primary" data-a="scheduleContent">Programma pubblicazione</button></div><div class="row2 stack"><button class="btn primary" data-a="publishContentNow">Pubblica ora</button><button class="btn danger" data-a="cancelContentSchedule" '+(pending ? '' : 'disabled')+'>Annulla bozza/programmazione</button></div></div>';
+}
+function capturePublicationContent() {
+  $('[data-roster]').forEach(el => { S.rosters[el.dataset.roster] = el.value; });
+  const convocati = $('[data-convocati]'); if (convocati) S.convocati = convocati.value;
+  return { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
+}
+function saveContentDraft() {
+  if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
+  const content = capturePublicationContent();
+  S.publication.pending = { status: 'draft', scheduledAt: null, content, savedAt: new Date().toISOString() };
+  commit(true); renderMain(); toast('Bozza salvata: non è ancora visibile al pubblico');
+}
+function scheduleContentPublication() {
+  if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
+  const value = $('#contentScheduleAt')?.value || '', at = value ? new Date(value) : null;
+  if (!at || !Number.isFinite(at.getTime()) || at.getTime() <= Date.now()) { toast('Scegli una data e un’ora future'); return; }
+  const content = capturePublicationContent();
+  S.publication.pending = { status: 'scheduled', scheduledAt: at.toISOString(), content, savedAt: new Date().toISOString() };
+  commit(true); renderMain(); toast('Pubblicazione programmata: il database la eseguirà all’orario stabilito');
+}
+function publishContentImmediately() {
+  if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
+  S.publication.published = capturePublicationContent();
+  S.publication.publishedAt = new Date().toISOString(); S.publication.pending = null;
+  commit(true); renderMain(); toast('Contenuti pubblicati sulla pagina live');
+}
+function cancelContentPublication() {
+  if (!CAN_EDIT || !S.publication?.pending) return;
+  S.publication.pending = null; commit(true); renderMain(); toast('Bozza/programmazione annullata: i contenuti pubblici non sono stati modificati');
+}
 function lineupsHtml() {
-  const any = ['home', 'away'].some(s => parseRoster(S.rosters[s]).length);
+  const published = publicContent();
+  const any = ['home', 'away'].some(s => parseRoster(published.rosters[s]).length);
   if (!any) return `<div class="empty"><h3>Formazioni in arrivo</h3>Appena disponibili compariranno qui.</div>`;
   return ['home', 'away'].map(s => {
-    const pl = parseRoster(S.rosters[s]); if (!pl.length) return '';
+    const pl = parseRoster(published.rosters[s]); if (!pl.length) return '';
     const row = p => `<div class="pl"><b>${esc(p.num)}</b><span>${esc(p.name)}</span></div>`;
     const st = pl.filter(p => p.starter), bn = pl.filter(p => !p.starter);
     return `<section class="lu">
@@ -3322,8 +3389,8 @@ function voteInfo() {
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
 function candidates() {
-  const out = [];
-  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(S.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
+  const out = [], published = publicContent();
+  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(published.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
   return out;
 }
 
@@ -3629,7 +3696,7 @@ function validExternalUrl(value) {
 }
 
 function convocatiPublicHtml() {
-  const players=parseRoster(S.convocati);
+  const players=parseRoster(publicContent().convocati);
   if(!players.length)return '<div class="empty"><h3>Convocati non ancora pubblicati</h3>La lista comparirà qui quando sarà salvata dalla regia.</div>';
   const side=S.match.ourSide||'home',meta=[matchDateTime(),S.match.comp,S.match.venue].filter(Boolean);
   return `<section class="lu">
@@ -3644,7 +3711,7 @@ function publicHtml() {
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
-  const convocatiPanel = parseRoster(S.convocati).length ? convocatiPublicHtml() : '';
+  const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
   return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
@@ -3718,8 +3785,8 @@ function regiaHtml() {
       <p class="small muted" data-ocrstat="${s}" aria-live="polite">${photos[s] ? 'Foto pronta. Avvia la lettura automatica.' : 'Carica prima una foto o un PDF della distinta.'}</p>
       <label class="f" style="margin-top:10px"><span>Controlla e correggi la distinta: numero e cognome, uno per riga</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
-      <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
-  }).join('');
+      <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva bozza</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
+  }).join('') + publicationControlsHtml();
   else if (t === 'social') body = `<div class="card"><h2>Cronaca narrativa</h2><p class="small muted">Testo generato dagli eventi registrati. Puoi modificarlo e salvarlo come bozza; la pagina pubblica lo mostrerà soltanto dopo la tua pubblicazione esplicita.</p><label class="f"><span>Testo della cronaca</span><textarea id="chronicleEditor" rows="18">${esc(S.match.chronicleDraft || buildChronicleDraft())}</textarea></label><div class="row2 stack"><button class="btn" data-a="saveChronicleDraft">Salva bozza</button><button class="btn" data-a="regenerateChronicle">Rigenera dagli eventi</button></div><button class="btn primary block" data-a="publishChronicle">Pubblica cronaca sulla pagina live</button><p class="small muted">${S.match.chroniclePublished ? S.match.chronicleNeedsReview ? 'ATTENZIONE: gli eventi sono cambiati dopo l’ultima pubblicazione. La cronaca pubblica non è stata aggiornata: controlla la bozza e premi Pubblica quando è pronta.' : 'Una cronaca è attualmente pubblicata. La nuova versione la sostituirà soltanto quando premi Pubblica.' : 'Nessuna cronaca narrativa è attualmente pubblicata.'}</p></div><div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Resoconto finale completo</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca eventi</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
@@ -4082,6 +4149,10 @@ document.addEventListener('click', async e => {
     case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s || 'both'); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
     case 'viewMatchResult': if (S.clock.phase !== 'ft') { toast('Il MATCH RESULT è disponibile dopo il fischio finale'); break; } await openMatchResult(); break;
+    case 'saveContentDraft': saveContentDraft(); break;
+    case 'scheduleContent': scheduleContentPublication(); break;
+    case 'publishContentNow': if (confirm('Pubblicare ora convocati e formazioni sulla pagina pubblica?')) publishContentImmediately(); break;
+    case 'cancelContentSchedule': if (confirm('Annullare la bozza o la programmazione? I contenuti già pubblicati resteranno visibili.')) cancelContentPublication(); break;
     case 'saveMatchResultGraphic': { const cv=await renderMatchResultGraphic(); cv.toBlob(blob=>{if(blob)saveBlob(blob,'match-result.jpg');},'image/jpeg',.94); break; }
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
     case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); const url=S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
@@ -4149,9 +4220,9 @@ document.addEventListener('click', async e => {
     case 'copyall': if (S.events.length) copyText(S.events.map(x => evText(x).replace(/\n\n#\S+$/, '')).join('\n\n')); break;
     case 'export': saveBlob(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `cronaca-${S.match.date || 'partita'}.json`); break;
     case 'readlist': await readLineup(a.dataset.s, document.querySelector('[data-ocrstat="' + a.dataset.s + '"]')); break;
-    case 'savelineup': { const s = a.dataset.s; S.rosters[s] = $(`[data-roster="${s}"]`).value; commit(true); toast('Salvataggio della formazione avviato: verifica lo stato della sincronizzazione'); break; }
-    case 'saveconvocati': S.convocati = $('[data-convocati]').value; commit(true); toast('Lista convocati salvata'); break;
-    case 'copyconvocati': { S.convocati = $('[data-convocati]').value; commit(true); copyText(buildConvocatiText()); break; }
+    case 'savelineup': { const s = a.dataset.s; S.rosters[s] = $(`[data-roster="${s}"]`).value; saveContentDraft(); break; }
+    case 'saveconvocati': S.convocati = $('[data-convocati]').value; saveContentDraft(); break;
+    case 'copyconvocati': { S.convocati = $('[data-convocati]').value; saveContentDraft(); copyText(buildConvocatiText()); break; }
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
     case 'libraryUseGoal': { const url = S.media?.library?.goal || ''; if (!url) { toast('Carica prima un modello GOAL'); break; } L.evImg.goal = url; L.evImgRaw.goal = false; commit(true); renderMain(); toast('Modello GOAL collegato agli eventi'); break; }
