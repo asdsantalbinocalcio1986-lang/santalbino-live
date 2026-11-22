@@ -3343,7 +3343,7 @@ function saveContentDraft() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
   const content = capturePublicationContent();
   S.publication.pending = { status: 'draft', scheduledAt: null, content, savedAt: new Date().toISOString() };
-  commit(true); toast('Bozza salvata: non è ancora visibile al pubblico');
+  commit(true); renderMain(); toast('Bozza salvata: non è ancora visibile al pubblico');
 }
 function scheduleContentPublication() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
@@ -3351,7 +3351,7 @@ function scheduleContentPublication() {
   if (!at || !Number.isFinite(at.getTime()) || at.getTime() <= Date.now()) { toast('Scegli una data e un’ora future'); return; }
   const content = capturePublicationContent();
   S.publication.pending = { status: 'scheduled', scheduledAt: at.toISOString(), content, savedAt: new Date().toISOString() };
-  commit(true); toast('Pubblicazione programmata: il database la eseguirà all’orario stabilito');
+  commit(true); renderMain(); toast('Pubblicazione programmata: il database la eseguirà all’orario stabilito');
 }
 function publishContentImmediately() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
