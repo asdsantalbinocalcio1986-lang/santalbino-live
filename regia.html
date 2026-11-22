@@ -3899,26 +3899,30 @@ async function renderMatchResultGraphic() {
   x.fillStyle='#fff'; x.font='900 70px Arial,sans-serif'; x.fillText('MATCH RESULT',800,430);
   const meta=[S.match.comp,fmtDate(S.match.date),S.match.venue].filter(Boolean).join('  ·  ');
   if(meta){ x.fillStyle='rgba(255,255,255,.72)'; x.font='700 21px Arial,sans-serif'; fitFont(x,meta,1400,21,700,'Arial,sans-serif'); x.fillText(meta,800,480); }
-  const goals=S.events.filter(e=>e.type==='goal').slice().sort((a,b)=>{
-    const minute=e=>{const m=String(e.min||'').match(/^(\d+)(?:\s*\+\s*(\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
-    return minute(a)-minute(b);
-  });
+  const goalMinute=e=>{const m=String(e.min||'').match(/^(\d+)(?:\s*\+\s*(\d+))?/);return m?Number(m[1])+Number(m[2]||0)/100:999;};
+  const goalsBySide = {
+    home: S.events.filter(e=>e.type==='goal' && scoringSide(e)==='home').slice().sort((a,b)=>goalMinute(a)-goalMinute(b)),
+    away: S.events.filter(e=>e.type==='goal' && scoringSide(e)==='away').slice().sort((a,b)=>goalMinute(a)-goalMinute(b))
+  };
   const panelY=535,panelH=565;
   x.fillStyle='rgba(3,15,8,.84)'; rrect(x,70,panelY,1460,panelH,26); x.fill();
   x.fillStyle='#e3c66d'; x.textAlign='center'; x.font='900 31px Arial,sans-serif'; x.fillText('MARCATORI',800,panelY+55);
-  if(!goals.length){
+  const maxRows=Math.max(goalsBySide.home.length,goalsBySide.away.length);
+  if(!maxRows){
     x.fillStyle='rgba(255,255,255,.82)'; x.font='700 30px Arial,sans-serif'; x.fillText('NESSUNA RETE',800,panelY+280);
   } else {
-    const cols=2, rows=Math.ceil(goals.length/cols), rowH=Math.min(78,Math.max(36,440/rows));
+    const rowH=Math.min(78,Math.max(36,440/maxRows));
     const colW=690, left=105, top=panelY+105;
-    goals.forEach((g,i)=>{
-      const col=i%2,row=Math.floor(i/2),xx=left+col*700,yy=top+row*rowH;
-      x.fillStyle='rgba(255,255,255,.075)'; rrect(x,xx,yy,colW,rowH-8,12); x.fill();
-      const scorer=(g.player||'Autore del gol')+(g.kind==='autogol'?' (aut.)':'');
-      const detail=`${teamName(scoringSide(g))}  ·  ${g.min ? g.min+'′' : 'minuto n.d.'}`;
-      x.textAlign='left'; x.textBaseline='middle'; x.fillStyle='#fff';
-      fitFont(x,scorer,colW-34,Math.min(25,rowH*.34),700,'Arial,sans-serif'); x.fillText(scorer,xx+18,yy+(rowH-8)*.38);
-      x.fillStyle='#e3c66d'; fitFont(x,detail,colW-34,Math.min(19,rowH*.27),700,'Arial,sans-serif'); x.fillText(detail,xx+18,yy+(rowH-8)*.72);
+    ['home','away'].forEach((side,col)=>{
+      goalsBySide[side].forEach((g,row)=>{
+        const xx=left+col*700,yy=top+row*rowH;
+        x.fillStyle='rgba(255,255,255,.075)'; rrect(x,xx,yy,colW,rowH-8,12); x.fill();
+        const scorer=(g.player||'Autore del gol')+(g.kind==='autogol'?' (aut.)':'');
+        const detail=teamName(scoringSide(g))+'  ·  '+(g.min ? g.min+'′' : 'minuto n.d.');
+        x.textAlign='left'; x.textBaseline='middle'; x.fillStyle='#fff';
+        fitFont(x,scorer,colW-34,Math.min(25,rowH*.34),700,'Arial,sans-serif'); x.fillText(scorer,xx+18,yy+(rowH-8)*.38);
+        x.fillStyle='#e3c66d'; fitFont(x,detail,colW-34,Math.min(19,rowH*.27),700,'Arial,sans-serif'); x.fillText(detail,xx+18,yy+(rowH-8)*.72);
+      });
     });
   }
   x.textAlign='center'; x.fillStyle='rgba(255,255,255,.75)'; x.font='800 19px Arial,sans-serif';
