@@ -2964,10 +2964,10 @@ async function renderFormationGraphic(side = 'both') {
 
   const panelY = combined ? 270 : 300;
   const panelH = combined ? 1150 : 620;
-  const panelW = combined ? 840 : 1080;
+  const panelW = combined ? 840 : 1440;
   const panels = combined
     ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 920, accent: '#f0c56b' }]
-    : [{ key: selectedSides[0], x: 260, accent: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
+    : [{ key: selectedSides[0], x: 80, accent: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
 
   for (const panel of panels) {
     const team = teams[panel.key], px = panel.x;
@@ -3012,34 +3012,60 @@ async function renderFormationGraphic(side = 'both') {
       continue;
     }
 
-    const listTop = panelY + 95;
-    const totalRows = starters.length + bench.length;
-    const rowH = Math.min(36, Math.floor((panelH - 185) / Math.max(1, totalRows)));
-    const drawList = (list, top, color) => list.forEach((p, i) => {
-      const yy = top + i * rowH;
-      if (yy > panelY + panelH - 35) return;
-      x.fillStyle = color;
-      x.beginPath(); x.arc(px + 45, yy, 13, 0, Math.PI * 2); x.fill();
-      x.fillStyle = '#08291d'; x.textAlign = 'center'; x.font = '800 15px Arial,sans-serif';
-      x.fillText(p.num || '•', px + 45, yy + 1);
-      x.textAlign = 'left'; x.fillStyle = '#fff';
-      fitFont(x, p.name || '', panelW - 100, Math.max(15, rowH - 5), 700, 'Arial,sans-serif');
-      x.fillText(p.name || '', px + 70, yy);
-    });
-    drawList(starters, listTop, panel.accent);
-    if (bench.length) {
-      const sepY = Math.min(panelY + panelH - 115, listTop + starters.length * rowH + 18);
-      x.strokeStyle = 'rgba(255,255,255,.20)'; x.lineWidth = 1;
-      x.beginPath(); x.moveTo(px + 30, sepY); x.lineTo(px + panelW - 30, sepY); x.stroke();
-      x.fillStyle = panel.accent; x.font = '900 24px Arial,sans-serif'; x.textAlign = 'left';
-      x.fillText('PANCHINA', px + 34, sepY + 30);
-      x.fillStyle = 'rgba(255,255,255,.65)'; x.font = '700 18px Arial,sans-serif';
-      x.textAlign = 'right'; x.fillText(bench.length + ' giocatori', px + panelW - 34, sepY + 30);
-      drawList(bench, sepY + 70, '#d5dce0');
-    } else {
-      x.fillStyle = 'rgba(255,255,255,.58)'; x.font = 'italic 19px Arial,sans-serif';
-      x.fillText('Nessuna riserva indicata', px + 34, listTop + starters.length * rowH + 20);
-    }
+    // Layout singola squadra: titolari e riserve affiancati in due colonne.
+    const innerX = px + 34, innerW = panelW - 68;
+    const dividerX = innerX + Math.round(innerW * 0.57);
+    const contentTop = panelY + 112;
+    const contentBottom = panelY + panelH - 34;
+    const contentH = contentBottom - contentTop;
+    const leftW = dividerX - innerX - 30;
+    const rightX = dividerX + 30;
+    const rightW = innerX + innerW - rightX;
+    x.strokeStyle = 'rgba(215,244,220,.42)';
+    x.lineWidth = 3;
+    x.beginPath(); x.moveTo(dividerX, panelY + 78); x.lineTo(dividerX, contentBottom); x.stroke();
+    x.fillStyle = panel.accent;
+    x.beginPath(); x.arc(dividerX, panelY + 78, 6, 0, Math.PI * 2); x.fill();
+
+    const drawColumnTitle = (label, count, cx, width, color) => {
+      x.textAlign = 'left'; x.textBaseline = 'middle';
+      x.fillStyle = color; x.font = '900 27px Arial,sans-serif';
+      x.fillText(label, cx, panelY + 48);
+      x.textAlign = 'right'; x.fillStyle = 'rgba(255,255,255,.72)';
+      x.font = '700 18px Arial,sans-serif';
+      x.fillText(String(count), cx + width, panelY + 48);
+    };
+    drawColumnTitle('TITOLARI', starters.length, innerX, leftW, panel.accent);
+    drawColumnTitle('RISERVE', bench.length, rightX, rightW, '#d5dce0');
+
+    const drawColumnList = (list, left, width, color, maxRows) => {
+      if (!list.length) {
+        x.fillStyle = 'rgba(255,255,255,.55)';
+        x.font = 'italic 19px Arial,sans-serif';
+        x.textAlign = 'left';
+        x.fillText('Nessuna riserva indicata', left, contentTop + 28);
+        return;
+      }
+      const rowH = Math.min(48, Math.floor(contentH / Math.max(1, maxRows || list.length)));
+      const blockH = rowH * list.length;
+      const top = contentTop + Math.max(0, (contentH - blockH) / 2);
+      const radius = Math.max(11, Math.min(15, rowH * .31));
+      list.forEach((p, i) => {
+        const yy = top + i * rowH + rowH / 2;
+        x.fillStyle = color;
+        x.beginPath(); x.arc(left + radius, yy, radius, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#08291d'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = '800 15px Arial,sans-serif';
+        x.fillText(p.num || '•', left + radius, yy + 1);
+        x.fillStyle = '#fff'; x.textAlign = 'left';
+        const textX = left + radius * 2 + 12;
+        const available = width - (textX - left) - 4;
+        fitFont(x, p.name || '', available, Math.max(16, Math.min(25, rowH * .56)), 700, 'Arial,sans-serif');
+        x.fillText(p.name || '', textX, yy);
+      });
+    };
+    drawColumnList(starters, innerX, leftW, panel.accent, 11);
+    drawColumnList(bench, rightX, rightW, '#d5dce0', Math.max(1, bench.length));
   }
   await addSponsorToGraphic(canvas,'formation');
   return canvas;
