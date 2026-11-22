@@ -202,8 +202,10 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 .mvp-box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
 .mvp-box h3{margin:0 0 4px;font:800 28px/1.05 var(--fd);letter-spacing:.03em;text-transform:uppercase}
 .count{display:inline-block;font:800 30px/1 var(--fd);font-variant-numeric:tabular-nums;color:var(--c-mvp);margin:6px 0 10px}
-.cands{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 14px}
-@media (max-width:420px){.cands{grid-template-columns:1fr}}
+.mvp-team-group{margin:14px 0 18px}
+.mvp-team-title{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:0 0 7px;border-bottom:1px solid var(--line);font:800 17px/1.2 var(--fd);letter-spacing:.06em;text-transform:uppercase}
+.cands{display:grid;grid-template-columns:1fr;gap:8px;margin:0}
+
 .cand{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;min-width:0}
 .cand .badge{width:26px;height:26px;box-shadow:none;border:1px solid var(--line)}
 .cand .badge i{font-size:12px}
@@ -3419,11 +3421,13 @@ function mvpPublicHtml() {
         ? `<p class="small" style="color:var(--c-goal);font-weight:700">Hai già votato. Grazie per aver partecipato!</p>`
         : `<p class="small muted">Scegli un giocatore. È possibile esprimere un solo voto per partita da questo dispositivo.</p>`}
       ${C.length
-        ? `<div class="cands">${C.map(c => `<div class="cand">
-            <span style="flex:1"><b>${esc(c.num)}</b> ${esc(c.name)}
-            <small class="muted"> · ${esc(teamName(c.side))}</small></span>
-            ${!voted ? `<button class="btn sm primary" data-vote-candidate="${esc(c.key)}">Vota</button>` : ''}
-          </div>`).join('')}</div>`
+        ? ['home', 'away'].filter(side => C.some(c => c.side === side)).map(side => `<section class="mvp-team-group">
+            <h4 class="mvp-team-title">${esc(teamName(side))}</h4>
+            <div class="cands">${C.filter(c => c.side === side).map(c => `<div class="cand">
+              <span style="flex:1"><b>${esc(c.num)}</b> ${esc(c.name)}</span>
+              ${!voted ? `<button class="btn sm primary" data-vote-candidate="${esc(c.key)}">Vota</button>` : ''}
+            </div>`).join('')}</div>
+          </section>`).join('')
         : '<p class="muted">Le formazioni non sono ancora disponibili.</p>'}
       <p class="small muted">I risultati della votazione sono riservati alla società.</p>
     </div>`;
