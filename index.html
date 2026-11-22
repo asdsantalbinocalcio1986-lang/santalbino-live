@@ -1368,7 +1368,7 @@ const SCRIPT_END = '<' + '/script>';
 /* ================= stato pubblico (incorporato nella pagina) ================= */
 const defaults = () => ({
   rev: 0,
-  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '', chronicleDraft: '', chroniclePublished: '', chroniclePublishedAt: '' },
+  match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SantAlbinoTerme', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '', chronicleDraft: '', chroniclePublished: '', chroniclePublishedAt: '', chronicleNeedsReview: false },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
@@ -2288,13 +2288,14 @@ function addEvent(ev, opts = {}) {
   if (!S.match.date) S.match.date = new Date().toISOString().slice(0, 10);
   S.events.push(ev);
   S.match.chronicleDraft = '';
+  if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true;
   if (ev.type === 'fulltime') refreshMvpVotes();
   if (opts.post) stash.set('open-post', ev.id);
   commit(true); renderMain();
   return ev;
 }
 function addPhase(type, min, extra = {}) { addEvent(Object.assign({ type, team: S.match.ourSide, min: min ?? curMinute() }, extra), { post: true }); }
-function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; S.match.chronicleDraft = ''; saveL(); commit(true); renderMain(); }
+function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true; saveL(); commit(true); renderMain(); }
 
 /* ================= immagini degli eventi ================= */
 const loadImg = src => new Promise(r => { if (!src) return r(null); const i = new Image(); if(/^https?:/i.test(src)) i.crossOrigin='anonymous'; i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
@@ -3684,7 +3685,7 @@ function regiaHtml() {
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva e mostra online</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('');
-  else if (t === 'social') body = `<div class="card"><h2>Cronaca narrativa</h2><p class="small muted">Testo generato dagli eventi registrati. Puoi modificarlo e salvarlo come bozza; la pagina pubblica lo mostrerà soltanto dopo la tua pubblicazione esplicita.</p><label class="f"><span>Testo della cronaca</span><textarea id="chronicleEditor" rows="18">${esc(S.match.chronicleDraft || buildChronicleDraft())}</textarea></label><div class="row2 stack"><button class="btn" data-a="saveChronicleDraft">Salva bozza</button><button class="btn" data-a="regenerateChronicle">Rigenera dagli eventi</button></div><button class="btn primary block" data-a="publishChronicle">Pubblica cronaca sulla pagina live</button><p class="small muted">${S.match.chroniclePublished ? 'Una cronaca è attualmente pubblicata. La nuova versione la sostituirà soltanto quando premi Pubblica.' : 'Nessuna cronaca narrativa è attualmente pubblicata.'}</p></div><div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Resoconto finale completo</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca eventi</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
+  else if (t === 'social') body = `<div class="card"><h2>Cronaca narrativa</h2><p class="small muted">Testo generato dagli eventi registrati. Puoi modificarlo e salvarlo come bozza; la pagina pubblica lo mostrerà soltanto dopo la tua pubblicazione esplicita.</p><label class="f"><span>Testo della cronaca</span><textarea id="chronicleEditor" rows="18">${esc(S.match.chronicleDraft || buildChronicleDraft())}</textarea></label><div class="row2 stack"><button class="btn" data-a="saveChronicleDraft">Salva bozza</button><button class="btn" data-a="regenerateChronicle">Rigenera dagli eventi</button></div><button class="btn primary block" data-a="publishChronicle">Pubblica cronaca sulla pagina live</button><p class="small muted">${S.match.chroniclePublished ? S.match.chronicleNeedsReview ? 'ATTENZIONE: gli eventi sono cambiati dopo l’ultima pubblicazione. La cronaca pubblica non è stata aggiornata: controlla la bozza e premi Pubblica quando è pronta.' : 'Una cronaca è attualmente pubblicata. La nuova versione la sostituirà soltanto quando premi Pubblica.' : 'Nessuna cronaca narrativa è attualmente pubblicata.'}</p></div><div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Resoconto finale completo</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca eventi</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();
@@ -3897,7 +3898,7 @@ function renderSheet() {
   const imgBox = CARD_TYPES.includes(d.type) ? `<div class="f"><span>Immagine per questo evento (facoltativa)</span>${d.img ? `<img class="thumb" style="max-height:110px" src="${d.img}" alt="Immagine scelta">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${d.img ? 'Cambia immagine' : 'Scegli immagine'}<input type="file" accept="image/*" data-evimg-one hidden></label>${d.img ? '<button type="button" class="btn sm danger" data-evimg-one-rm>Togli</button>' : ''}</div>
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
-  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${editingEventId ? 'Modifica evento' : esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
+  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${editingEventId ? 'Modifica evento' : esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type] || PHASE_EV[d.type] || 'Evento')}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
     ${editingEventId ? '' : '<label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>'}
     <button type="button" class="btn primary block" data-sub="go">${editingEventId ? 'Salva modifiche evento' : 'Registra evento'}</button></form>`;
@@ -4128,7 +4129,7 @@ document.addEventListener('click', async e => {
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
     case 'saveChronicleDraft': { const value=$('#chronicleEditor')?.value.trim()||''; if(!value){toast('La bozza è vuota');break;} S.match.chronicleDraft=value; commit(true); toast('Bozza della cronaca salvata: non è pubblica'); break; }
     case 'regenerateChronicle': { const value=buildChronicleDraft(); const editor=$('#chronicleEditor'); if(editor)editor.value=value; S.match.chronicleDraft=value; commit(true); toast('Bozza rigenerata dagli eventi registrati'); break; }
-    case 'publishChronicle': { const value=$('#chronicleEditor')?.value.trim()||''; if(!value){toast('Scrivi o genera prima la cronaca');break;} if(!confirm('Pubblicare questa cronaca sulla pagina pubblica SANTA Live?'))break; S.match.chronicleDraft=value; S.match.chroniclePublished=value; S.match.chroniclePublishedAt=new Date().toISOString(); commit(true); toast('Cronaca pubblicata sulla pagina live'); renderMain(); break; }
+    case 'publishChronicle': { const value=$('#chronicleEditor')?.value.trim()||''; if(!value){toast('Scrivi o genera prima la cronaca');break;} if(!confirm('Pubblicare questa cronaca sulla pagina pubblica SANTA Live?'))break; S.match.chronicleDraft=value; S.match.chroniclePublished=value; S.match.chroniclePublishedAt=new Date().toISOString(); S.match.chronicleNeedsReview=false; commit(true); toast('Cronaca pubblicata sulla pagina live'); renderMain(); break; }
     case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
     case 'rmmvptpl': S.mvp.tpl = ''; S.mvp.raw = false; commit(true); renderMain(); break;
@@ -4181,7 +4182,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
@@ -4303,7 +4304,7 @@ function wireSheet() {
         const original = S.events[index], updated = Object.assign({}, original, ev, {id: original.id, ts: original.ts});
         if (ev._img) setEvOne(original.id, ev._img, ev._raw);
         delete updated._img; delete updated._raw;
-        S.events[index] = updated; S.match.chronicleDraft = '';
+        S.events[index] = updated; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true;
         editingEventId = null; sh.close(); commit(true); renderMain(); toast('Evento aggiornato: risultato, timeline e cronaca saranno ricalcolati');
       } else {
         sh.close();
