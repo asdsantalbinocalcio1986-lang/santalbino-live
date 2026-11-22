@@ -3719,14 +3719,14 @@ function buildMatchReport() {
         const team = sideLabel(scoringSide(ev));
         if (ev.kind === 'autogol') return prefix + (player || 'un giocatore') + ' devia il pallone nella propria porta e regala una rete a ' + team + '. Il punteggio diventa ' + scoreText(current[0], current[1]) + '.';
         const how = ev.kind === 'rigore' ? ' dal dischetto' : ev.kind === 'punizione' ? ' direttamente su calcio di punizione' : ev.kind === 'testa' ? ' con un colpo di testa' : '';
-        return prefix + (player || 'un giocatore') + ' firma la rete per ' + team + how + (ev.assist ? ', su assist di ' + ev.assist : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
+        return prefix + (player || 'un giocatore') + ' firma la rete per ' + team + how + (ev.assist ? ', su assist di ' + cleanName(ev.assist) : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
       }
       case 'yellow':
         return prefix + 'il direttore di gara estrae il cartellino giallo nei confronti di ' + (player || 'un giocatore') + '.';
       case 'red':
         return prefix + (player || 'un giocatore') + ' viene espulso' + (ev.kind === 'doppio' ? ' per doppia ammonizione' : ' con un cartellino rosso diretto') + '.';
       case 'sub':
-        return prefix + 'cambio in campo: ' + (ev.inn || 'un giocatore') + ' entra al posto di ' + (ev.out || 'un compagno') + '.';
+        return prefix + 'cambio in campo: ' + (ev.inn ? cleanName(ev.inn) : 'un giocatore') + ' entra al posto di ' + (ev.out ? cleanName(ev.out) : 'un compagno') + '.';
       case 'injury':
         return prefix + 'il gioco viene interrotto per consentire i soccorsi a ' + (player || 'un giocatore') + '.';
       case 'note': {
@@ -3837,15 +3837,19 @@ function buildMatchReport() {
 
   const lineupSections = ['home','away'].map(side => {
     const players = parseRoster(S.rosters[side]);
-    if (!players.length) return teamName(side) + ': formazione non inserita.';
+    const teamHeading = teamName(side).toLocaleUpperCase('it');
+    if (!players.length) return teamHeading + '\nFORMAZIONE NON INSERITA.';
     const starters = players.filter(p => p.starter);
     const bench = players.filter(p => !p.starter);
-    const format = p => (p.num ? p.num + ' ' : '') + p.name;
-    return teamName(side) + ': ' + (starters.length ? 'titolari ' + starters.map(p => (p.num ? p.num + ' ' : '') + cleanName(p.name)).join(', ') : 'titolari non inseriti') +
-      (bench.length ? '. A disposizione ' + bench.map(format).join(', ') : '') + '.';
+    const format = p => (p.num ? p.num + ' ' : '') + String(p.name || '').toLocaleUpperCase('it');
+    const starterText = starters.length
+      ? 'TITOLARI: ' + starters.map(p => (p.num ? p.num + ' ' : '') + String(p.name || '').toLocaleUpperCase('it')).join(', ')
+      : 'TITOLARI NON INSERITI';
+    return teamHeading + '\n' + starterText +
+      (bench.length ? '\nA DISPOSIZIONE: ' + bench.map(format).join(', ') : '');
   });
   return opening + '\n\n' + firstText + '\n\n' + secondText + ' ' + closing + mvpLine +
-    '\n\nLe formazioni\n\n' + lineupSections.join('\n\n');
+    '\n\n' + lineupSections.join('\n\n');
 }
 function buildMatchSummary() {
   const [h, a] = scoreOf(S.events), home = teamName('home'), away = teamName('away');
