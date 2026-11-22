@@ -1490,7 +1490,7 @@ function describe(e, sc) {
     case 'foul': return { title: e.kind === 'rigore' && e.foulInArea !== false ? 'Fallo da rigore' : e.handball ? 'Fallo di mano' : 'Fallo', main: p || t, sub: e.kind === 'rigore' && e.foulInArea !== false ? esc(t) + ' · calcio di rigore assegnato' : e.handball ? esc(t) + ' · fallo di mano' : esc(t) + ' · fallo' };
     case 'yellow': return { title: 'Cartellino giallo', main: p || t, sub: esc(t) };
     case 'red': return { title: e.kind === 'doppio' ? 'Doppio giallo' : 'Espulsione', main: p || t, sub: esc(t) + ' · in dieci' };
-    case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}`, subRaw: true };
+    case 'sub': return { title: 'Sostituzione', main: '', sub: `<b>Entra</b> ${esc(e.inn || '…')} · <b>Esce</b> ${esc(e.out || '…')} · ${esc(t)}${e.possibleSubs ? `<br><span class="small">Possibili alternative: ${esc(e.possibleSubs)}</span>` : ''}`, subRaw: true };
     case 'save': return { title: e.kind === 'facile' ? 'Parata' : 'Grande parata', main: p || t, sub: esc(t) };
     case 'shot': return { title: e.kind === 'fuori' ? 'Tiro fuori' : e.kind === 'in_porta' ? describeShot(e) : 'Tiro', main: p || t, sub: esc(t) };
     case 'crossbar': return { title: 'Traversa', main: p || t, sub: esc(t) };
@@ -1519,7 +1519,7 @@ function buildText(ev, sc) {
     case 'foul': { const penalty = ev.kind === 'rigore' && ev.foulInArea !== false; const label = penalty ? 'FALLO DA RIGORE' : ev.handball ? 'FALLO DI MANO' : 'FALLO'; x = `⚠️ ${m}${label}\n${p ? p + ' (' + t + ')' : t}${penalty ? '\nCalcio di rigore assegnato.' : ev.handball ? '\nFallo di mano.' : '\nFallo.'}`; break; }
     case 'yellow': x = `🟨 ${m}CARTELLINO GIALLO\n${p ? p + ' (' + t + ')' : t}`; break;
     case 'red': x = `🟥 ${m}ESPULSIONE\n${ev.kind === 'doppio' ? 'Doppio giallo' : 'Rosso diretto'}${p ? ' per ' + p : ''} (${t}). ${t} in inferiorità numerica.`; break;
-    case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.`; break;
+    case 'sub': x = `🔄 ${m}SOSTITUZIONE\n${t}: entra ${ev.inn || '…'}, esce ${ev.out || '…'}.${ev.possibleSubs ? `\nPossibili alternative: ${ev.possibleSubs}.` : ''}`; break;
     case 'save': x = `🧤 ${m}${ev.kind === 'facile' ? 'PARATA' : 'GRANDE PARATA'}\n${p ? 'di ' + p + ' (' + t + ')' : t}`; break;
     case 'shot': x = ev.kind === 'fuori' ? `⚽ ${m}TIRO FUORI\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : ev.kind === 'in_porta' ? `🎯 ${m}${describeShot(ev).toUpperCase()}\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.` : `⚽ ${m}TIRO\n${p ? 'di ' + p + ' per ' + t : 'per ' + t}.`; break;
     case 'crossbar': x = `🥅 ${m}TRAVERSA!\n${p ? 'Colpita da ' + p + ' (' + t + ')' : t}.`; break;
@@ -2313,13 +2313,15 @@ function addEvent(ev, opts = {}) {
   if (ev._img) setEvOne(ev.id, ev._img, ev._raw); delete ev._img; delete ev._raw;
   if (!S.match.date) S.match.date = new Date().toISOString().slice(0, 10);
   S.events.push(ev);
+  S.match.chronicleDraft = '';
+  if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true;
   if (ev.type === 'fulltime') refreshMvpVotes();
   if (opts.post) stash.set('open-post', ev.id);
   commit(true); renderMain();
   return ev;
 }
 function addPhase(type, min, extra = {}) { addEvent(Object.assign({ type, team: S.match.ourSide, min: min ?? curMinute() }, extra), { post: true }); }
-function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; saveL(); commit(true); renderMain(); }
+function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true; saveL(); commit(true); renderMain(); }
 
 /* ================= immagini degli eventi ================= */
 const loadImg = src => new Promise(r => { if (!src) return r(null); const i = new Image(); if(/^https?:/i.test(src)) i.crossOrigin='anonymous'; i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
@@ -4037,12 +4039,21 @@ let armedNew = false;
 let draft = null, textManual = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function openSheet(type) {
-  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '', foulInArea: false, handball: false };
+  editingEventId = null;
+  draft = { img: '', raw: false, type, team: S.match.ourSide, kind: type === 'goal' ? 'azione' : type === 'foul' ? 'normal' : type === 'red' ? 'diretto' : type === 'miss' ? 'Occasione' : type === 'save' ? 'facile' : '', player: '', assist: '', out: '', inn: '', possibleSubs: '', note: '', min: '', shotZone: '', freeKickZone: '', cornerSide: '', foulInArea: false, handball: false };
+  textManual = false; renderSheet(); $('#sheet').showModal();
+}
+function editEvent(id) {
+  const ev = S.events.find(item => item.id === id); if (!ev) return;
+  editingEventId = id;
+  const one = L.evOne?.[id] || {};
+  draft = Object.assign({img: one.img || '', raw: !!one.raw, assist:'', out:'', inn:'', possibleSubs:'', note:'', shotZone:'', freeKickZone:'', cornerSide:'', foulInArea:false, handball:false}, ev);
+  draft.img = one.img || ''; draft.raw = !!one.raw; draft.min = String(ev.min ?? '');
   textManual = false; renderSheet(); $('#sheet').showModal();
 }
 function draftEvent() {
   const d = draft, t = d.team;
-  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: d.min.trim() || curMinute(), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), note: d.note.trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '', foulInArea: !!d.foulInArea, handball: !!d.handball };
+  return { _img: d.img || '', _raw: !!d.raw, type: d.type, team: t, kind: d.kind, min: String(d.min || '').trim() || (editingEventId ? '' : curMinute()), player: resolvePlayer(t, d.player), assist: resolvePlayer(t, d.assist), out: resolvePlayer(t, d.out), inn: resolvePlayer(t, d.inn), possibleSubs: String(d.possibleSubs || '').trim(), note: String(d.note || '').trim(), shotZone: d.shotZone || '', freeKickZone: d.freeKickZone || '', cornerSide: d.cornerSide || '', foulInArea: !!d.foulInArea, handball: !!d.handball };
 }
 function renderSheet() {
   const keepText = textManual && $('#fText') ? $('#fText').value : null;
@@ -4062,7 +4073,7 @@ function renderSheet() {
     case 'offside': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'red': fields = P('player', 'Giocatore') + SEL('kind', 'Motivo', [['diretto', 'Rosso diretto'], ['doppio', 'Doppio giallo']]); break;
     case 'miss': fields = P('player', 'Giocatore') + SEL('kind', 'Cosa è successo', MISS_KINDS); break;
-    case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra'); break;
+    case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra') + P('possibleSubs', 'Altre possibili sostituzioni (facoltativo)', 'Nomi separati da virgola'); break;
     case 'note': fields = `<label class="f"><span>Testo</span><textarea data-d="note" rows="3" placeholder="Es. Recupero di 3 minuti">${esc(d.note)}</textarea></label>`; break;
   }
   const teamHint = d.type === 'freekick' ? '<p class="small muted">Seleziona la squadra che ha subito il fallo.</p>' : d.type === 'corner' ? '<p class="small muted">Seleziona la squadra che ha guadagnato il calcio d’angolo.</p>' : '';
@@ -4070,10 +4081,10 @@ function renderSheet() {
   const imgBox = CARD_TYPES.includes(d.type) ? `<div class="f"><span>Immagine per questo evento (facoltativa)</span>${d.img ? `<img class="thumb" style="max-height:110px" src="${d.img}" alt="Immagine scelta">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${d.img ? 'Cambia immagine' : 'Scegli immagine'}<input type="file" accept="image/*" data-evimg-one hidden></label>${d.img ? '<button type="button" class="btn sm danger" data-evimg-one-rm>Togli</button>' : ''}</div>
     ${d.img ? `<label class="check" style="margin-top:8px"><input type="checkbox" data-d-raw ${d.raw ? 'checked' : ''}> Usa solo questa immagine, senza dati sopra</label>` : '<span class="small muted">Altrimenti si usa l’immagine del tipo di evento o quella automatica.</span>'}</div>` : '';
-  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type])}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
+  $('#sheet').innerHTML = `<form id="sheetForm" novalidate><div class="sheethead"><h2>${editingEventId ? 'Modifica evento' : esc(({ goal: 'Gol', foul: 'Fallo', yellow: 'Cartellino giallo', red: 'Cartellino rosso', sub: 'Sostituzione', save: 'Parata', miss: 'Occasione', shot: 'Tiro', crossbar: 'Traversa', corner: 'Calcio d’angolo', freekick: 'Calcio di punizione', injury: 'Infortunio', note: 'Nota libera' })[d.type] || PHASE_EV[d.type] || 'Evento')}</h2><button type="button" class="btn sm" id="sheetClose">Chiudi</button></div>
     ${teamSeg}${fields}${imgBox}<label class="f" style="max-width:180px"><span>Minuto</span><input type="text" inputmode="numeric" data-d="min" value="${esc(d.min)}" placeholder="auto ${esc(curMinute() || '–')}"></label>
-    <label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>
-    <button type="button" class="btn primary block" data-sub="go">Registra evento</button></form>`;
+    ${editingEventId ? '' : '<label class="f"><span>Testo del post Facebook (modificabile)</span><textarea id="fText" rows="5"></textarea></label>'}
+    <button type="button" class="btn primary block" data-sub="go">${editingEventId ? 'Salva modifiche evento' : 'Registra evento'}</button></form>`;
   refreshPreview(); if (keepText !== null) $('#fText').value = keepText;
 }
 function refreshPreview() { if (!textManual && draft) { const ev = draftEvent(); $('#fText').value = buildText(ev, scoreOf([...S.events, ev])); } }
@@ -4188,6 +4199,7 @@ document.addEventListener('click', async e => {
       break; }
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
+    case 'editevent': if (!CAN_EDIT || L.mode !== 'regia' || !ev) { toast('Modifica evento disponibile solo dalla regia'); break; } editEvent(ev.id); break;
     case 'viewgraphic': if (a.dataset.id) openGraphic(a.dataset.id); break;
     case 'viewlineupgraphic': await openLineupGraphic(a.dataset.s || 'both'); break;
     case 'viewMatchDayGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openMatchDayGraphic(); break;
@@ -4448,9 +4460,20 @@ function wireSheet() {
       if (draft?.type === 'shot' && !draft.shotZone) { toast('Seleziona prima il punto del tiro sulla porta'); return; }
       if (draft?.type === 'freekick' && !draft.freeKickZone) { toast('Seleziona prima la posizione del calcio di punizione'); return; }
       if (draft?.type === 'corner' && !draft.cornerSide) { toast('Seleziona prima il lato del calcio d’angolo'); return; }
-      const ev = draftEvent(), txt = $('#fText').value.trim(); sh.close();
-      const made = addEvent(ev, { post: true });
-      if (txt && txt !== buildText(made, scoreAt(S.events.indexOf(made)))) { socialOf(made.id).text = txt; saveL(); }
+      const ev = draftEvent(), txt = $('#fText')?.value.trim() || '';
+      if (editingEventId) {
+        const index = S.events.findIndex(item => item.id === editingEventId);
+        if (index < 0) { toast('Evento non più disponibile: riapri la modifica'); return; }
+        const original = S.events[index], updated = Object.assign({}, original, ev, {id: original.id, ts: original.ts});
+        if (ev._img) setEvOne(original.id, ev._img, ev._raw);
+        delete updated._img; delete updated._raw;
+        S.events[index] = updated; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true;
+        editingEventId = null; sh.close(); commit(true); renderMain(); toast('Evento aggiornato: risultato, timeline e cronaca saranno ricalcolati');
+      } else {
+        sh.close();
+        const made = addEvent(ev, { post: true });
+        if (txt && txt !== buildText(made, scoreAt(S.events.indexOf(made)))) { socialOf(made.id).text = txt; saveL(); }
+      }
     }
   });
   $('#postDlg').addEventListener('input', e => { if (e.target.id === 'postText') { socialOf(postId).text = e.target.value; saveL(); } });
