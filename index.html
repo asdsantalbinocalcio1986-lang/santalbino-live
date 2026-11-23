@@ -4152,7 +4152,32 @@ function topHtml() {
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
   return `${banner}<div class="top">${brand}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
-function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
+let inAppNotificationChannel = null;
+let inAppNotificationMatchKey = '';
+async function ensureInAppNotifications() {
+  if (TEST_MODE || !db || !S.match.pollId || !mvpPollKey()) return;
+  const matchKey = mvpPollKey();
+  if (matchKey === inAppNotificationMatchKey) return;
+  inAppNotificationMatchKey = matchKey;
+  if (inAppNotificationChannel) {
+    try { await db.removeChannel(inAppNotificationChannel); } catch (_) {}
+    inAppNotificationChannel = null;
+  }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(matchKey));
+  const topicHash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2,'0')).join('').slice(0,32);
+  inAppNotificationChannel = db.channel('santalive-match-' + topicHash)
+    .on('broadcast', { event: 'match-notification' }, ({ payload }) => {
+      if (!payload || payload.matchKey !== matchKey) return;
+      const title = String(payload.title || 'SANTA Live').slice(0,120);
+      const body = String(payload.body || 'Aggiornamento della partita').slice(0,300);
+      toast(title + ' · ' + body);
+    })
+    .subscribe(status => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('Canale notifiche live non disponibile:', status);
+    });
+}
+
+function renderMain() { void ensureInAppNotifications(); const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
 let lastVote = 'none';
 function renderAll() {
   if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
