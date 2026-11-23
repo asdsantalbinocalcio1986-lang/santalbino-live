@@ -119,7 +119,9 @@ Deno.serve(async (req: Request) => {
     if (isMvpInvite) {
       const hasFullTime = (state.events || []).some((event: any) => event.type === "fulltime");
       const selected = state.mvp?.selectedCandidates;
-      if (!hasFullTime || !Array.isArray(selected) || selected.length !== 4) {
+      const hasHome = Array.isArray(selected) && selected.some((key: string) => key.startsWith("home|"));
+      const hasAway = Array.isArray(selected) && selected.some((key: string) => key.startsWith("away|"));
+      if (!hasFullTime || !Array.isArray(selected) || selected.length !== 4 || !hasHome || !hasAway) {
         return json({ error: "La votazione MVP non è pronta" }, 409, origin);
       }
     }
@@ -133,19 +135,23 @@ Deno.serve(async (req: Request) => {
     if (logError) throw logError;
 
     const matchId = String(state.match?.pollId || "");
+    const title = String(body?.title || "SANTALive").slice(0, 90);
+    const message = String(body?.body || "Aggiornamento della partita").slice(0, 180);
+    const url = safeMatchUrl(body?.url);
+    const { error: noticeError } = await service.from("santalbino_live_notifications").upsert({
+      event_id: eventId, match_id: matchId, event_type: eventType, title, body: message, url
+    }, { onConflict: "event_id", ignoreDuplicates: true });
+    if (noticeError) throw noticeError;
     const { data: rows, error: rowsError } = await service.from("santalbino_push_subscriptions")
       .select("endpoint,p256dh,auth,match_id,event_types").contains("event_types", [eventType]);
     if (rowsError) throw rowsError;
     const recipients = (rows || []).filter((row: any) => !row.match_id || row.match_id === matchId);
     if (!recipients.length) {
       await service.from("santalbino_push_deliveries").update({ status: "no_subscribers", sent_count: 0, failed_count: 0, updated_at: new Date().toISOString() }).eq("event_id", eventId);
-      return json({ status: "no_subscribers", sent: 0, message: "Nessun dispositivo iscritto a questa tipologia" }, 200, origin);
+      return json({ status: "no_subscribers", sent: 0, message: "Avviso in-app pubblicato; nessun dispositivo push iscritto a questa tipologia" }, 200, origin);
     }
 
     configureVapid();
-    const title = String(body?.title || "SANTALive").slice(0, 90);
-    const message = String(body?.body || "Aggiornamento della partita").slice(0, 180);
-    const url = safeMatchUrl(body?.url);
     const payload = JSON.stringify({ title, body: message, url, tag: "santalive-" + eventId });
     let sent = 0, failed = 0;
     const results = await Promise.allSettled(recipients.map(async (row: any) => {
