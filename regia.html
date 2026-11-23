@@ -3745,15 +3745,22 @@ async function openGraphic(id) {
 }
 let armedMvp = false;
 function mvpRegiaHtml() {
-  const vi = voteInfo(), C = candidates();
-  const st = { none: 'La votazione parte automaticamente al fischio finale e dura 12 ore.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
+  const vi = voteInfo(), C = candidates(), all = allMvpCandidates();
+  const selected = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
+  const locked = ['open', 'closed', 'done'].includes(vi.state);
+  const st = { none: 'Seleziona i quattro candidati prima del fischio finale. La votazione si aprirà al termine della partita.', unconfigured: 'La partita è terminata: completa la selezione dei quattro candidati per aprire la votazione.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
   const tally = k => (mvpVoteCounts[k] || S.mvp.votes[k] || 0);
   const sorted = [...C].sort((a, b) => tally(b.key) - tally(a.key));
-  return `<div class="card"><h2>Votazione MVP</h2><p style="margin-top:0">${st}</p>
-    <label class="check"><input type="checkbox" id="m-our" ${S.mvp.ourOnly ? 'checked' : ''}> Candidati: solo i giocatori della nostra squadra</label>
-    <button class="btn primary block" data-a="savemvp">Salva impostazioni</button>
+  const candidateSelector = ['home', 'away'].map(side => {
+    const players = all.filter(player => player.side === side);
+    return players.length ? `<section class="mvp-team-group"><h4 class="mvp-team-title">${esc(teamName(side))}</h4><div class="cands">${players.map(player => `<label class="cand"><input type="checkbox" data-mvp-candidate value="${esc(player.key)}" ${selected.includes(player.key) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span style="flex:1"><b>${esc(player.num)}</b> ${esc(player.name)}</span></label>`).join('')}</div></section>` : '';
+  }).join('');
+  return `<div class="card"><h2>Candidati MVP · ${selected.length}/4</h2><p style="margin-top:0">Seleziona esattamente quattro giocatori, con almeno un candidato per ciascuna squadra. La selezione resta modificabile fino all'apertura del voto.</p>
+    ${candidateSelector || '<p class="muted">Inserisci e pubblica le formazioni di entrambe le squadre per scegliere i candidati.</p>'}
+    <button class="btn primary block" data-a="savemvp" ${locked ? 'disabled' : ''}>Salva i quattro candidati</button>
+    <p class="small muted">${st}</p>
     <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
-    <p class="small muted">Il pubblico vota direttamente dalla scheda MVP della pagina live. Un voto per dispositivo e partita.</p></div>
+    <p class="small muted">Il pubblico potrà votare un solo candidato, una volta per partita e per identificativo browser.</p></div>`;
   <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow\"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
     ${S.mvp.tpl ? `<img class="thumb" style="max-height:120px" src="${S.mvp.tpl}" alt="Sfondo MVP">` : ''}
@@ -4679,7 +4686,16 @@ document.addEventListener('click', async e => {
     case 'libraryImportGoal': { const url = L.evImg.goal || ''; if (!url) { toast('Non è presente un modello GOAL nelle Impostazioni'); break; } S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}, {goal:url}); commit(true); renderMain(); toast('Modello GOAL aggiunto alla libreria'); break; }
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
-    case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
+    case 'savemvp': {
+      const keys = $('[data-mvp-candidate]:checked').map(input => input.value);
+      const all = allMvpCandidates();
+      const chosen = keys.map(key => all.find(player => player.key === key)).filter(Boolean);
+      if (keys.length !== 4 || new Set(keys).size !== 4 || chosen.length !== 4) { toast('Seleziona esattamente quattro giocatori presenti nelle formazioni.'); break; }
+      if (new Set(chosen.map(player => player.side)).size !== 2) { toast('Deve essere selezionato almeno un giocatore per ciascuna squadra.'); break; }
+      S.mvp.candidateKeys = keys;
+      S.mvp.ourOnly = false;
+      commit(true); renderMain(); toast('I quattro candidati MVP sono stati salvati'); break;
+    }
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
     case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
