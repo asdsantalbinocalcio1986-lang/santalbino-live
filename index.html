@@ -3756,8 +3756,8 @@ function notificationPanelHtml() {
   return '<section class="card" aria-label="Notifiche partita"><h3>Notifiche della partita</h3>' +
     '<p class="small muted">Ricevi aggiornamenti anche quando non stai guardando SANTA Live. Puoi disattivarli in qualsiasi momento.</p>' +
     (active
-      ? '<p class="small" style="color:var(--c-goal);font-weight:700">Notifiche attive su questo dispositivo.</p><button class="btn block" data-notification-action="disable">Disattiva notifiche</button>'
-      : '<button class="btn primary block" data-notification-action="enable">Attiva notifiche della partita</button>') +
+      ? '<p class="small" style="color:var(--c-goal);font-weight:700">Notifiche attive su questo dispositivo.</p><button class="btn block" data-notification-action="disable">Disattiva per questa partita</button>'
+      : '<button class="btn primary block" data-notification-action="enable">Attiva notifiche di questa partita</button>') +
     '</section>';
 }
 function createSubscriptionToken() {
@@ -3797,9 +3797,8 @@ async function disableMatchNotifications() {
   let token = '';
   try { token = localStorage.getItem(notificationStorageKey()) || ''; } catch (_) {}
   if (token) await callNotificationService('unsubscribe', { subscriptionToken: token });
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
-  if (subscription) await subscription.unsubscribe();
+  // La sottoscrizione browser può essere condivisa con altre partite:
+  // disattiviamo solo questa partita lato server, senza revocare il PushSubscription globale.
   try { localStorage.removeItem(notificationStorageKey()); } catch (_) {}
   renderMain();
   toast('Notifiche disattivate su questo dispositivo.');
