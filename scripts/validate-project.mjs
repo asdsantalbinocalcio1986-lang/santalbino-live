@@ -33,8 +33,8 @@ assert.match(sw, /const CACHE_PREFIX = 'santa-live-shell-';/, 'Il service worker
 assert.match(sw, /key\.startsWith\(CACHE_PREFIX\) && key !== CACHE/, 'Il service worker deve eliminare soltanto le proprie cache obsolete');
 assert.doesNotMatch(sw, /caches\.match\(/, 'Il service worker non deve leggere cache di altre applicazioni sullo stesso dominio');
 assert.match(sw, /cache\.match\(request\)/, 'Le richieste offline devono leggere dalla cache SANTA Live');
-assert.match(workflow, /^permissions:\\n  contents: read$/m, 'I permessi globali del workflow devono restare in sola lettura');
-assert.match(workflow, /^  deploy:[\\s\\S]*?^    permissions:\\n      contents: read\\n      pages: write\\n      id-token: write/m, 'I permessi di pubblicazione devono essere assegnati soltanto al job deploy');
+assert.match(workflow, /^permissions:\n  contents: read$/m, 'I permessi globali del workflow devono restare in sola lettura');
+assert.match(workflow, /^  deploy:[\s\S]*?^    permissions:\n      contents: read\n      pages: write\n      id-token: write/m, 'I permessi di pubblicazione devono essere assegnati soltanto al job deploy');
 assert.doesNotMatch(workflow, /^  pages: write$/m, 'pages:write non deve essere globale');
 assert.doesNotMatch(workflow, /^  id-token: write$/m, 'id-token:write non deve essere globale');
 for (const [file, source] of [['home.html', home], ['preview.html', preview], ['index.html', html], ['regia.html', regia]]) {
