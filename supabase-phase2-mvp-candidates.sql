@@ -101,7 +101,8 @@ begin
     raise exception using errcode='22023', message='Candidato non ammesso';
   end if;
 
-  v_roster := coalesce(v_state #>> array['publication','published','rosters',v_side], v_state #>> array['rosters',v_side], '');
+  -- I candidati vengono scelti sulle formazioni salvate in regia, anche se non ancora pubblicate.
+  v_roster := coalesce(nullif(v_state #>> array['rosters',v_side],''), v_state #>> array['publication','published','rosters',v_side], '');
   foreach v_line in array string_to_array(v_roster,E'\n') loop
     v_line := btrim(v_line);
     if v_line='' or v_line ~ '^[-–—=]{3,}$' or v_line ~* '^panchina\b' then
