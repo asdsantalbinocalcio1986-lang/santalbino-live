@@ -4798,7 +4798,7 @@ document.addEventListener('click', async e => {
     case 'reloadNotificationSettings': await loadNotificationSettings(); break;
     case 'notifyEvent': if (ev) { try { await sendEventNotification(ev); } catch (error) { toast(error.message || 'Invio notifica non riuscito'); } } break;
     case 'copyreport': await copyText(buildMatchReport()); break;
-    case 'savevotes': { const v = {}; $('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
+    case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
     case 'rmmvptpl': S.mvp.tpl = ''; S.mvp.raw = false; commit(true); renderMain(); break;
     case 'proclaim': { const vi = voteInfo();
       if (vi.state === 'open' && !armedMvp) { armedMvp = true; renderMain(); setTimeout(() => { armedMvp = false; renderMain(); }, 4000); break; }
