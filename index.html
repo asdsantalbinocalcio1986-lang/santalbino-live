@@ -1376,7 +1376,7 @@ const defaults = () => ({
   rosters: { home: '', away: '' },
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
-  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
+  mvp: { link: '', ourOnly: false, candidateKeys: [], votes: {}, tpl: '', raw: false },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
@@ -3387,13 +3387,21 @@ function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
   if (!ft) return { state: 'none' };
   const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
+  const chosen = candidates();
+  if (chosen.length !== 4 || new Set(chosen.map(c => c.side)).size !== 2) return { state: 'unconfigured', end, mv };
   return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
-function candidates() {
+function allMvpCandidates() {
   const out = [], published = publicContent();
-  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(published.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
+  ['home', 'away'].forEach(side => parseRoster(published.rosters[side]).forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name })));
   return out;
+}
+function candidates() {
+  const all = allMvpCandidates();
+  const keys = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
+  if (keys.length !== 4 || new Set(keys).size !== 4) return [];
+  return keys.map(key => all.find(candidate => candidate.key === key)).filter(Boolean);
 }
 
 
@@ -3409,7 +3417,10 @@ function mvpPublicHtml() {
   })();
 
   if (vi.state === 'none') {
-    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre automaticamente al fischio finale e resta aperta 12 ore.</div>`;
+    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre al fischio finale, dopo la selezione dei quattro candidati da parte della regia.</div>`;
+  }
+  if (vi.state === 'unconfigured') {
+    return `<div class="empty"><h3>Votazione in preparazione</h3>La regia sta completando la selezione dei quattro candidati. Riprova tra poco.</div>`;
   }
 
   if (vi.state === 'open') {
@@ -3475,15 +3486,22 @@ async function openGraphic(id) {
 }
 let armedMvp = false;
 function mvpRegiaHtml() {
-  const vi = voteInfo(), C = candidates();
-  const st = { none: 'La votazione parte automaticamente al fischio finale e dura 12 ore.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
+  const vi = voteInfo(), C = candidates(), all = allMvpCandidates();
+  const selected = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
+  const locked = ['open', 'closed', 'done'].includes(vi.state);
+  const st = { none: 'Seleziona i quattro candidati prima del fischio finale. La votazione si aprirà al termine della partita.', unconfigured: 'La partita è terminata: completa la selezione dei quattro candidati per aprire la votazione.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
   const tally = k => (mvpVoteCounts[k] || S.mvp.votes[k] || 0);
   const sorted = [...C].sort((a, b) => tally(b.key) - tally(a.key));
-  return `<div class="card"><h2>Votazione MVP</h2><p style="margin-top:0">${st}</p>
-    <label class="check"><input type="checkbox" id="m-our" ${S.mvp.ourOnly ? 'checked' : ''}> Candidati: solo i giocatori della nostra squadra</label>
-    <button class="btn primary block" data-a="savemvp">Salva impostazioni</button>
+  const candidateSelector = ['home', 'away'].map(side => {
+    const players = all.filter(player => player.side === side);
+    return players.length ? `<section class="mvp-team-group"><h4 class="mvp-team-title">${esc(teamName(side))}</h4><div class="cands">${players.map(player => `<label class="cand"><input type="checkbox" data-mvp-candidate value="${esc(player.key)}" ${selected.includes(player.key) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span style="flex:1"><b>${esc(player.num)}</b> ${esc(player.name)}</span></label>`).join('')}</div></section>` : '';
+  }).join('');
+  return `<div class="card"><h2>Candidati MVP · ${selected.length}/4</h2><p style="margin-top:0">Seleziona esattamente quattro giocatori, con almeno un candidato per ciascuna squadra. La selezione resta modificabile fino all'apertura del voto.</p>
+    ${candidateSelector || '<p class="muted">Inserisci e pubblica le formazioni di entrambe le squadre per scegliere i candidati.</p>'}
+    <button class="btn primary block" data-a="savemvp" ${locked ? 'disabled' : ''}>Salva i quattro candidati</button>
+    <p class="small muted">${st}</p>
     <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
-    <p class="small muted">Il pubblico vota direttamente dalla scheda MVP della pagina live. Un voto per dispositivo e partita.</p></div>
+    <p class="small muted">Il pubblico potrà votare un solo candidato, una volta per partita e per identificativo browser.</p></div>
   <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow\"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
     ${S.mvp.tpl ? `<img class="thumb" style="max-height:120px" src="${S.mvp.tpl}" alt="Sfondo MVP">` : ''}
@@ -3714,13 +3732,85 @@ function convocatiPublicHtml() {
     <p class="small muted" style="padding:8px 14px;margin:0">Forza Sant’Albino! 💚💛</p>
   </section>`;
 }
+function notificationStorageKey() { return 'santalive-push-token:' + mvpPollKey(); }
+function notificationBase64Key(value) {
+  const padding = '='.repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+}
+async function callNotificationService(action, payload = {}) {
+  const endpoint = (cfg.supabaseUrl || '').replace(/\/$/, '') + '/functions/v1/santalive-notifications';
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey },
+    body: JSON.stringify(Object.assign({ action, matchKey: mvpPollKey() }, payload)),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Servizio notifiche non disponibile');
+  return result;
+}
+function notificationPanelHtml() {
+  if (TEST_MODE || !cfg.vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return '';
+  let active = false;
+  try { active = !!localStorage.getItem(notificationStorageKey()); } catch (_) {}
+  return '<section class="card" aria-label="Notifiche partita"><h3>Notifiche della partita</h3>' +
+    '<p class="small muted">Ricevi aggiornamenti anche quando non stai guardando SANTA Live. Puoi disattivarli per questa partita in qualsiasi momento. Su iPhone/iPad aggiungi prima SANTA Live alla schermata Home.</p>' +
+    (active
+      ? '<p class="small" style="color:var(--c-goal);font-weight:700">Notifiche attive su questo dispositivo.</p><button class="btn block" data-notification-action="disable">Disattiva per questa partita</button>'
+      : '<button class="btn primary block" data-notification-action="enable">Attiva notifiche di questa partita</button>') +
+    '</section>';
+}
+function createSubscriptionToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+async function enableMatchNotifications() {
+  if (!cfg.vapidPublicKey) { toast('Le notifiche non sono ancora configurate.'); return; }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    toast('Questo browser non supporta le notifiche Push.'); return;
+  }
+  if (Notification.permission === 'denied') {
+    toast('Notifiche bloccate dal browser: abilita il permesso nelle impostazioni del sito.'); return;
+  }
+  const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (permission !== 'granted') { toast('Permesso notifiche non concesso.'); return; }
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: notificationBase64Key(cfg.vapidPublicKey),
+  });
+  let token = '';
+  try { token = localStorage.getItem(notificationStorageKey()) || ''; } catch (_) {}
+  if (token.length < 32) token = createSubscriptionToken();
+  await callNotificationService('subscribe', {
+    subscription: subscription.toJSON(),
+    subscriptionToken: token,
+    categories: ['kickoff', 'halftime', 'fulltime', 'goal', 'yellow_card', 'red_card', 'substitution', 'injury', 'mvp'],
+  });
+  try { localStorage.setItem(notificationStorageKey(), token); } catch (_) {}
+  renderMain();
+  toast('Notifiche attivate per questa partita.');
+}
+async function disableMatchNotifications() {
+  let token = '';
+  try { token = localStorage.getItem(notificationStorageKey()) || ''; } catch (_) {}
+  if (token) await callNotificationService('unsubscribe', { subscriptionToken: token });
+  // La sottoscrizione browser può essere condivisa con altre partite:
+  // disattiviamo solo questa partita lato server, senza revocare il PushSubscription globale.
+  try { localStorage.removeItem(notificationStorageKey()); } catch (_) {}
+  renderMain();
+  toast('Notifiche disattivate su questo dispositivo.');
+}
+
 function publicHtml() {
   const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni']];
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
-  return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
+  return convocatiPanel + notificationPanelHtml() + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
@@ -4062,7 +4152,32 @@ function topHtml() {
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
   return `${banner}<div class="top">${brand}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
-function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
+let inAppNotificationChannel = null;
+let inAppNotificationMatchKey = '';
+async function ensureInAppNotifications() {
+  if (TEST_MODE || !db || !S.match.pollId || !mvpPollKey()) return;
+  const matchKey = mvpPollKey();
+  if (matchKey === inAppNotificationMatchKey) return;
+  inAppNotificationMatchKey = matchKey;
+  if (inAppNotificationChannel) {
+    try { await db.removeChannel(inAppNotificationChannel); } catch (_) {}
+    inAppNotificationChannel = null;
+  }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(matchKey));
+  const topicHash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2,'0')).join('').slice(0,32);
+  inAppNotificationChannel = db.channel('santalive-match-' + topicHash)
+    .on('broadcast', { event: 'match-notification' }, ({ payload }) => {
+      if (!payload || payload.matchKey !== matchKey) return;
+      const title = String(payload.title || 'SANTA Live').slice(0,120);
+      const body = String(payload.body || 'Aggiornamento della partita').slice(0,300);
+      toast(title + ' · ' + body);
+    })
+    .subscribe(status => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('Canale notifiche live non disponibile:', status);
+    });
+}
+
+function renderMain() { void ensureInAppNotifications(); const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
 let lastVote = 'none';
 function renderAll() {
   if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
@@ -4080,6 +4195,19 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
+  const notificationBtn = t.closest('[data-notification-action]');
+  if (notificationBtn) {
+    notificationBtn.disabled = true;
+    try {
+      if (notificationBtn.dataset.notificationAction === 'enable') await enableMatchNotifications();
+      else await disableMatchNotifications();
+    } catch (error) {
+      console.warn('Gestione notifiche SANTA Live:', error);
+      toast(error.message || 'Operazione notifiche non riuscita.');
+      notificationBtn.disabled = false;
+    }
+    return;
+  }
   const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (['archive','season','scorers','archiveForms'].includes(L.tab)) void loadMatchArchive(true); return; }
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
@@ -4239,7 +4367,16 @@ document.addEventListener('click', async e => {
     case 'libraryImportGoal': { const url = L.evImg.goal || ''; if (!url) { toast('Non è presente un modello GOAL nelle Impostazioni'); break; } S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}, {goal:url}); commit(true); renderMain(); toast('Modello GOAL aggiunto alla libreria'); break; }
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
-    case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
+    case 'savemvp': {
+      const keys = $('[data-mvp-candidate]:checked').map(input => input.value);
+      const all = allMvpCandidates();
+      const chosen = keys.map(key => all.find(player => player.key === key)).filter(Boolean);
+      if (keys.length !== 4 || new Set(keys).size !== 4 || chosen.length !== 4) { toast('Seleziona esattamente quattro giocatori presenti nelle formazioni.'); break; }
+      if (new Set(chosen.map(player => player.side)).size !== 2) { toast('Deve essere selezionato almeno un giocatore per ciascuna squadra.'); break; }
+      S.mvp.candidateKeys = keys;
+      S.mvp.ourOnly = false;
+      commit(true); renderMain(); toast('I quattro candidati MVP sono stati salvati'); break;
+    }
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
     case 'saveChronicleDraft': { const value=$('#chronicleEditor')?.value.trim()||''; if(!value){toast('La bozza è vuota');break;} S.match.chronicleDraft=value; commit(true); toast('Bozza della cronaca salvata: non è pubblica'); break; }
     case 'regenerateChronicle': { const value=buildChronicleDraft(); const editor=$('#chronicleEditor'); if(editor)editor.value=value; S.match.chronicleDraft=value; commit(true); toast('Bozza rigenerata dagli eventi registrati'); break; }
