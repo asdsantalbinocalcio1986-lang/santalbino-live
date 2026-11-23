@@ -149,7 +149,7 @@ assert.ok(regiaChecked >= 1, 'Script inline della regia mancante o non verificab
 assert.match(regia, /function capturePublicationContent\(\)[\s\S]*?\$\$\('\[data-roster\]'\)\.forEach/, 'Il salvataggio bozze deve raccogliere entrambe le formazioni come NodeList/array');
 assert.match(regia, /const keys = \$\$\('\[data-mvp-candidate\]:checked'\)\.map/, 'La selezione dei candidati MVP deve usare una raccolta, non il selettore singolo');
 assert.match(regia, /\$\$\('\[data-vote\]'\)\.forEach/, 'Il salvataggio dei voti deve raccogliere tutti i campi voto');
-assert.match(regia, /const openDialogs = \$\$\('dialog\\[open\\]'\)/, 'La navigazione Indietro deve raccogliere correttamente tutti i dialog aperti');
+assert.ok(regia.includes("const openDialogs = $('dialog[open]');"), 'La navigazione Indietro deve raccogliere correttamente tutti i dialog aperti');
 assert.match(regia, /function ensureAppHistoryGuard\(\)/, 'La regia deve proteggere la partita dal tasto Indietro del browser');
 assert.match(regia, /window\.addEventListener\('popstate',[\s\S]*?history\.pushState\(\{ santaliveAppGuard: true \}/, 'Il tasto Indietro deve chiudere gli overlay e mantenere la sessione della partita');
 assert.match(regia, /story \? 1080 : 1600[\s\S]*story \? 1920 : 1100/, 'La grafica singola deve supportare il formato Storie Instagram 9:16');
