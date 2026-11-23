@@ -27,7 +27,12 @@ const json = (body: unknown, status = 200, origin: string | null = null) =>
 function validSubscription(value: any) {
   try {
     const endpoint = new URL(String(value?.endpoint || ""));
-    return endpoint.protocol === "https:" &&
+    const host = endpoint.hostname.toLowerCase();
+    const trustedPushHost = host === "fcm.googleapis.com" ||
+      host === "updates.push.services.mozilla.com" ||
+      host.endsWith(".push.services.mozilla.com") ||
+      host === "web.push.apple.com";
+    return endpoint.protocol === "https:" && endpoint.href.length <= 2048 && trustedPushHost &&
       typeof value?.keys?.p256dh === "string" && value.keys.p256dh.length >= 20 &&
       typeof value?.keys?.auth === "string" && value.keys.auth.length >= 10;
   } catch { return false; }
