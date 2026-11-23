@@ -151,6 +151,10 @@ Deno.serve(async (req: Request) => {
       return json({ status: "no_subscribers", sent: 0, message: "Avviso in-app pubblicato; nessun dispositivo push iscritto a questa tipologia" }, 200, origin);
     }
 
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      await service.from("santalbino_push_deliveries").update({ status: "no_subscribers", sent_count: 0, failed_count: 0, last_error: "VAPID non configurato", updated_at: new Date().toISOString() }).eq("event_id", eventId);
+      return json({ status: "in_app_only", sent: 0, message: "Avviso in-app pubblicato; notifiche push da configurare" }, 200, origin);
+    }
     configureVapid();
     const payload = JSON.stringify({ title, body: message, url, tag: "santalive-" + eventId });
     let sent = 0, failed = 0;
