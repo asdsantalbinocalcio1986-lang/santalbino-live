@@ -44,8 +44,14 @@ assert.doesNotMatch(workflow, /^  id-token: write$/m, 'id-token:write non deve e
 assert.match(html, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La pagina pubblica deve esporre un landmark main');
 assert.match(regia, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La regia deve esporre un landmark main');
 assert.match(html, /<textarea data-convocati-preview rows="10" readonly aria-label="Testo del post pre-partita">/, 'L’anteprima del post deve avere un nome accessibile');
-assert.match(html, /function reportHtml\(\) \{\s*return `<section><h2>Statistiche finali<\/h2>\$\{statsHtml\(\)\}<\/section>`;/, 'Il resoconto finale deve contenere solo statistiche');
-assert.doesNotMatch(html, /<textarea id="matchReport"/, 'Il resoconto finale non deve contenere l’articolo della cronaca');
+assert.doesNotMatch(html, /function reportHtml\(|data-tab="report"|\['report',\s*'Resoconto'\]/, 'La pagina pubblica non deve avere la scheda Resoconto');
+assert.doesNotMatch(regia, /function reportHtml\(|data-tab="report"|\['report',\s*'Resoconto'\]/, 'La modalità pubblica della regia non deve avere la scheda Resoconto');
+assert.doesNotMatch(html, /<textarea id="matchReport"/, 'La pagina pubblica non deve contenere un editor di resoconto');
+assert.match(regia, /if \(S\.clock\?\.phase === 'ft' \|\| voteInfo\(\)\.state !== 'none'\) tabs\.push\(\['mvp', 'MVP'\]\)/, 'La modalità pubblica della regia deve mostrare MVP a fine partita');
+for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
+  assert.match(source, /S\.clock\?\.finishedAt/, 'Il timer MVP deve avere un timestamp persistente in ' + file);
+  assert.match(source, /c\.finishedAt = Date\.now\(\); addPhase\('fulltime'/, 'Il fischio finale deve salvare il timestamp in ' + file);
+}
 assert.match(html, /<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">/, 'L’editor del testo evento deve avere un nome accessibile');
 assert.doesNotMatch(regia, /Articolo di fine partita|Resoconto finale completo/, 'La regia non deve mostrare l’articolo della cronaca nel resoconto finale');
 assert.equal((html.match(/<meta name="theme-color"/g) || []).length, 1, 'La pagina pubblica non deve duplicare theme-color');
@@ -59,7 +65,7 @@ assert.match(sw, /'\.\/config\.js'/, 'Shell offline senza configurazione');
 assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
 assert.match(html, /<img src="\$\{esc\(lg\)\}" alt="">/, 'I loghi devono essere escapati negli attributi HTML');
 assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ht'; addPhase\('halftime', endMinute\)/, 'Il recupero del primo tempo deve essere conservato');
-assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ft'; addPhase\('fulltime', endMinute\)/, 'Il recupero del secondo tempo deve essere conservato');
+assert.match(html, /const endMinute = curMinute\(\); c\.phase = 'ft'; c\.finishedAt = Date\.now\(\); addPhase\('fulltime', endMinute\)/, 'Il recupero del secondo tempo deve essere conservato e datato');
 assert.match(html, /const scorerLine = scorers\.length \? 'Marcatori: '/, 'Il riepilogo MATCH RESULT deve preparare la riga dei marcatori');
 assert.ok(html.includes("return result + '\\n' + scorerLine;"), 'Il riepilogo MATCH RESULT deve contenere risultato e marcatori');
 assert.match(html, /if \(!S\.match\.pollId\) S\.match\.pollId = uid\(\);/);
