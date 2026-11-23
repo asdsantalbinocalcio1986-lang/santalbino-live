@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") || "";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") || "";
-const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:polisportivasantalbinocalcio1986@gmail.com";
+const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "";
 const ALLOWED_ORIGINS = new Set([
   "https://asdsantalbinocalcio1986-lang.github.io",
   "http://localhost:4173",
@@ -33,7 +33,7 @@ function validSubscription(value: any) {
   } catch { return false; }
 }
 function configureVapid() {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) throw new Error("VAPID_NOT_CONFIGURED");
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) throw new Error("VAPID_NOT_CONFIGURED");
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 function safeMatchUrl(value: unknown) {
@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     const action = String(body?.action || "");
 
     if (action === "public-key") {
-      if (!VAPID_PUBLIC_KEY) return json({ error: "Servizio notifiche non ancora configurato" }, 503, origin);
+      if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) return json({ error: "Servizio notifiche non ancora configurato" }, 503, origin);
       return json({ publicKey: VAPID_PUBLIC_KEY }, 200, origin);
     }
 
