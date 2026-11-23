@@ -4209,7 +4209,7 @@ function notificationSettingsHtml() {
     '</div><button class="btn primary block" data-a="saveNotificationSettings">Salva preferenze</button><p class="small muted">'+(notificationSettingsLoaded?'Preferenze caricate dal server.':'Valori iniziali mostrati: carica le preferenze del server per verificare lo stato corrente.')+'</p><button class="btn block" data-a="reloadNotificationSettings">Ricarica preferenze</button></div>';
 }
 async function saveNotificationSettings() {
-  const categories = $('[data-notify-category]:checked').map(input => input.dataset.notifyCategory);
+  const categories = Array.from(document.querySelectorAll('[data-notify-category]:checked')).map(input => input.dataset.notifyCategory);
   await regiaNotificationRequest('set-settings',{enabledCategories:categories});
   notificationEnabledCategories=categories; notificationSettingsLoaded=true; renderMain(); toast('Preferenze notifiche salvate.');
 }
