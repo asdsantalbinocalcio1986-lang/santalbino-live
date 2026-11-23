@@ -2121,6 +2121,12 @@ async function initCaps() {
   if (!TEST_MODE) db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
+  if (!TEST_MODE) db.channel('santalbino-approved-notifications').on('postgres_changes', {event:'INSERT',schema:'public',table:'santalbino_live_notifications'}, payload => {
+    const notice = payload.new;
+    if (notice?.match_id === mvpPollKey() && Date.now() - new Date(notice.created_at).getTime() < 300000) {
+      toast((notice.title || 'SANTALive') + ' · ' + (notice.body || 'Aggiornamento partita'));
+    }
+  }).subscribe();
   if (CAN_EDIT) await refreshMvpVotes();
   if (legacyLogoMigration && CAN_EDIT) commit(true);
 }
@@ -3691,7 +3697,9 @@ function notificationConfig() {
 }
 function pushSubscriptionHtml() {
   if (TEST_MODE || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return '';
-  return '<div class="card"><h2>Notifiche partita</h2><p class="small muted">Attiva le notifiche per ricevere gli aggiornamenti principali anche quando non hai SANTA Live aperto. L’iscrizione è volontaria e puoi disattivarla in qualsiasi momento.</p><button class="btn block" data-a="togglePushSubscription">Attiva / disattiva notifiche</button></div>';
+  return `<div class="card"><h2>Notifiche partita</h2><p class="small muted">Attiva le notifiche per ricevere gli aggiornamenti principali anche quando non hai SANTA Live aperto. L’iscrizione è volontaria e puoi disattivarla in qualsiasi momento.</p>
+    ${[['kickoff','Kick Off',true],['halftime','Half Time',true],['fulltime','Full Time',true],['goal','Goal',true],['yellow','Ammonizioni',false],['red','Espulsioni',false],['sub','Sostituzioni',false],['mvp','Votazione MVP',false]].map(([key,label,checked]) => `<label class="check"><input type="checkbox" data-user-push-type="${key}" ${checked ? 'checked' : ''}> ${label}</label>`).join('')}
+    <button class="btn block" data-a="togglePushSubscription">Attiva / disattiva notifiche</button></div>`;
 }
 function base64UrlToUint8Array(value) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -3725,7 +3733,7 @@ async function togglePushSubscription() {
     if (!publicKey) throw new Error('Servizio notifiche non ancora configurato');
     const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToUint8Array(publicKey) });
     const saved = await db.functions.invoke('santalive-push', {
-      body: { action: 'subscribe', subscription: subscription.toJSON(), matchId: mvpPollKey(), eventTypes: PUSH_DEFAULT_TYPES }
+      body: { action: 'subscribe', subscription: subscription.toJSON(), matchId: mvpPollKey(), eventTypes: $('[data-user-push-type]:checked').map(input => input.dataset.userPushType) }
     });
     if (saved.error) { await subscription.unsubscribe(); throw saved.error; }
     toast('Notifiche attivate: riceverai Kick Off, Half Time, Full Time e Goal');
@@ -3821,6 +3829,8 @@ function mvpRegiaHtml() {
     <div class="cands" style="margin-top:10px">${available.map(c => `<label class="cand"><input type="checkbox" data-mvp-candidate="${esc(c.key)}" ${selected.has(c.key) ? 'checked' : ''} ${selected.size >= 4 && !selected.has(c.key) ? 'disabled' : ''}><span style="flex:1"><b>${esc(c.num || '–')}</b> ${esc(c.name)} <span class="small muted">· ${esc(teamName(c.side))}</span></span></label>`).join('') || '<p class="muted">Pubblica prima le formazioni di entrambe le squadre.</p>'}</div>
     <button class="btn primary block" data-a="savemvp" ${validMvpSelection(C) ? '' : 'disabled'}>Salva i quattro candidati</button>
     <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
+    ${vi.state === 'open' && notificationConfig().enabled && notificationConfig().types.mvp ? '<button class="btn primary block" data-a="sendMvpInvite">Invia notifica apertura votazione MVP</button>' : ''}
+    ${vi.state === 'open' ? '<button class="btn block" data-a="openMvpInviteGraphic">Crea grafica invito alla votazione</button>' : ''}
     <p class="small muted">Il pubblico vota dalla pagina live. Un voto per dispositivo e partita.</p></div>
   <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Seleziona i quattro candidati per visualizzare i voti.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
@@ -3834,6 +3844,65 @@ function proclaim() {
   const key = $('#m-win').value, side = key.split('|')[0], name = key.split('|').slice(1).join('|'), n = mvpVoteCounts[key] || S.mvp.votes[key] || 0;
   S.events = S.events.filter(e => e.type !== 'mvp');
   addEvent({ type: 'mvp', team: side, min: '', player: name, votes: n }, { post: true });
+}
+let mvpInviteBlob = null;
+async function openMvpInviteGraphic() {
+  if (!validMvpSelection()) { toast('Seleziona prima i quattro candidati MVP'); return; }
+  const dlg = $('#graphicDlg'), list = candidates();
+  const W = 1080, H = 1350, canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const x = canvas.getContext('2d');
+  const bg = x.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#163d29'); bg.addColorStop(.55,'#0b2116'); bg.addColorStop(1,'#060f0a');
+  x.fillStyle = bg; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(227,198,109,.45)'; x.lineWidth=3; x.strokeRect(34,34,W-68,H-68);
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillStyle='#e3c66d'; x.font='800 31px Arial,sans-serif'; x.fillText("ASD SANT’ALBINO TERME",W/2,125);
+  x.fillStyle='#fff'; x.font='900 96px Arial,sans-serif'; x.fillText("VOTA L’MVP",W/2,270);
+  x.fillStyle='#dce8dd'; x.font='700 32px Arial,sans-serif'; x.fillText('MIGLIORE IN CAMPO · SCEGLI IL TUO PREFERITO',W/2,345);
+  const rowY=[485,660,835,1010];
+  list.forEach((c,i)=>{
+    const y=rowY[i]; x.fillStyle='rgba(255,255,255,.08)'; x.beginPath(); x.roundRect(95,y-62,890,124,20); x.fill();
+    x.strokeStyle=c.side==='home'?'#b8e7c8':'#e3c66d'; x.lineWidth=3; x.stroke();
+    x.fillStyle=c.side==='home'?'#b8e7c8':'#e3c66d'; x.beginPath(); x.arc(165,y,36,0,Math.PI*2); x.fill();
+    x.fillStyle='#102819'; x.font='900 27px Arial,sans-serif'; x.fillText(c.num||'•',165,y+1);
+    x.textAlign='left'; x.fillStyle='#fff'; x.font='800 42px Arial,sans-serif'; x.fillText(c.name,225,y+2,700); x.textAlign='center';
+    x.fillStyle='#aab9ac'; x.font='600 21px Arial,sans-serif'; x.fillText(teamName(c.side),W/2,y+48);
+  });
+  x.fillStyle='#e3c66d'; x.font='900 43px Arial,sans-serif'; x.fillText('VOTA ORA SU SANTA LIVE',W/2,1165);
+  x.fillStyle='#e7eee8'; x.font='600 20px Arial,sans-serif'; x.fillText('Apri il link nel testo del post per esprimere il tuo voto',W/2,1220);
+  x.fillStyle='rgba(255,255,255,.65)'; x.font='600 18px Arial,sans-serif'; x.fillText('SANTALive · ASD Sant’Albino Terme',W/2,1280);
+  mvpInviteBlob = await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.94));
+  if (!mvpInviteBlob) { toast('Creazione grafica non riuscita'); return; }
+  const url=canvas.toDataURL('image/jpeg',.94);
+  dlg.innerHTML='<div class="sheethead"><h2>Invito votazione MVP</h2><button class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica invito alla votazione MVP"><p class="small muted">Il link diretto alla votazione verrà incluso nel testo quando condividi la grafica.</p><div class="row2 stack"><button class="btn" data-a="saveMvpInviteGraphic">Salva immagine</button><button class="btn primary" data-a="shareMvpInviteGraphic">Condividi invito</button></div>';
+  if (!dlg.open) dlg.showModal();
+}
+async function shareMvpInviteGraphic() {
+  if (!mvpInviteBlob) return;
+  const url='https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(mvpPollKey());
+  const text='Vota l’MVP di giornata su SANTALive! Scegli il migliore in campo tra i quattro candidati. '+url;
+  const file=new File([mvpInviteBlob],'vota-mvp-santalbino.jpg',{type:'image/jpeg'});
+  try {
+    if (navigator.share && navigator.canShare?.({files:[file]})) await navigator.share({files:[file],title:'Vota l’MVP · SANTALive',text,url});
+    else { await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); await copyText(text); toast('Immagine salvata e link copiato: allega la grafica al post'); }
+  } catch(error) { if(error?.name!=='AbortError') { await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); toast('Immagine salvata: condividila insieme al link della votazione'); } }
+}
+async function sendMvpInvite() {
+  if (TEST_MODE || !CAN_EDIT || !db || !dbReady) { toast('Invio notifiche disponibile soltanto nella regia ufficiale online'); return; }
+  const cfg = notificationConfig(), vi = voteInfo();
+  if (vi.state !== 'open' || !cfg.enabled || cfg.types.mvp !== true || !validMvpSelection()) { toast('La votazione MVP non è pronta o le notifiche MVP sono disattivate'); return; }
+  const url = 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(mvpPollKey());
+  const title = 'SANTALive · Vota l’MVP di giornata';
+  const body = 'Scegli il migliore in campo tra i quattro candidati della partita.';
+  try {
+    const { data, error } = await db.functions.invoke('santalive-push', { body: { action: 'send', approved: true, eventId: String(mvpPollKey()) + ':mvp', eventType: 'mvp', title, body, url } });
+    if (error) throw error;
+    toast(data?.status === 'sent' ? 'Invito MVP inviato a ' + Number(data.sent || 0) + ' dispositivi' : (data?.message || 'Esito invio: ' + (data?.status || 'non disponibile')));
+  } catch (error) {
+    console.error('Invio invito MVP:', error);
+    toast(error?.message || 'Invio invito MVP non riuscito');
+  }
 }
 async function sendPushForEvent(eventId) {
   if (TEST_MODE || !CAN_EDIT || !db || !dbReady) { toast('Invio notifiche disponibile soltanto nella regia ufficiale online'); return; }
@@ -4807,6 +4876,10 @@ document.addEventListener('click', async e => {
     }
     case 'togglePushSubscription': await togglePushSubscription(); break;
     case 'sendPushForEvent': await sendPushForEvent(a.dataset.id || ''); break;
+    case 'sendMvpInvite': await sendMvpInvite(); break;
+    case 'openMvpInviteGraphic': await openMvpInviteGraphic(); break;
+    case 'saveMvpInviteGraphic': if (mvpInviteBlob) await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); break;
+    case 'shareMvpInviteGraphic': await shareMvpInviteGraphic(); break;
     case 'verifySocialPublishing': await verifySocialPublishing(); break;
     case 'refreshSocialLog': await loadSocialPublicationLog(); break;
     case 'retrySocialPublication': await retrySocialPublication(a.dataset.id || ''); break;
