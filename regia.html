@@ -3688,21 +3688,6 @@ function candidates() {
 }
 
 
-function allMvpCandidates() {
-  // La regia sceglie dai roster salvati della partita, non dalla copia già pubblicata.
-  // In questo modo è possibile preparare i quattro candidati anche mentre le formazioni sono ancora bozze.
-  const out = [];
-  ['home', 'away'].forEach(side => parseRoster(S.rosters?.[side] || '').forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name })));
-  return out;
-}
-function candidates() {
-  const all = allMvpCandidates();
-  const keys = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
-  if (keys.length !== 4 || new Set(keys).size !== 4) return [];
-  return keys.map(key => all.find(candidate => candidate.key === key)).filter(Boolean);
-}
-
-
 function mvpPublicHtml() {
   const vi = voteInfo();
   const C = candidates();
