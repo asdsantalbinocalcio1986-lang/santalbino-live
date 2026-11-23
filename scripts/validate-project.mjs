@@ -37,6 +37,15 @@ assert.match(workflow, /^permissions:\n  contents: read$/m, 'I permessi globali 
 assert.match(workflow, /^  deploy:[\s\S]*?^    permissions:\n      contents: read\n      pages: write\n      id-token: write/m, 'I permessi di pubblicazione devono essere assegnati soltanto al job deploy');
 assert.doesNotMatch(workflow, /^  pages: write$/m, 'pages:write non deve essere globale');
 assert.doesNotMatch(workflow, /^  id-token: write$/m, 'id-token:write non deve essere globale');
+
+assert.match(html, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La pagina pubblica deve esporre un landmark main');
+assert.match(regia, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La regia deve esporre un landmark main');
+assert.match(html, /<textarea data-convocati-preview rows="10" readonly aria-label="Testo del post pre-partita">/, 'L’anteprima del post deve avere un nome accessibile');
+assert.match(html, /<textarea id="matchReport" rows="22" readonly aria-label="Resoconto finale">/, 'Il resoconto finale deve avere un nome accessibile');
+assert.match(html, /<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">/, 'L’editor del testo evento deve avere un nome accessibile');
+assert.match(html, /<textarea rows="10" readonly aria-label="Resoconto finale completo">/, 'Il resoconto completo pubblico deve avere un nome accessibile');
+assert.equal((html.match(/<meta name="theme-color"/g) || []).length, 1, 'La pagina pubblica non deve duplicare theme-color');
+assert.equal((regia.match(/<meta name="theme-color"/g) || []).length, 1, 'La regia non deve duplicare theme-color');
 for (const [file, source] of [['home.html', home], ['preview.html', preview], ['index.html', html], ['regia.html', regia]]) {
   assert.match(source, /@supabase\/supabase-js@2\.119\.1/, 'Versione Supabase JS non fissata in ' + file);
 }
