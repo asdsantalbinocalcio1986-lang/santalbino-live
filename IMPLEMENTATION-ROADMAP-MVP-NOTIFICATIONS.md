@@ -98,3 +98,11 @@ Collaudo obbligatorio in partita di prova:
 - Segreti server richiesti: `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. La service role e la chiave VAPID privata non devono mai essere inserite nel client o nel repository.
 - La sottoscrizione è distinta per coppia partita/endpoint: lo stesso browser può seguire più partite.
 - Le tabelle non concedono accesso diretto al browser; tutte le operazioni passano dall'Edge Function.
+
+
+### Interfacce aggiunte nel branch
+
+- La pagina pubblica mostra il comando di opt-in per la singola partita solo quando la chiave VAPID pubblica è configurata e il browser supporta Push.
+- La regia dispone di una scheda Notifiche per leggere e salvare le categorie abilitate e di un pulsante esplicito "Invia notifica" sugli eventi supportati della cronaca.
+- Se una categoria è disattivata, l'override richiede una seconda conferma esplicita. La stessa notifica non può essere inviata due volte.
+- Il browser mantiene una sottoscrizione Push riutilizzabile tra partite; disattivare una singola partita revoca solo quella relazione e non le altre partite.
