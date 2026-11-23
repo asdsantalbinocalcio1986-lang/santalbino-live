@@ -4130,12 +4130,12 @@ const QUICK = [['goal', 'Gol'], ['foul', 'Fallo'], ['yellow', 'Giallo'], ['red',
 function feedHtml(list) {
   if (!list.length) return '<div class="empty">Nessun evento. Premi “Fischio d’inizio” o aggiungi un evento.</div>';
   return list.map(e => {
-    const so = socialOf(e.id), editing = editId === e.id, txt = evText(e);
+    const so = socialOf(e.id), editing = editId === e.id, txt = evText(e), notifyCategory = notificationCategory(e.type);
     return `<div class="ev" data-id="${e.id}"><div class="m">${esc(e.min || '–')}${e.min ? '′' : ''}</div><div>
       ${editing ? `<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
       <div class="meta"><span class="chip ${so.status}">${so.status === 'pubblicato' ? 'Su Facebook' : 'Da pubblicare'}</span>
       ${editing ? `<button class="btn sm primary" data-a="saveedit">Salva testo</button><button class="btn sm" data-a="canceledit">Annulla</button>`
-        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
+        : `<button class="btn sm primary" data-a="post">Pubblica</button>${notifyCategory ? '<button class="btn sm" data-a="notifyEvent">Invia notifica</button>' : ''}<button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
   }).join('');
 }
 let editId = null, armedDel = null, editingEventId = null;
