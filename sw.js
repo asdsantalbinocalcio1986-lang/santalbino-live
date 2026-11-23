@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'santa-live-shell-';
-const CACHE = `${CACHE_PREFIX}v30`;
+const CACHE = `${CACHE_PREFIX}v31`;
 const SHELL = [
   './home.html',
   './index.html',
@@ -64,4 +64,42 @@ self.addEventListener('fetch', event => {
       .then(cache => cache.match(request))
       .then(cached => cached || network)
   );
+});
+
+
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    let data = {};
+    try { data = event.data ? event.data.json() : {}; } catch (_) {}
+    const title = typeof data.title === 'string' ? data.title.slice(0, 120) : "SANTA Live";
+    const options = {
+      body: typeof data.body === 'string' ? data.body.slice(0, 500) : "Aggiornamento della partita",
+      icon: data.icon || './santa-live-icon.svg',
+      badge: data.badge || './santa-live-icon.svg',
+      tag: typeof data.tag === 'string' ? data.tag.slice(0, 180) : 'santalive-update',
+      data: { url: typeof data.url === 'string' ? data.url : './home.html' },
+      renotify: false,
+    };
+    await self.registration.showNotification(title, options);
+  })());
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const raw = event.notification?.data?.url || './home.html';
+  event.waitUntil((async () => {
+    let target = new URL('./home.html', self.location.origin);
+    try {
+      const parsed = new URL(raw, self.location.origin);
+      if (parsed.origin === self.location.origin) target = parsed;
+    } catch (_) {}
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) {
+      if (new URL(client.url).origin === self.location.origin) {
+        await client.navigate(target.href);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(target.href);
+  })());
 });
