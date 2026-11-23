@@ -46,7 +46,8 @@ Deno.serve(async (req: Request) => {
     return reply(503, { error: "Configurazione server incompleta" });
   }
 
-  if (req.headers.get("apikey") !== SUPABASE_ANON_KEY) return reply(401, { error: "Chiave applicativa non valida" });
+  const acceptedApiKeys = [SUPABASE_ANON_KEY, Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? ""].filter(Boolean);
+  if (!acceptedApiKeys.includes(req.headers.get("apikey") ?? "")) return reply(401, { error: "Chiave applicativa non valida" });
 
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
