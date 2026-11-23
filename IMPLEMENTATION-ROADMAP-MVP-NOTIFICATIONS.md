@@ -106,3 +106,11 @@ Collaudo obbligatorio in partita di prova:
 - La regia dispone di una scheda Notifiche per leggere e salvare le categorie abilitate e di un pulsante esplicito "Invia notifica" sugli eventi supportati della cronaca.
 - Se una categoria è disattivata, l'override richiede una seconda conferma esplicita. La stessa notifica non può essere inviata due volte.
 - Il browser mantiene una sottoscrizione Push riutilizzabile tra partite; disattivare una singola partita revoca solo quella relazione e non le altre partite.
+
+### In-app Realtime
+
+- La Edge Function invia un broadcast sul canale privato-nel-nome (topic non contiene dati partita in chiaro), esclusivamente dopo l'approvazione esplicita della regia.
+- La pagina pubblica ascolta il canale della partita e mostra il messaggio mentre l'utente sta seguendo la diretta.
+- Il broadcast non richiede il permesso browser Push; il Web Push resta un canale separato per chi non ha la pagina aperta.
+- L'outbox registra separatamente il flag `in_app_sent`.
+- Se VAPID non è ancora configurata, l'invio approvato può comunque raggiungere gli utenti collegati tramite Realtime; il risultato segnala che il canale Push non è ancora attivo.
