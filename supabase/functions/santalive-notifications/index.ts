@@ -40,11 +40,13 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply(405, { error: "Metodo non consentito" });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
     return reply(503, { error: "Configurazione server incompleta" });
   }
+
+  if (req.headers.get("apikey") !== SUPABASE_ANON_KEY) return reply(401, { error: "Chiave applicativa non valida" });
 
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -79,7 +81,7 @@ Deno.serve(async (req: Request) => {
         match_key: matchKey, endpoint, p256dh, auth_key: authKey,
         subscription_token_hash: tokenHash, enabled_categories: categories,
         active: true, revoked_at: null, updated_at: new Date().toISOString(),
-      }, { onConflict: "endpoint" });
+      }, { onConflict: "match_key,endpoint" });
       if (error) throw error;
       return reply(200, { ok: true, subscribed: true });
     }
@@ -134,6 +136,11 @@ Deno.serve(async (req: Request) => {
       if (!eventId || !CATEGORIES.has(category) || !title || !body || !validTarget(targetUrl)) {
         return reply(400, { error: "Dati della notifica non validi" });
       }
+      const publicKey = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
+      const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
+      const subject = Deno.env.get("VAPID_SUBJECT") ?? "";
+      if (!publicKey || !privateKey || !subject) return reply(503, { error: "Chiavi VAPID non configurate: nessuna notifica inviata" });
+
       const { data: settings } = await adminClient.from("santalbino_notification_settings")
         .select("enabled_categories").eq("match_key", matchKey).maybeSingle();
       const enabled = settings?.enabled_categories ?? DEFAULT_CATEGORIES;
@@ -157,16 +164,6 @@ Deno.serve(async (req: Request) => {
         .select("id,endpoint,p256dh,auth_key")
         .eq("match_key", matchKey).eq("active", true).contains("enabled_categories", [category]);
       if (subscribersError) throw subscribersError;
-
-      const publicKey = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
-      const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
-      const subject = Deno.env.get("VAPID_SUBJECT") ?? "";
-      if (!publicKey || !privateKey || !subject) {
-        await adminClient.from("santalbino_notification_outbox").update({
-          status: "failed", last_error: "VAPID non configurate", completed_at: new Date().toISOString(),
-        }).eq("id", outbox.id);
-        return reply(503, { error: "Chiavi VAPID non configurate: nessuna notifica inviata" });
-      }
 
       webpush.setVapidDetails(subject, publicKey, privateKey);
       const payload = JSON.stringify({
