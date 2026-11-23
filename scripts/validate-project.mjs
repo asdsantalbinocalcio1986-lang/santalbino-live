@@ -86,6 +86,11 @@ assert.match(html, /function saveContentDraft\(\)/, 'Deve essere disponibile il 
 assert.match(html, /function scheduleContentPublication\(\)/, 'Deve essere disponibile la programmazione della pubblicazione');
 assert.match(html, /function publishContentImmediately\(\)/, 'Deve essere disponibile la pubblicazione immediata');
 assert.match(html, /function cancelContentPublication\(\)/, 'Deve essere disponibile l’annullamento della bozza o programmazione');
+assert.match(html, /family=Inter:wght@400;500;600;700;800;900/, 'La pagina pubblica deve caricare Inter per le grafiche');
+assert.match(html, /FB="\'Inter\',sans-serif",FD="\'Inter\',sans-serif"/, 'La grafica evento pubblica deve usare Inter come font predefinito');
+assert.match(html, /fontFamily:'Inter',fontScale:1/, 'L’editor pubblico deve avere Inter come font predefinito');
+assert.match(html, /<option value="Inter"/, 'L’editor pubblico deve offrire Inter nella selezione dei caratteri');
+assert.match(html, /teamLabelFamily=\(\{Inter:/, 'Le intestazioni delle squadre devono supportare Inter');
 assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la modifica di un evento già registrato');
 assert.match(regia, /function resetMatch\(\) \{[^}]*S\.match\.chronicleDraft = '';[^}]*S\.match\.chroniclePublished = '';[^}]*S\.match\.chroniclePublishedAt = '';[^}]*S\.match\.chronicleNeedsReview = false;/, 'L’azzeramento della regia deve eliminare il resoconto della partita precedente');
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');
