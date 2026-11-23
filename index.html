@@ -3385,8 +3385,10 @@ function lineupsHtml() {
 const VOTE_MS = 12 * 3600 * 1000;
 function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
-  if (!ft) return { state: 'none' };
-  const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
+  // La pagina pubblica deve poter mostrare l'MVP anche quando il flag
+  // di fine partita è stato sincronizzato prima/indipendentemente dall'evento.
+  if (!ft && S.clock?.phase !== 'ft') return { state: 'none' };
+  const end = (ft?.ts || Date.now()) + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
   const chosen = candidates();
   if (chosen.length !== 4 || new Set(chosen.map(c => c.side)).size !== 2) return { state: 'unconfigured', end, mv };
   return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
@@ -3732,11 +3734,14 @@ function convocatiPublicHtml() {
 function publicHtml() {
   const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni']];
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
-  if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']);
+  // MVP visibile solo a partita conclusa; il Resoconto è stato rimosso
+  // perché duplicava integralmente la scheda Statistiche.
+  if (S.clock?.phase === 'ft' || voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
   return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
