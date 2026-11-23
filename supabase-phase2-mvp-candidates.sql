@@ -101,7 +101,7 @@ begin
     raise exception using errcode='22023', message='Candidato non ammesso';
   end if;
 
-  v_roster := coalesce(v_state #>> array['rosters',v_side],'');
+  v_roster := coalesce(v_state #>> array['publication','published','rosters',v_side], v_state #>> array['rosters',v_side], '');
   foreach v_line in array string_to_array(v_roster,E'\n') loop
     v_line := btrim(v_line);
     if v_line='' or v_line ~ '^[-–—=]{3,}$' or v_line ~* '^panchina\b' then
@@ -110,7 +110,7 @@ begin
     v_parts := regexp_match(v_line,'^\s*(\d{1,2})?[\s.\-–)\]]*(.+)$');
     if v_parts is not null then
       v_player_num := coalesce(v_parts[1],'');
-      v_player_name := btrim(v_parts[2]);
+      v_player_name := btrim(regexp_replace(regexp_replace(v_parts[2], '\\mGK\\M', '', 'gi'), '\\s{2,}', ' ', 'g'));
       if v_player_name <> '' and v_side || '|' || v_player_name = p_candidate_key then
         v_found := true;
         exit;
