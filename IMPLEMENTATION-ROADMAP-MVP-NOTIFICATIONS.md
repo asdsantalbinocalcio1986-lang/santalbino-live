@@ -90,3 +90,11 @@ Collaudo obbligatorio in partita di prova:
 - Non è ancora presente l'interfaccia pubblica di iscrizione né il pannello regia per invio/override; non è ancora collegato il canale in-app Realtime.
 - Lo script SQL e la funzione Edge non sono stati applicati/distribuiti nel progetto Supabase di produzione.
 - Il controllo MVP lato database usa la rosa pubblicata quando disponibile, in coerenza con i candidati mostrati dalla pagina pubblica, e normalizza il marcatore GK.
+
+
+### Note operative Edge Function
+
+- La funzione gestisce endpoint pubblici di iscrizione/revoca e azioni amministrative nello stesso handler: va distribuita con verifica JWT del gateway disattivata (`--no-verify-jwt`) e controllo della chiave applicativa `apikey` nel codice. Le azioni amministrative verificano comunque il JWT utente e la RPC `is_santalbino_admin()`.
+- Segreti server richiesti: `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. La service role e la chiave VAPID privata non devono mai essere inserite nel client o nel repository.
+- La sottoscrizione è distinta per coppia partita/endpoint: lo stesso browser può seguire più partite.
+- Le tabelle non concedono accesso diretto al browser; tutte le operazioni passano dall'Edge Function.
