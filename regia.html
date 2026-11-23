@@ -4219,6 +4219,7 @@ async function sendEventNotification(event) {
   const labels=Object.fromEntries(NOTIFICATION_CATEGORY_LABELS);
   const targetUrl=new URL('./index.html?view=live',location.href).pathname+'?view=live';
   const payload={eventId:String(event.id),category,title:'SANTA Live · '+(labels[category]||'Aggiornamento'),body:(evText(event)||'Aggiornamento della partita').slice(0,500),targetUrl};
+  if (!confirm('Confermi l’invio della notifica?\\n\\n'+payload.title+'\\n'+payload.body)) return;
   try { await regiaNotificationRequest('approve-and-send',payload); toast('Notifica inviata.'); }
   catch(error) {
     if(error.status===409 && String(error.message).includes('Categoria disattivata')) {
