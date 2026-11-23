@@ -1377,7 +1377,7 @@ const defaults = () => ({
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
-  clock: { phase: 'pre', t0: 0 },
+  clock: { phase: 'pre', t0: 0, finishedAt: 0 },
   mvp: { link: '', ourOnly: false, candidateKeys: [], candidatePlayers: [], votes: {}, tpl: '', raw: false },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
@@ -3666,8 +3666,15 @@ function lineupsHtml() {
 const VOTE_MS = 12 * 3600 * 1000;
 function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
-  if (!ft) return { state: 'none' };
-  const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
+  if (!ft && S.clock?.phase !== 'ft') return { state: 'none' };
+  // Timestamp persistente: il countdown non riparte a ogni aggiornamento
+  // se lo stato FT arriva senza l'evento fulltime.
+  const lastEventTs = [...(S.events || [])].reverse().find(e => Number.isFinite(Number(e.ts)))?.ts;
+  const fallbackEnd = Number(S.clock?.finishedAt) ||
+    (Number(S.clock?.t0) > 0 ? Number(S.clock.t0) + 45 * 60 * 1000 : 0) ||
+    Number(lastEventTs) || Date.now();
+  const end = (Number(ft?.ts) || fallbackEnd) + VOTE_MS;
+  const mv = S.events.find(e => e.type === 'mvp');
   const chosen = candidates();
   if (chosen.length !== 4 || new Set(chosen.map(c => c.side)).size !== 2) return { state: 'unconfigured', end, mv };
   return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
@@ -4091,10 +4098,6 @@ async function openMatchResult() {
     dlg.innerHTML='<div class="sheethead"><h2>Grafica non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">'+esc(err?.message||'Errore nella generazione')+'</p>';
   }
 }
-function reportHtml() {
-  return `<section><h2>Statistiche finali</h2>${statsHtml()}</section>`;
-}
-
 /* ================= vista pubblica ================= */
 
 function standingsHtml() {
@@ -4150,10 +4153,12 @@ function publicHtml() {
   const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni']];
   if(parseRoster(publicContent().convocati).length)tabs.push(['convocati','Convocati']);
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
-  if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
+  if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']);
+  // La scheda MVP è disponibile solo a partita conclusa.
+  if (S.clock?.phase === 'ft' || voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -4615,7 +4620,7 @@ document.addEventListener('click', async e => {
         S.match.attackDirectionCurrent = oppositeAttackDirection(S.match.attackDirectionFirst);
         c.phase = 'p2'; c.t0 = Date.now(); addPhase('secondhalf', '45', { attackDirection: S.match.attackDirectionCurrent });
       }
-      else if (c.phase === 'p2') { const endMinute = curMinute(); c.phase = 'ft'; addPhase('fulltime', endMinute); }
+      else if (c.phase === 'p2') { const endMinute = curMinute(); c.phase = 'ft'; c.finishedAt = Date.now(); addPhase('fulltime', endMinute); }
       break; }
     case 'nudge': if (S.clock.phase === 'p1' || S.clock.phase === 'p2') { S.clock.t0 -= +a.dataset.d; commit(false); tickClock(); } break;
     case 'post': if (ev) openPost(ev.id); break;
@@ -4796,7 +4801,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
