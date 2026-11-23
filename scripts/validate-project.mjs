@@ -90,8 +90,7 @@ assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la mod
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');
 assert.match(regia, /data-a="editevent"/, 'La timeline della regia deve esporre il comando di modifica evento');
 assert.match(regia, /window\.addEventListener\('offline'/, 'La regia deve segnalare la perdita di connessione');
-assert.match(regia, /window\.__santalbinoConnectionWatch/
-
+assert.match(regia, /window\.__santalbinoConnectionWatch/, 'La regia deve controllare periodicamente il riallineamento');
 for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
   assert.match(source, /let pendingLocalSync = false, remoteStateLoaded = false, draftRecoveryPrompted = false/, 'Stato delle modifiche locali e della base remota mancante in ' + file);
   assert.match(source, /pendingLocalSync = true/, 'Le modifiche devono essere marcate come pendenti in ' + file);
@@ -115,7 +114,7 @@ for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
   assert.equal(policy({pending:true,canEdit:false,localOnly:false,dbReady:true,remoteStateLoaded:true,syncState:'error',syncDetail:'offline'}), false, 'La riconnessione non deve scrivere senza autorizzazione in ' + file);
   assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,remoteStateLoaded:false,syncState:'error',syncDetail:'offline'}), false, 'La riconnessione non deve pubblicare senza una revisione remota nota in ' + file);
 }
-, 'La regia deve controllare periodicamente il riallineamento');
+
 const publicationMigration = fs.readFileSync('supabase/migrations/20261122174518_scheduled_public_content.sql', 'utf8');
 assert.match(publicationMigration, /create extension if not exists pg_cron/i, 'La pubblicazione programmata deve usare il cron server-side');
 assert.match(publicationMigration, /function public\.publish_santalbino_scheduled_content\(\)/i, 'Funzione server-side di pubblicazione programmata mancante');
