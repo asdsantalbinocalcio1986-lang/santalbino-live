@@ -2154,7 +2154,7 @@ function migrateBundledLogos(state) {
 }
 function mergeState(raw) {
   const d = defaults();
-  const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
+  const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),notifications:Object.assign({},d.notifications,raw.notifications||{},{types:Object.assign({},d.notifications.types,raw.notifications?.types||{})}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
   if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
   return state;
 }
