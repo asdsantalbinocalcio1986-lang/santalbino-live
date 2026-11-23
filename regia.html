@@ -3612,7 +3612,7 @@ function publicationControlsHtml() {
 }
 function capturePublicationContent() {
   // Read all roster editors as a collection; $() intentionally returns only one element.
-  $('[data-roster]').forEach(el => {
+  $$('[data-roster]').forEach(el => {
     const side = el.dataset.roster;
     if (side === 'home' || side === 'away') S.rosters[side] = String(el.value || '');
   });
@@ -4499,7 +4499,7 @@ window.addEventListener('popstate', () => {
     const sh = $('#sheet');
     if (sh?.open) sh.close();
   } else {
-    const openDialogs = $('dialog[open]');
+    const openDialogs = $$('dialog[open]');
     const topDialog = openDialogs[openDialogs.length - 1];
     if (topDialog) topDialog.close();
     else {
@@ -4784,7 +4784,7 @@ document.addEventListener('click', async e => {
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
     case 'savemvp': {
-      const keys = $('[data-mvp-candidate]:checked').map(input => input.value);
+      const keys = $$('[data-mvp-candidate]:checked').map(input => input.value);
       const all = allMvpCandidates();
       const chosen = keys.map(key => all.find(player => player.key === key)).filter(Boolean);
       if (keys.length !== 4 || new Set(keys).size !== 4 || chosen.length !== 4) { toast('Seleziona esattamente quattro giocatori presenti nelle formazioni.'); break; }
@@ -4798,7 +4798,7 @@ document.addEventListener('click', async e => {
     case 'reloadNotificationSettings': await loadNotificationSettings(); break;
     case 'notifyEvent': if (ev) { try { await sendEventNotification(ev); } catch (error) { toast(error.message || 'Invio notifica non riuscito'); } } break;
     case 'copyreport': await copyText(buildMatchReport()); break;
-    case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
+    case 'savevotes': { const v = {}; $$$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
     case 'rmmvptpl': S.mvp.tpl = ''; S.mvp.raw = false; commit(true); renderMain(); break;
     case 'proclaim': { const vi = voteInfo();
       if (vi.state === 'open' && !armedMvp) { armedMvp = true; renderMain(); setTimeout(() => { armedMvp = false; renderMain(); }, 4000); break; }
