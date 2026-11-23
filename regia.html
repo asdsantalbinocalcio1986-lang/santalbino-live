@@ -3760,7 +3760,7 @@ function mvpRegiaHtml() {
     <button class="btn primary block" data-a="savemvp" ${locked ? 'disabled' : ''}>Salva i quattro candidati</button>
     <p class="small muted">${st}</p>
     <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
-    <p class="small muted">Il pubblico potrà votare un solo candidato, una volta per partita e per identificativo browser.</p></div>`;
+    <p class="small muted">Il pubblico potrà votare un solo candidato, una volta per partita e per identificativo browser.</p></div>
   <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow\"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
     ${S.mvp.tpl ? `<img class="thumb" style="max-height:120px" src="${S.mvp.tpl}" alt="Sfondo MVP">` : ''}
