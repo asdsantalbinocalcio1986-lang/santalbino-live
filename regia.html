@@ -4227,7 +4227,7 @@ function regiaHtml() {
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva bozza</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('') + publicationControlsHtml() + mvpDraftSelectorHtml();
-  else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly aria-label="Resoconto finale completo">${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
+  else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<section><h2>Statistiche finali</h2>${statsHtml()}</section>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();
