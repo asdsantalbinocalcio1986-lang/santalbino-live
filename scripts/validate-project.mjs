@@ -12,6 +12,8 @@ const home = fs.readFileSync('home.html', 'utf8');
 const preview = fs.readFileSync('preview.html', 'utf8');
 const sw = fs.readFileSync('sw.js', 'utf8');
 const workflow = fs.readFileSync('.github/workflows/pages.yml', 'utf8');
+const socialFunction = fs.readFileSync('supabase/functions/santalive-social-publish/index.ts', 'utf8');
+const socialMigration = fs.readFileSync('supabase/migrations/20261123160000_santalbino_social_publications.sql', 'utf8');
 
 for (const file of ['home.html', 'preview.html']) {
   const page = fs.readFileSync(file, 'utf8');
@@ -146,5 +148,22 @@ assert.match(regia, /const numberX = left \+ columnTextInset \+ radius/, 'Numeri
 assert.match(regia, /previewLineupStory[\s\S]*instagram-story-1080x1920/, 'La regia deve consentire anteprima e salvataggio del formato Storie');
 
 
+
+
+assert.match(regia, /function autoPublishSocialEvent\(ev\)/, 'La regia deve avere la pubblicazione automatica degli eventi');
+assert.match(regia, /if \(TEST_MODE \|\| !CAN_EDIT \|\| !dbReady \|\| !db \|\| !cfg\.enabled \|\| !cfg\.ready\) return;/, 'La pubblicazione automatica deve essere disattivata in prova e finché Meta non è verificato');
+assert.match(regia, /SOCIAL_AUTO_EVENT_TYPES = \['goal', 'red', 'halftime', 'fulltime'\]/, 'Gli eventi social automatici devono restare limitati alle tipologie approvate');
+assert.match(regia, /db\.functions\.invoke\(['"]santalive-social-publish['"]/, 'La regia deve invocare la Edge Function social');
+assert.match(regia, /case ['"]retrySocialPublication['"]/, 'Il registro deve consentire un nuovo tentativo senza ripubblicare i canali già riusciti');
+assert.match(socialFunction, /auth\.getUser\(bearer\)/, 'La Edge Function deve verificare la sessione autenticata');
+assert.match(socialFunction, /from\(['"]santalbino_admins['"]\)/, 'La Edge Function deve verificare l’amministratore autorizzato');
+assert.match(socialFunction, /santalbino_social_publications/, 'La Edge Function deve registrare gli esiti');
+assert.match(socialFunction, /instagramId\}\/media_publish/, 'La Edge Function deve pubblicare i contenuti Instagram');
+assert.match(socialFunction, /pageId\}\/photos/, 'La Edge Function deve pubblicare le immagini sulla Pagina Facebook');
+assert.match(socialFunction, /santalbino-media\/social\//, 'La Edge Function deve accettare solo immagini nell’archivio social pubblico');
+assert.match(socialMigration, /alter table public\.santalbino_social_publications enable row level security/i, 'Il registro social deve avere RLS attivo');
+assert.match(socialMigration, /public\.is_santalbino_admin\(\)/i, 'Il registro social deve essere leggibile soltanto dall’amministratore');
+assert.match(socialMigration, /unique/i, 'Il registro social deve impedire duplicati per ID evento');
+assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PAGE_ACCESS_TOKEN/, 'La guida deve descrivere i segreti Meta richiesti');
 
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');
