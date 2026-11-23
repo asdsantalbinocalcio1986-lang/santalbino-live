@@ -3775,7 +3775,7 @@ function buildMatchReport() {
     return 'al minuto ' + m.base + (m.extra ? ' più ' + m.extra : '');
   };
   const eventSide = ev => ev.team === 'home' || ev.team === 'away' ? ev.team : '';
-  const cleanName = value => String(value || '').trim().toLocaleLowerCase('it').replace(/(^|[\s'’-])([\p{L}])/gu, (_, sep, letter) => sep + letter.toLocaleUpperCase('it'));
+  const cleanName = value => String(value || '').trim().toLocaleLowerCase('it').replace(/(^|[\s'’-])([\p{L}])/gu, (_, sep, letter) => sep + letter.toLocaleUpperCase('it')).replace(/\(([a-z])\)/giu, (_, letter) => '(' + letter.toLocaleUpperCase('it') + ')');
   const eventPhrase = ev => {
     const player = cleanName(ev.player);
     const at = minuteText(ev);
@@ -3817,7 +3817,8 @@ function buildMatchReport() {
         const team = sideLabel(scoringSide(ev));
         if (ev.kind === 'autogol') return prefix + (player || 'un giocatore') + ' devia il pallone nella propria porta e regala una rete a ' + team + '. Il punteggio diventa ' + scoreText(current[0], current[1]) + '.';
         const how = ev.kind === 'rigore' ? ' dal dischetto' : ev.kind === 'punizione' ? ' direttamente su calcio di punizione' : ev.kind === 'testa' ? ' con un colpo di testa' : '';
-        return prefix + (player || 'un giocatore') + ' firma la rete per ' + team + how + (ev.assist ? ', su assist di ' + cleanName(ev.assist) : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
+        const scorerPhrase = player ? player + ' firma la rete per ' + team : 'la rete arriva per ' + team;
+        return prefix + scorerPhrase + how + (ev.assist ? ', su assist di ' + cleanName(ev.assist) : '') + '. Il punteggio si aggiorna: ' + scoreText(current[0], current[1]) + '.';
       }
       case 'yellow':
         return prefix + 'il direttore di gara estrae il cartellino giallo nei confronti di ' + (player || 'un giocatore') + '.';

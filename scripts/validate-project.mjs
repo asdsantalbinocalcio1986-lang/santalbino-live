@@ -93,6 +93,8 @@ assert.match(html, /<option value="Inter"/, 'L’editor pubblico deve offrire In
 assert.match(html, /teamLabelFamily=\(\{Inter:/, 'Le intestazioni delle squadre devono supportare Inter');
 assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la modifica di un evento già registrato');
 assert.match(regia, /function resetMatch\(\) \{[^}]*S\.match\.chronicleDraft = '';[^}]*S\.match\.chroniclePublished = '';[^}]*S\.match\.chroniclePublishedAt = '';[^}]*S\.match\.chronicleNeedsReview = false;/, 'L’azzeramento della regia deve eliminare il resoconto della partita precedente');
+assert.match(regia, /const scorerPhrase = player \? player \+ ' firma la rete per ' \+ team : 'la rete arriva per ' \+ team;/, 'Un gol senza marcatore non deve inventare un autore generico');
+assert.ok(regia.includes(".replace(/\\(([a-z])\\)/giu, (_, letter) => '(' + letter.toLocaleUpperCase('it') + ')')"), 'Le sigle tra parentesi nei nomi devono mantenere le maiuscole, ad esempio (C)');
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');
 assert.match(regia, /data-a="editevent"/, 'La timeline della regia deve esporre il comando di modifica evento');
 assert.match(regia, /window\.addEventListener\('offline'/, 'La regia deve segnalare la perdita di connessione');
