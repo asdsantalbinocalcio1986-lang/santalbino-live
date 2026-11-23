@@ -3754,7 +3754,7 @@ function notificationPanelHtml() {
   let active = false;
   try { active = !!localStorage.getItem(notificationStorageKey()); } catch (_) {}
   return '<section class="card" aria-label="Notifiche partita"><h3>Notifiche della partita</h3>' +
-    '<p class="small muted">Ricevi aggiornamenti anche quando non stai guardando SANTA Live. Puoi disattivarli in qualsiasi momento.</p>' +
+    '<p class="small muted">Ricevi aggiornamenti anche quando non stai guardando SANTA Live. Puoi disattivarli per questa partita in qualsiasi momento. Su iPhone/iPad aggiungi prima SANTA Live alla schermata Home.</p>' +
     (active
       ? '<p class="small" style="color:var(--c-goal);font-weight:700">Notifiche attive su questo dispositivo.</p><button class="btn block" data-notification-action="disable">Disattiva per questa partita</button>'
       : '<button class="btn primary block" data-notification-action="enable">Attiva notifiche di questa partita</button>') +
