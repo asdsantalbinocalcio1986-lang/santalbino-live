@@ -47,7 +47,7 @@ assert.match(html, /<textarea rows="10" readonly aria-label="Resoconto finale co
 assert.equal((html.match(/<meta name="theme-color"/g) || []).length, 1, 'La pagina pubblica non deve duplicare theme-color');
 assert.equal((regia.match(/<meta name="theme-color"/g) || []).length, 1, 'La regia non deve duplicare theme-color');
 for (const [file, source] of [['home.html', home], ['preview.html', preview], ['index.html', html], ['regia.html', regia]]) {
-  assert.match(source, /@supabase\/supabase-js@2\.119\.1/, 'Versione Supabase JS non fissata in ' + file);
+  assert.match(source, /@supabase\/supabase-js@2\.119\.2/, 'Versione Supabase JS non fissata in ' + file);
 }
 assert.match(home, /\.range\(start,start\+PAGE_SIZE-1\)/, 'Archivio non paginato');
 assert.match(sw, /'\.\/index\.html'/, 'Shell offline senza pagina regia');
