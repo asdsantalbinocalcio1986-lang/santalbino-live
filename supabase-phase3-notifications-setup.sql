@@ -20,7 +20,7 @@ create table if not exists public.santalbino_notification_settings (
 create table if not exists public.santalbino_notification_subscriptions (
   id uuid primary key default gen_random_uuid(),
   match_key text not null,
-  endpoint text not null unique,
+  endpoint text not null,
   p256dh text not null,
   auth_key text not null,
   subscription_token_hash text not null unique,
@@ -35,7 +35,8 @@ create table if not exists public.santalbino_notification_subscriptions (
       'yellow_card','red_card','substitution','injury','mvp'
     ]::text[]
   ),
-  constraint santalbino_notification_subscriptions_endpoint_check check (endpoint like 'https://%')
+  constraint santalbino_notification_subscriptions_endpoint_check check (endpoint like 'https://%'),
+  constraint santalbino_notification_subscriptions_match_endpoint_key unique (match_key, endpoint)
 );
 
 create index if not exists santalbino_notification_subscriptions_match_active_idx
