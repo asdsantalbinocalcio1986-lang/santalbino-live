@@ -168,8 +168,12 @@ Deno.serve(async (req: Request) => {
       image_url: imageUrl,
       platforms,
       overall_status: "processing",
-      facebook_status: platforms.facebook ? (existing?.facebook_status === "published" ? "published" : "processing") : "skipped",
-      instagram_status: platforms.instagram ? (existing?.instagram_status === "published" ? "published" : "processing") : "skipped",
+      facebook_status: platforms.facebook
+        ? (existing?.facebook_status === "published" ? "published" : "processing")
+        : (existing?.facebook_status === "published" ? "published" : "skipped"),
+      instagram_status: platforms.instagram
+        ? (existing?.instagram_status === "published" ? "published" : "processing")
+        : (existing?.instagram_status === "published" ? "published" : "skipped"),
       facebook_error: null,
       instagram_error: null,
       updated_at: new Date().toISOString(),
