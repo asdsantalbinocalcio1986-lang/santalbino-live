@@ -2392,7 +2392,7 @@ async function verifySocialPublishing() {
     commit(true);
     renderMain();
     if (data?.ready) toast('Collegamento Meta verificato: Facebook e Instagram pronti');
-    else toast('Collegamento Meta non pronto: ' + (data?.missing || [data?.message || 'configurazione da completare']).join(', '));
+    else toast('Collegamento Meta non pronto: ' + (data?.missing?.length ? data.missing.join(', ') : (data?.message || 'configurazione da completare')));
   } catch (err) {
     S.socialPublishing = Object.assign(socialPublishingConfig(), { ready: false });
     commit(true);
