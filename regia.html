@@ -2068,6 +2068,7 @@ async function initCaps() {
   const { data, error } = await db.from(STATE_TABLE).select('state').eq('id', 1).maybeSingle();
   let legacyLogoMigration = false;
   if (!error && data?.state) {
+    remoteStateLoaded = true;
     S = mergeState(data.state);
     remoteRev = Number(S.rev || 0);
     legacyLogoMigration = migrateBundledLogos(S);
@@ -2184,10 +2185,10 @@ async function signOutAdmin() { if (db) await db.auth.signOut(); CAN_EDIT = fals
 /* ================= sincronizzazione online ================= */
 let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publishPending = false, remoteRev = 0;
 let realtimeNeedsResync = false, remoteRefreshBusy = false;
-let pendingLocalSync = false;
+let pendingLocalSync = false, remoteStateLoaded = false, draftRecoveryPrompted = false;
 function setSync(st, detail = '') { syncState = st; syncDetail = detail; const el = $('#sync'); if (el) el.outerHTML = syncHtml(); }
 function shouldRetryPendingSync(state) {
-  return !!state.pending && !!state.canEdit && !state.localOnly && !!state.dbReady &&
+  return !!state.pending && !!state.canEdit && !state.localOnly && !!state.dbReady && !!state.remoteStateLoaded &&
     !(state.syncState === 'error' && String(state.syncDetail || '').startsWith('conflitto:'));
 }
 function handleNetworkOnline(reason = 'network-online') {
@@ -2223,7 +2224,8 @@ function readDraft() {
   } catch (e) { return null; }
 }
 function offerDraftRecovery() {
-  if (!CAN_EDIT) return;
+  if (!CAN_EDIT || !remoteStateLoaded || draftRecoveryPrompted) return;
+  draftRecoveryPrompted = true;
   const draft = readDraft();
   if (!draft || !draft.state || !Number.isFinite(Number(draft.state.rev))) return;
   const draftRev = Number(draft.state.rev || 0);
@@ -2264,11 +2266,12 @@ function recoverDraftManually() {
 function commit(now) {
   S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {}), graphicEditor:Object.assign({global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}},S.media?.graphicEditor||{})};
   S.rev = (S.rev || 0) + 1; saveDraft(); pendingLocalSync = true; renderHero(); updDatalists();
-  if (!CAN_EDIT || LOCAL_ONLY || !dbReady) { setSync('error', 'accesso amministratore necessario'); return; }
+  if (!CAN_EDIT || LOCAL_ONLY || !dbReady || !remoteStateLoaded) { setSync('error', !remoteStateLoaded ? 'stato online non caricato: bozza conservata' : 'accesso amministratore necessario'); return; }
   setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, now ? 80 : 700);
 }
 async function publishNow() {
   if (!db || !CAN_EDIT) return;
+  if (!remoteStateLoaded) { setSync('error', 'stato online non caricato: bozza conservata'); return; }
   if (publishing) { publishPending = true; return; }
   publishing = true; publishPending = false;
   // Allinea la revisione locale a quella remota prima di chiamare la RPC.
@@ -2311,7 +2314,8 @@ async function refreshRemoteState(reason = 'reconnect') {
   try {
     const { data, error } = await db.from(STATE_TABLE).select('state').eq('id', 1).maybeSingle();
     if (error) throw error;
-    if (!data?.state) return false;
+    if (!data?.state) { setSync('error', 'stato online non disponibile'); return false; }
+    remoteStateLoaded = true;
     const nextRev = Number(data.state.rev || 0);
     if (nextRev > Number(S.rev || 0)) {
       remoteRev = nextRev;
@@ -2324,8 +2328,10 @@ async function refreshRemoteState(reason = 'reconnect') {
       if (CAN_EDIT) await refreshMvpVotes();
     }
     realtimeNeedsResync = false;
+    offerDraftRecovery();
     return true;
   } catch (err) {
+    setSync('error', 'riallineamento database non riuscito');
     console.warn('Riallineamento Sant\'Albino Live (' + reason + '):', err);
     return false;
   } finally {
@@ -4556,7 +4562,7 @@ document.addEventListener('click', async e => {
      case 'editorBack': L.rtab='live'; saveL(); renderMain(); break;
     case 'editorPreview': await openGraphicEditorPreview(); break;
     case 'editorReset': { const c=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope; if(key==='global')c.global={accent:'#e3c66d',overlay:0,border:3,sponsor:true,sponsorPos:{x:0,y:0,scale:1},fontFamily:'Inter',fontScale:1}; else delete c.templates[key]; commit(true); renderMain(); toast('Valori predefiniti ripristinati per questo template'); break; }
-    case 'retry': if (pendingLocalSync) await publishNow(); else { setSync('ok'); await refreshRemoteState('manual-retry'); } break;
+    case 'retry': if (pendingLocalSync && remoteStateLoaded) await publishNow(); else if (pendingLocalSync) toast('Bozza conservata: ricarica la pagina online per confrontarla con la versione remota.'); else { setSync('ok'); await refreshRemoteState('manual-retry'); } break;
     case 'archiveMatch': await archiveCurrentMatch(); break;
     case 'deleteArchivedMatch': await deleteArchivedMatch(a.dataset.id); break;
     case 'discardMatch': await discardCurrentMatch(); break;
@@ -4727,6 +4733,7 @@ async function discardDraftAndReloadRemote() {
   const { data, error } = await db.from(STATE_TABLE).select('state').eq('id',1).maybeSingle();
   if (error || !data?.state) { setSync('error','impossibile ricaricare lo stato online'); return; }
   S = mergeState(data.state);
+  remoteStateLoaded = true;
   remoteRev = Number(S.rev || 0);
   L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
   L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
