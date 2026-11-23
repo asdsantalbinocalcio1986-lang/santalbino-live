@@ -3787,7 +3787,7 @@ async function enableMatchNotifications() {
   await callNotificationService('subscribe', {
     subscription: subscription.toJSON(),
     subscriptionToken: token,
-    categories: ['kickoff', 'halftime', 'fulltime', 'goal'],
+    categories: ['kickoff', 'halftime', 'fulltime', 'goal', 'yellow_card', 'red_card', 'substitution', 'injury', 'mvp'],
   });
   try { localStorage.setItem(notificationStorageKey(), token); } catch (_) {}
   renderMain();
