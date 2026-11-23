@@ -93,10 +93,11 @@ assert.match(regia, /window\.addEventListener\('offline'/, 'La regia deve segnal
 assert.match(regia, /window\.__santalbinoConnectionWatch/
 
 for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
-  assert.match(source, /let pendingLocalSync = false/, 'Stato delle modifiche locali non sincronizzate mancante in ' + file);
+  assert.match(source, /let pendingLocalSync = false, remoteStateLoaded = false, draftRecoveryPrompted = false/, 'Stato delle modifiche locali e della base remota mancante in ' + file);
   assert.match(source, /pendingLocalSync = true/, 'Le modifiche devono essere marcate come pendenti in ' + file);
   assert.match(source, /pendingLocalSync = false/, 'Il completamento del salvataggio deve azzerare lo stato pendente in ' + file);
   assert.match(source, /function handleNetworkOnline\(reason = ['"]network-online['"]\)/, 'La riconnessione deve gestire il salvataggio pendente in ' + file);
+  assert.match(source, /!dbReady \|\| !remoteStateLoaded/, 'Non si deve pubblicare senza aver caricato la base remota in ' + file);
   assert.match(source, /window\.addEventListener\(['"]online['"], \(\) => handleNetworkOnline\(['"]network-online['"]\)\)/, 'Il ritorno online deve richiamare la gestione della sincronizzazione in ' + file);
   assert.match(source, /remoteRefreshBusy \|\| publishing \|\| pendingLocalSync \|\| syncState !== ['"]ok['"]/, 'Il riallineamento remoto non deve sovrascrivere una bozza pendente in ' + file);
   assert.match(source, /!publishing && !pendingLocalSync && syncState === ['"]ok['"]/, 'Realtime non deve sostituire modifiche locali pendenti in ' + file);
@@ -108,10 +109,11 @@ function extractSyncPolicy(source, file) {
 }
 for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
   const policy = extractSyncPolicy(source, file);
-  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,syncState:'error',syncDetail:'dispositivo offline'}), true, 'Le modifiche locali devono essere ritentate dopo la riconnessione in ' + file);
-  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,syncState:'error',syncDetail:'conflitto: versione online aggiornata altrove'}), false, 'Un conflitto non deve essere sovrascritto automaticamente in ' + file);
-  assert.equal(policy({pending:false,canEdit:true,localOnly:false,dbReady:true,syncState:'error',syncDetail:'lettura database'}), false, 'Senza modifiche pendenti va ricaricato lo stato, non pubblicato quello locale, in ' + file);
-  assert.equal(policy({pending:true,canEdit:false,localOnly:false,dbReady:true,syncState:'error',syncDetail:'offline'}), false, 'La riconnessione non deve scrivere senza autorizzazione in ' + file);
+  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,remoteStateLoaded:true,syncState:'error',syncDetail:'dispositivo offline'}), true, 'Le modifiche locali devono essere ritentate dopo la riconnessione in ' + file);
+  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,remoteStateLoaded:true,syncState:'error',syncDetail:'conflitto: versione online aggiornata altrove'}), false, 'Un conflitto non deve essere sovrascritto automaticamente in ' + file);
+  assert.equal(policy({pending:false,canEdit:true,localOnly:false,dbReady:true,remoteStateLoaded:true,syncState:'error',syncDetail:'lettura database'}), false, 'Senza modifiche pendenti va ricaricato lo stato, non pubblicato quello locale, in ' + file);
+  assert.equal(policy({pending:true,canEdit:false,localOnly:false,dbReady:true,remoteStateLoaded:true,syncState:'error',syncDetail:'offline'}), false, 'La riconnessione non deve scrivere senza autorizzazione in ' + file);
+  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,remoteStateLoaded:false,syncState:'error',syncDetail:'offline'}), false, 'La riconnessione non deve pubblicare senza una revisione remota nota in ' + file);
 }
 , 'La regia deve controllare periodicamente il riallineamento');
 const publicationMigration = fs.readFileSync('supabase/migrations/20261122174518_scheduled_public_content.sql', 'utf8');
