@@ -1376,7 +1376,7 @@ const defaults = () => ({
   rosters: { home: '', away: '' },
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
-  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
+  mvp: { link: '', ourOnly: false, candidateKeys: [], votes: {}, tpl: '', raw: false },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
@@ -3387,13 +3387,21 @@ function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
   if (!ft) return { state: 'none' };
   const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
+  const chosen = candidates();
+  if (chosen.length !== 4 || new Set(chosen.map(c => c.side)).size !== 2) return { state: 'unconfigured', end, mv };
   return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
-function candidates() {
+function allMvpCandidates() {
   const out = [], published = publicContent();
-  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(published.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
+  ['home', 'away'].forEach(side => parseRoster(published.rosters[side]).forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name })));
   return out;
+}
+function candidates() {
+  const all = allMvpCandidates();
+  const keys = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
+  if (keys.length !== 4 || new Set(keys).size !== 4) return [];
+  return keys.map(key => all.find(candidate => candidate.key === key)).filter(Boolean);
 }
 
 
@@ -3409,7 +3417,10 @@ function mvpPublicHtml() {
   })();
 
   if (vi.state === 'none') {
-    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre automaticamente al fischio finale e resta aperta 12 ore.</div>`;
+    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre al fischio finale, dopo la selezione dei quattro candidati da parte della regia.</div>`;
+  }
+  if (vi.state === 'unconfigured') {
+    return `<div class="empty"><h3>Votazione in preparazione</h3>La regia sta completando la selezione dei quattro candidati. Riprova tra poco.</div>`;
   }
 
   if (vi.state === 'open') {
