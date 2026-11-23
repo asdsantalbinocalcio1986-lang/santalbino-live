@@ -98,10 +98,11 @@ Deno.serve(async (req: Request) => {
       if (missing.length) return json({ ready: false, publishingEnabled, missing, message: "Inserisci i segreti Meta in Supabase" });
       try {
         const page = await graphGet(pageId, {
-          fields: "id,name,connected_instagram_account",
+          fields: "id,name,connected_instagram_account{id,username}",
           access_token: pageToken,
         });
-        const linkedInstagramId = String(page.connected_instagram_account?.id || "");
+        const linkedInstagram = page.connected_instagram_account || null;
+        const linkedInstagramId = String(linkedInstagram?.id || "");
         if (!linkedInstagramId) {
           return json({
             ready: false,
@@ -118,23 +119,11 @@ Deno.serve(async (req: Request) => {
             message: "L'ID Instagram configurato non coincide con l'account collegato alla Pagina Facebook.",
           });
         }
-        const instagram = await graphGet(instagramId, {
-          fields: "id,username",
-          access_token: pageToken,
-        });
-        if (String(instagram.id || "") !== instagramId) {
-          return json({
-            ready: false,
-            publishingEnabled,
-            missing: [],
-            message: "Meta non ha confermato l'account Instagram configurato.",
-          });
-        }
         return json({
           ready: true,
           publishingEnabled,
           page: { id: page.id, name: page.name || "" },
-          instagram: { id: instagram.id, username: instagram.username || "" },
+          instagram: { id: linkedInstagramId, username: linkedInstagram.username || "" },
         });
       } catch (error) {
         return json({ ready: false, publishingEnabled, missing: [], message: safeError(error, pageToken) });
