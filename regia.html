@@ -4733,7 +4733,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
