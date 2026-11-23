@@ -1,0 +1,81 @@
+# SANTALive — MVP e notifiche partita
+
+Questo documento accompagna la prima implementazione della votazione MVP a quattro candidati e definisce il completamento tecnico del sistema notifiche.
+
+## MVP — comportamento richiesto
+
+- La regia seleziona quattro giocatori dalle formazioni ufficiali.
+- La selezione deve contenere almeno un giocatore per squadra; il sistema verifica esattamente quattro chiavi distinte.
+- La selezione è salvata nello stato della partita e sincronizzata come gli altri contenuti della regia.
+- La votazione si apre dopo il Full Time e resta aperta 12 ore.
+- Il pubblico vede esclusivamente i quattro candidati, divisi per squadra.
+- È consentito un voto per identificativo browser e partita, come nel sistema esistente.
+- La regia può modificare i candidati finché la votazione non è aperta; una volta aperta, la selezione si blocca.
+- Il backend valida nuovamente la lista: non è sufficiente nascondere gli altri giocatori nell'interfaccia.
+- La simulazione resta isolata e non scrive nella votazione ufficiale.
+
+## Notifiche — specifica funzionale
+
+### Tipologie predefinite
+
+| Evento | Predefinito |
+|---|---|
+| Kick Off | Attivo |
+| Half Time | Attivo |
+| Full Time | Attivo |
+| Goal | Attivo |
+| Ammonizione | Disattivo |
+| Espulsione | Disattivo |
+| Sostituzione | Disattivo |
+| Infortunio | Disattivo |
+| Apertura voto MVP | Disattivo |
+
+Le preferenze sono predefinite, non un'autorizzazione all'invio automatico. Un evento registrato o sincronizzato non deve generare da solo una notifica.
+
+### Flusso editoriale obbligatorio
+
+1. La regia registra o modifica l'evento.
+2. Il pannello mostra se quel tipo di evento è abilitato nelle preferenze e permette un override per il singolo evento.
+3. La regia visualizza l'anteprima e sceglie esplicitamente **Invia notifica** oppure lascia l'evento senza notifica.
+4. Solo l'approvazione esplicita crea un elemento nell'outbox.
+5. L'outbox invia una sola volta la notifica, registra esito/errore e impedisce duplicati.
+6. Correzioni successive all'evento non devono reinviare automaticamente una notifica già spedita.
+
+### Canali
+
+- **In-app / Realtime:** messaggio o banner nella pagina della partita per gli utenti collegati. Non richiede il permesso browser Push.
+- **Web Push:** notifica anche quando il sito non è aperto, solo dopo consenso esplicito del visitatore e sottoscrizione del browser/dispositivo.
+- **Iscrizione:** l'utente può iscriversi a una squadra o a una singola partita e revocare il consenso in modo semplice.
+- **Preferenze:** le preferenze personali filtrano ulteriormente le tipologie consentite dalla regia.
+
+### Componenti tecnici da completare
+
+- Tabella privata delle sottoscrizioni Push (endpoint e chiavi cifrate/protette; nessuna lettura pubblica).
+- Tabella outbox con stato pending/sent/failed/cancelled, riferimento univoco all'evento e timestamp di approvazione/invio.
+- Funzioni server-side che verificano l'amministratore prima di approvare/inviare e che non accettano invii generici dal client pubblico.
+- Edge Function di invio Web Push con VAPID, gestione delle sottoscrizioni scadute e registrazione degli esiti.
+- Service Worker: gestione evento push, visualizzazione notifica e apertura del link corretto alla partita.
+- Interfaccia pubblica per consenso, iscrizione/disiscrizione e preferenze.
+- Interfaccia regia per preferenze predefinite, override per evento, anteprima e invio esplicito.
+
+### Configurazione e collaudo
+
+Prima dell'attivazione Web Push occorrono chiavi VAPID (pubblica, privata e subject) configurate come segreti Supabase, non nel repository e non nel browser. La chiave pubblica può essere esposta al client per la sottoscrizione.
+
+Collaudo obbligatorio in partita di prova:
+- consenso negato, concesso e revocato;
+- browser Android e PWA iOS compatibile;
+- utente iscritto e non iscritto;
+- evento registrato senza approvazione (zero notifiche);
+- invio approvato una sola volta;
+- evento modificato dopo l'invio (nessun reinvio);
+- errore endpoint scaduto e relativa disattivazione;
+- verifica che nessun dato della partita ufficiale venga modificato durante i test.
+
+## Principi di sicurezza e prodotto
+
+- Mai esporre service-role o VAPID privata nel frontend.
+- RLS su tutte le tabelle esposte; sottoscrizioni e outbox non sono leggibili pubblicamente.
+- L'utente deve poter revocare il consenso.
+- La regia mantiene il controllo editoriale: registrazione, pubblicazione e notifica sono operazioni distinte.
+- Le notifiche predefinite Kick Off, Half Time, Full Time e Goal sono selezionate come impostazione iniziale, ma l'invio richiede comunque l'azione esplicita della regia.
