@@ -3611,15 +3611,31 @@ function publicationControlsHtml() {
   return '<div class="card"><h2>Pubblicazione contenuti</h2><p class="small muted">Le modifiche salvate come bozza non compaiono nella pagina pubblica. Puoi pubblicarle subito oppure programmarle: il database esegue la pubblicazione anche se la regia è chiusa.</p><p class="small" aria-live="polite"><b>'+esc(status)+'</b></p><label class="f"><span>Data e ora di pubblicazione</span><input id="contentScheduleAt" type="datetime-local" value="'+esc(localDateTimeValue(pending?.scheduledAt))+'"></label><div class="row2 stack"><button class="btn" data-a="saveContentDraft">Salva bozza</button><button class="btn primary" data-a="scheduleContent">Programma pubblicazione</button></div><div class="row2 stack"><button class="btn primary" data-a="publishContentNow">Pubblica ora</button><button class="btn danger" data-a="cancelContentSchedule" '+(pending ? '' : 'disabled')+'>Annulla bozza/programmazione</button></div></div>';
 }
 function capturePublicationContent() {
-  document.querySelectorAll('[data-roster]').forEach(el => { S.rosters[el.dataset.roster] = el.value; });
-  const convocati = $('[data-convocati]'); if (convocati) S.convocati = convocati.value;
-  return { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
+  // Read all roster editors as a collection; $() intentionally returns only one element.
+  $('[data-roster]').forEach(el => {
+    const side = el.dataset.roster;
+    if (side === 'home' || side === 'away') S.rosters[side] = String(el.value || '');
+  });
+  const convocati = $('[data-convocati]');
+  if (convocati) S.convocati = String(convocati.value || '');
+  return {
+    rosters: { home: String(S.rosters.home || ''), away: String(S.rosters.away || '') },
+    convocati: String(S.convocati || '')
+  };
 }
 function saveContentDraft() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
-  const content = capturePublicationContent();
-  S.publication.pending = { status: 'draft', scheduledAt: null, content, savedAt: new Date().toISOString() };
-  commit(true); renderMain(); toast('Bozza salvata: non è ancora visibile al pubblico');
+  try {
+    const content = capturePublicationContent();
+    S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
+    S.publication.pending = { status: 'draft', scheduledAt: null, content, savedAt: new Date().toISOString() };
+    commit(true);
+    renderMain();
+    toast('Bozza salvata su questo dispositivo; sincronizzazione online in corso. Non è pubblicata.');
+  } catch (error) {
+    console.error('Salvataggio bozza contenuti:', error);
+    toast('Salvataggio bozza non riuscito: ' + (error?.message || 'errore imprevisto'));
+  }
 }
 function scheduleContentPublication() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
@@ -4454,7 +4470,14 @@ let armedNew = false;
 
 /* ================= finestra evento ================= */
 let draft = null, textManual = false, sheetHistoryEntry = false;
+let appHistoryGuardReady = false;
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
+function ensureAppHistoryGuard() {
+  if (appHistoryGuardReady) return;
+  // Keep an in-app history entry so Android/browser Back cannot leave the active match.
+  history.pushState({ santaliveAppGuard: true }, '', location.href);
+  appHistoryGuardReady = true;
+}
 function pushSheetHistory() {
   if (sheetHistoryEntry) return;
   history.pushState({ santaliveSheet: true }, '', location.href);
@@ -4468,11 +4491,24 @@ function closeSheet() {
     if (history.state?.santaliveSheet) history.back();
   }
 }
+ensureAppHistoryGuard();
 window.addEventListener('popstate', () => {
-  if (!sheetHistoryEntry) return;
-  sheetHistoryEntry = false;
-  const sh = $('#sheet');
-  if (sh?.open) sh.close();
+  // Back closes the topmost transient UI first. If nothing is open, it stays in the match.
+  if (sheetHistoryEntry) {
+    sheetHistoryEntry = false;
+    const sh = $('#sheet');
+    if (sh?.open) sh.close();
+  } else {
+    const openDialogs = $('dialog[open]');
+    const topDialog = openDialogs[openDialogs.length - 1];
+    if (topDialog) topDialog.close();
+    else {
+      const mobileMenu = $('.mobile-actions[open]');
+      if (mobileMenu) mobileMenu.removeAttribute('open');
+    }
+  }
+  ensureAppHistoryGuard();
+  history.pushState({ santaliveAppGuard: true }, '', location.href);
 });
 function openSheet(type) {
   editingEventId = null;
