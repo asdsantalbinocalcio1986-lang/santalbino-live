@@ -1376,7 +1376,7 @@ const defaults = () => ({
   rosters: { home: '', away: '' },
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
-  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
+  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false, selectedCandidates: [] },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
@@ -3387,13 +3387,25 @@ function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
   if (!ft) return { state: 'none' };
   const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
-  return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
+  if (mv) return { state: 'done', end, mv };
+  if (!validMvpSelection()) return { state: 'setup', end, mv: null };
+  return { state: Date.now() < end ? 'open' : 'closed', end, mv: null };
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
-function candidates() {
+function availableMvpCandidates() {
   const out = [], published = publicContent();
-  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(published.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
+  ['home', 'away'].forEach(side => {
+    parseRoster(published.rosters[side]).forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name }));
+  });
   return out;
+}
+function candidates() {
+  const selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+  return availableMvpCandidates().filter(candidate => selected.has(candidate.key));
+}
+function validMvpSelection(list = candidates()) {
+  const sides = new Set(list.map(candidate => candidate.side));
+  return list.length === 4 && sides.has('home') && sides.has('away');
 }
 
 
@@ -3409,7 +3421,10 @@ function mvpPublicHtml() {
   })();
 
   if (vi.state === 'none') {
-    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre automaticamente al fischio finale e resta aperta 12 ore.</div>`;
+    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre al fischio finale, dopo la scelta dei quattro candidati da parte della regia, e resta aperta 12 ore.</div>`;
+  }
+  if (vi.state === 'setup') {
+    return `<div class="empty"><h3>Votazione in preparazione</h3>La regia sta completando la selezione dei quattro candidati. Torna qui tra poco.</div>`;
   }
 
   if (vi.state === 'open') {
@@ -3720,7 +3735,8 @@ function publicHtml() {
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
-  return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
+  const mvpPrompt = voteInfo().state === 'open' ? '<div class="mvp-box"><h3>Vota l’MVP di giornata</h3><p class="small muted">La votazione è aperta: scegli il migliore in campo tra i quattro candidati.</p><button class="btn primary block" data-tab="mvp">VOTA ORA</button></div>' : '';
+  return convocatiPanel + mvpPrompt + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
