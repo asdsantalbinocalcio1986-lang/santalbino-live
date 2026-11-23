@@ -1373,12 +1373,13 @@ const defaults = () => ({
   rev: 0,
   publication: { published: null, pending: null, publishedAt: '' },
   socialPublishing: { enabled: false, facebook: true, instagram: true, ready: false },
+  notifications: { enabled: true, types: { kickoff: true, halftime: true, fulltime: true, goal: true, yellow: false, red: false, sub: false, mvp: false } },
   match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SANTALive', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
-  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
+  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false, selectedCandidates: [] },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
@@ -1394,9 +1395,11 @@ function testDefaults() {
 let S = (() => {
   let raw = {}; try { raw = JSON.parse($('#app-state').textContent) || {}; } catch (e) {}
   const d = defaults();
-  return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), socialPublishing: Object.assign(d.socialPublishing, raw.socialPublishing || {}), events: raw.events || [] });
+  return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), socialPublishing: Object.assign(d.socialPublishing, raw.socialPublishing || {}), notifications: Object.assign(d.notifications, raw.notifications || {}), events: raw.events || [] });
 })();
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
+S.notifications = Object.assign({ enabled: true, types: { kickoff: true, halftime: true, fulltime: true, goal: true, yellow: false, red: false, sub: false, mvp: false } }, S.notifications || {});
+S.notifications.types = Object.assign({ kickoff: true, halftime: true, fulltime: true, goal: true, yellow: false, red: false, sub: false, mvp: false }, S.notifications.types || {});
 S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false }, S.socialPublishing || {});
 if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
 
@@ -2118,6 +2121,12 @@ async function initCaps() {
   if (!TEST_MODE) db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
   }).subscribe();
+  if (!TEST_MODE) db.channel('santalbino-approved-notifications').on('postgres_changes', {event:'INSERT',schema:'public',table:'santalbino_live_notifications'}, payload => {
+    const notice = payload.new;
+    if (notice?.match_id === mvpPollKey() && Date.now() - new Date(notice.created_at).getTime() < 300000) {
+      toast((notice.title || 'SANTALive') + ' · ' + (notice.body || 'Aggiornamento partita'));
+    }
+  }).subscribe();
   if (CAN_EDIT) await refreshMvpVotes();
   if (legacyLogoMigration && CAN_EDIT) commit(true);
 }
@@ -2145,7 +2154,7 @@ function migrateBundledLogos(state) {
 }
 function mergeState(raw) {
   const d = defaults();
-  const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
+  const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),notifications:Object.assign({},d.notifications,raw.notifications||{},{types:Object.assign({},d.notifications.types,raw.notifications?.types||{})}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
   if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
   return state;
 }
@@ -3661,14 +3670,79 @@ function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
   if (!ft) return { state: 'none' };
   const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
-  return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
+  if (mv) return { state: 'done', end, mv };
+  if (!validMvpSelection()) return { state: 'setup', end, mv: null };
+  return { state: Date.now() < end ? 'open' : 'closed', end, mv: null };
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
-function candidates() {
+function availableMvpCandidates() {
   const out = [], published = publicContent();
-  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(published.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
+  ['home', 'away'].forEach(side => {
+    parseRoster(published.rosters[side]).forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name }));
+  });
   return out;
 }
+function candidates() {
+  const selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+  return availableMvpCandidates().filter(candidate => selected.has(candidate.key));
+}
+function validMvpSelection(list = candidates()) {
+  const sides = new Set(list.map(candidate => candidate.side));
+  return list.length === 4 && sides.has('home') && sides.has('away');
+}
+const PUSH_DEFAULT_TYPES = ['kickoff','halftime','fulltime','goal'];
+function notificationConfig() {
+  const defaults = { enabled: true, types: { kickoff: true, halftime: true, fulltime: true, goal: true, yellow: false, red: false, sub: false, mvp: false } };
+  return { ...defaults, ...(S.notifications || {}), types: { ...defaults.types, ...(S.notifications?.types || {}) } };
+}
+function pushSubscriptionHtml() {
+  if (TEST_MODE || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return '';
+  return `<div class="card"><h2>Notifiche partita</h2><p class="small muted">Attiva le notifiche per ricevere gli aggiornamenti principali anche quando non hai SANTA Live aperto. L’iscrizione è volontaria e puoi disattivarla in qualsiasi momento.</p>
+    ${[['kickoff','Kick Off',true],['halftime','Half Time',true],['fulltime','Full Time',true],['goal','Goal',true],['yellow','Ammonizioni',false],['red','Espulsioni',false],['sub','Sostituzioni',false],['mvp','Votazione MVP',false]].map(([key,label,checked]) => `<label class="check"><input type="checkbox" data-user-push-type="${key}" ${checked ? 'checked' : ''}> ${label}</label>`).join('')}
+    <button class="btn block" data-a="togglePushSubscription">Attiva / disattiva notifiche</button></div>`;
+}
+function base64UrlToUint8Array(value) {
+  const padding = '='.repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64), output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+  return output;
+}
+async function togglePushSubscription() {
+  if (TEST_MODE || !db || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    toast('Le notifiche push non sono disponibili in questo browser o nella modalità di prova'); return;
+  }
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  const installed = navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+  if (isIos && !installed) { toast('Su iPhone/iPad aggiungi prima SANTA Live alla schermata Home'); return; }
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      const { error } = await db.functions.invoke('santalive-push', { body: { action: 'unsubscribe', subscription: existing.toJSON() } });
+      if (error) throw error;
+      await existing.unsubscribe();
+      toast('Notifiche disattivate su questo dispositivo');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') { toast('Permesso notifiche non concesso'); return; }
+    const keyResult = await db.functions.invoke('santalive-push', { body: { action: 'public-key' } });
+    if (keyResult.error) throw keyResult.error;
+    const publicKey = keyResult.data?.publicKey;
+    if (!publicKey) throw new Error('Servizio notifiche non ancora configurato');
+    const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToUint8Array(publicKey) });
+    const saved = await db.functions.invoke('santalive-push', {
+      body: { action: 'subscribe', subscription: subscription.toJSON(), matchId: mvpPollKey(), eventTypes: $('[data-user-push-type]:checked').map(input => input.dataset.userPushType) }
+    });
+    if (saved.error) { await subscription.unsubscribe(); throw saved.error; }
+    toast('Notifiche attivate: riceverai Kick Off, Half Time, Full Time e Goal');
+  } catch (error) {
+    console.error('Iscrizione notifiche SANTA Live:', error);
+    toast(error?.message || 'Attivazione notifiche non riuscita');
+  }
+}
+
 
 
 function mvpPublicHtml() {
@@ -3683,7 +3757,10 @@ function mvpPublicHtml() {
   })();
 
   if (vi.state === 'none') {
-    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre automaticamente al fischio finale e resta aperta 12 ore.</div>`;
+    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre al fischio finale, dopo la scelta dei quattro candidati da parte della regia, e resta aperta 12 ore.</div>`;
+  }
+  if (vi.state === 'setup') {
+    return `<div class="empty"><h3>Votazione in preparazione</h3>La regia sta completando la selezione dei quattro candidati. Torna qui tra poco.</div>`;
   }
 
   if (vi.state === 'open') {
@@ -3734,28 +3811,118 @@ async function openGraphic(id) {
 }
 let armedMvp = false;
 function mvpRegiaHtml() {
-  const vi = voteInfo(), C = candidates();
-  const st = { none: 'La votazione parte automaticamente al fischio finale e dura 12 ore.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
+  const vi = voteInfo(), C = candidates(), available = availableMvpCandidates();
+  const selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+  const st = {
+    none: 'Prepara quattro candidati: almeno uno per squadra. La votazione si aprirà al fischio finale e durerà 12 ore.',
+    setup: 'La partita è terminata: completa e salva la selezione dei quattro candidati per aprire la votazione.',
+    open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`,
+    closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.',
+    done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.`
+  }[vi.state];
   const tally = k => (mvpVoteCounts[k] || S.mvp.votes[k] || 0);
   const sorted = [...C].sort((a, b) => tally(b.key) - tally(a.key));
+  const sideCounts = { home: C.filter(c => c.side === 'home').length, away: C.filter(c => c.side === 'away').length };
   return `<div class="card"><h2>Votazione MVP</h2><p style="margin-top:0">${st}</p>
-    <label class="check"><input type="checkbox" id="m-our" ${S.mvp.ourOnly ? 'checked' : ''}> Candidati: solo i giocatori della nostra squadra</label>
-    <button class="btn primary block" data-a="savemvp">Salva impostazioni</button>
+    <p class="small muted">Seleziona esattamente quattro giocatori tra le formazioni pubblicate. Deve esserci almeno un candidato per squadra; gli altri due posti sono liberi. Puoi modificare la selezione prima dell’apertura del voto.</p>
+    <div class="row2"><div><b>${selected.size}/4</b><div class="small muted">${esc(teamName('home'))}: ${sideCounts.home} · ${esc(teamName('away'))}: ${sideCounts.away}</div></div></div>
+    <div class="cands" style="margin-top:10px">${available.map(c => `<label class="cand"><input type="checkbox" data-mvp-candidate="${esc(c.key)}" ${selected.has(c.key) ? 'checked' : ''} ${selected.size >= 4 && !selected.has(c.key) ? 'disabled' : ''}><span style="flex:1"><b>${esc(c.num || '–')}</b> ${esc(c.name)} <span class="small muted">· ${esc(teamName(c.side))}</span></span></label>`).join('') || '<p class="muted">Pubblica prima le formazioni di entrambe le squadre.</p>'}</div>
+    <button class="btn primary block" data-a="savemvp" ${validMvpSelection(C) ? '' : 'disabled'}>Salva i quattro candidati</button>
     <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
-    <p class="small muted">Il pubblico vota direttamente dalla scheda MVP della pagina live. Un voto per dispositivo e partita.</p></div>
-  <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow\"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
+    ${vi.state === 'open' && notificationConfig().enabled && notificationConfig().types.mvp ? '<button class="btn primary block" data-a="sendMvpInvite">Invia notifica apertura votazione MVP</button>' : ''}
+    ${vi.state === 'open' ? '<button class="btn block" data-a="openMvpInviteGraphic">Crea grafica invito alla votazione</button>' : ''}
+    <p class="small muted">Il pubblico vota dalla pagina live. Un voto per dispositivo e partita.</p></div>
+  <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Seleziona i quattro candidati per visualizzare i voti.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
     ${S.mvp.tpl ? `<img class="thumb" style="max-height:120px" src="${S.mvp.tpl}" alt="Sfondo MVP">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${S.mvp.tpl ? 'Cambia immagine' : 'Carica immagine'}<input type="file" accept="image/*" data-mvptpl hidden></label>${S.mvp.tpl ? '<button class="btn sm danger" data-a="rmmvptpl">Togli</button>' : ''}</div>
     ${S.mvp.tpl ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-mvpraw ${S.mvp.raw ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>
   <div class="card"><h2>Proclama</h2>${C.length ? `<label class="f"><span>Migliore in campo</span><select id="m-win">${sorted.map(c => `<option value="${esc(c.key)}">${esc(c.num)} ${esc(c.name)} (${esc(teamName(c.side))}) · ${tally(c.key)} voti</option>`).join('')}</select></label>
-    <button class="btn primary block" data-a="proclaim" ${vi.state === 'none' || vi.state === 'open' ? 'disabled' : ''}>${vi.state === 'done' ? 'Cambia MVP e rifai l’immagine' : 'Proclama MVP e crea l’immagine'}</button>` : '<p class="muted" style="margin:0">Servono le formazioni.</p>'}</div>`;
+    <button class="btn primary block" data-a="proclaim" ${vi.state === 'none' || vi.state === 'setup' || vi.state === 'open' ? 'disabled' : ''}>${vi.state === 'done' ? 'Cambia MVP e rifai l’immagine' : 'Proclama MVP e crea l’immagine'}</button>` : '<p class="muted" style="margin:0">Seleziona i quattro candidati.</p>'}</div>`;
 }
 function proclaim() {
   const key = $('#m-win').value, side = key.split('|')[0], name = key.split('|').slice(1).join('|'), n = mvpVoteCounts[key] || S.mvp.votes[key] || 0;
   S.events = S.events.filter(e => e.type !== 'mvp');
   addEvent({ type: 'mvp', team: side, min: '', player: name, votes: n }, { post: true });
 }
+let mvpInviteBlob = null;
+async function openMvpInviteGraphic() {
+  if (!validMvpSelection()) { toast('Seleziona prima i quattro candidati MVP'); return; }
+  const dlg = $('#graphicDlg'), list = candidates();
+  const W = 1080, H = 1350, canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const x = canvas.getContext('2d');
+  const bg = x.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#163d29'); bg.addColorStop(.55,'#0b2116'); bg.addColorStop(1,'#060f0a');
+  x.fillStyle = bg; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(227,198,109,.45)'; x.lineWidth=3; x.strokeRect(34,34,W-68,H-68);
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillStyle='#e3c66d'; x.font='800 31px Arial,sans-serif'; x.fillText("ASD SANT’ALBINO TERME",W/2,125);
+  x.fillStyle='#fff'; x.font='900 96px Arial,sans-serif'; x.fillText("VOTA L’MVP",W/2,270);
+  x.fillStyle='#dce8dd'; x.font='700 32px Arial,sans-serif'; x.fillText('MIGLIORE IN CAMPO · SCEGLI IL TUO PREFERITO',W/2,345);
+  const rowY=[485,660,835,1010];
+  list.forEach((c,i)=>{
+    const y=rowY[i]; x.fillStyle='rgba(255,255,255,.08)'; rrect(x,95,y-62,890,124,20); x.fill();
+    x.strokeStyle=c.side==='home'?'#b8e7c8':'#e3c66d'; x.lineWidth=3; x.stroke();
+    x.fillStyle=c.side==='home'?'#b8e7c8':'#e3c66d'; x.beginPath(); x.arc(165,y,36,0,Math.PI*2); x.fill();
+    x.fillStyle='#102819'; x.font='900 27px Arial,sans-serif'; x.fillText(c.num||'•',165,y+1);
+    x.textAlign='left'; x.fillStyle='#fff'; x.font='800 42px Arial,sans-serif'; x.fillText(c.name,225,y+2,700); x.textAlign='center';
+    x.fillStyle='#aab9ac'; x.font='600 21px Arial,sans-serif'; x.fillText(teamName(c.side),W/2,y+48);
+  });
+  x.fillStyle='#e3c66d'; x.font='900 43px Arial,sans-serif'; x.fillText('VOTA ORA SU SANTA LIVE',W/2,1165);
+  x.fillStyle='#e7eee8'; x.font='600 20px Arial,sans-serif'; x.fillText('Apri il link nel testo del post per esprimere il tuo voto',W/2,1220);
+  x.fillStyle='rgba(255,255,255,.65)'; x.font='600 18px Arial,sans-serif'; x.fillText('SANTALive · ASD Sant’Albino Terme',W/2,1280);
+  mvpInviteBlob = await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.94));
+  if (!mvpInviteBlob) { toast('Creazione grafica non riuscita'); return; }
+  const url=canvas.toDataURL('image/jpeg',.94);
+  dlg.innerHTML='<div class="sheethead"><h2>Invito votazione MVP</h2><button class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica invito alla votazione MVP"><p class="small muted">Il link diretto alla votazione verrà incluso nel testo quando condividi la grafica.</p><div class="row2 stack"><button class="btn" data-a="saveMvpInviteGraphic">Salva immagine</button><button class="btn primary" data-a="shareMvpInviteGraphic">Condividi invito</button></div>';
+  if (!dlg.open) dlg.showModal();
+}
+async function shareMvpInviteGraphic() {
+  if (!mvpInviteBlob) return;
+  const url='https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(mvpPollKey());
+  const text='Vota l’MVP di giornata su SANTALive! Scegli il migliore in campo tra i quattro candidati. '+url;
+  const file=new File([mvpInviteBlob],'vota-mvp-santalbino.jpg',{type:'image/jpeg'});
+  try {
+    if (navigator.share && navigator.canShare?.({files:[file]})) await navigator.share({files:[file],title:'Vota l’MVP · SANTALive',text,url});
+    else { await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); await copyText(text); toast('Immagine salvata e link copiato: allega la grafica al post'); }
+  } catch(error) { if(error?.name!=='AbortError') { await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); toast('Immagine salvata: condividila insieme al link della votazione'); } }
+}
+async function sendMvpInvite() {
+  if (TEST_MODE || !CAN_EDIT || !db || !dbReady || syncState !== 'ok') { toast('Attendi la sincronizzazione della regia prima di inviare una notifica'); return; }
+  const cfg = notificationConfig(), vi = voteInfo();
+  if (vi.state !== 'open' || !cfg.enabled || cfg.types.mvp !== true || !validMvpSelection()) { toast('La votazione MVP non è pronta o le notifiche MVP sono disattivate'); return; }
+  const url = 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(mvpPollKey());
+  const title = 'SANTALive · Vota l’MVP di giornata';
+  const body = 'Scegli il migliore in campo tra i quattro candidati della partita.';
+  try {
+    const { data, error } = await db.functions.invoke('santalive-push', { body: { action: 'send', approved: true, eventId: String(mvpPollKey()) + ':mvp', eventType: 'mvp', title, body, url } });
+    if (error) throw error;
+    toast(data?.status === 'sent' ? 'Invito MVP inviato a ' + Number(data.sent || 0) + ' dispositivi' : (data?.message || 'Esito invio: ' + (data?.status || 'non disponibile')));
+  } catch (error) {
+    console.error('Invio invito MVP:', error);
+    toast(error?.message || 'Invio invito MVP non riuscito');
+  }
+}
+async function sendPushForEvent(eventId) {
+  if (TEST_MODE || !CAN_EDIT || !db || !dbReady || syncState !== 'ok') { toast('Attendi la sincronizzazione della regia prima di inviare una notifica'); return; }
+  const ev = S.events.find(item => item.id === eventId), cfg = notificationConfig();
+  if (!ev || !cfg.enabled || cfg.types[ev.type] !== true) { toast('Notifica non autorizzata: controlla le preferenze della regia'); return; }
+  const index = S.events.indexOf(ev), score = scoreAt(index);
+  const labels = { kickoff: 'Kick Off', halftime: 'Half Time', fulltime: 'Full Time', goal: 'Goal', yellow: 'Ammonizione', red: 'Espulsione', sub: 'Sostituzione', mvp: 'Votazione MVP' };
+  const title = 'SANTALive · ' + (labels[ev.type] || 'Aggiornamento partita');
+  const body = teamName('home') + ' ' + score[0] + '–' + score[1] + ' ' + teamName('away') + (ev.player ? ' · ' + ev.player : '');
+  const url = 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(mvpPollKey());
+  try {
+    const { data, error } = await db.functions.invoke('santalive-push', { body: { action: 'send', approved: true, eventId: String(ev.id), eventType: ev.type, title, body, url } });
+    if (error) throw error;
+    toast(data?.status === 'sent' ? 'Notifica inviata a ' + Number(data.sent || 0) + ' dispositivi' : (data?.message || 'Esito invio: ' + (data?.status || 'non disponibile')));
+  } catch (error) {
+    console.error('Invio notifica SANTA Live:', error);
+    toast(error?.message || 'Invio notifiche non riuscito: verifica la configurazione push');
+  }
+}
+
 
 /* ================= resoconto automatico di fine partita ================= */
 function buildMatchReport() {
@@ -4103,7 +4270,8 @@ function publicHtml() {
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
-  return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
+  const mvpPrompt = voteInfo().state === 'open' ? '<div class="mvp-box"><h3>Vota l’MVP di giornata</h3><p class="small muted">La votazione è aperta: scegli il migliore in campo tra i quattro candidati.</p><button class="btn primary block" data-tab="mvp">VOTA ORA</button></div>' : '';
+  return pushSubscriptionHtml() + mvpPrompt + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
@@ -4113,11 +4281,12 @@ function feedHtml(list) {
   if (!list.length) return '<div class="empty">Nessun evento. Premi “Fischio d’inizio” o aggiungi un evento.</div>';
   return list.map(e => {
     const so = socialOf(e.id), editing = editId === e.id, txt = evText(e);
+    const notify = notificationConfig().enabled && notificationConfig().types[e.type] === true;
     return `<div class="ev" data-id="${e.id}"><div class="m">${esc(e.min || '–')}${e.min ? '′' : ''}</div><div>
       ${editing ? `<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
       <div class="meta"><span class="chip ${so.status}">${so.status === 'pubblicato' ? 'Su Facebook' : 'Da pubblicare'}</span>
       ${editing ? `<button class="btn sm primary" data-a="saveedit">Salva testo</button><button class="btn sm" data-a="canceledit">Annulla</button>`
-        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
+        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button>${notify ? `<button class="btn sm" data-a="sendPushForEvent" data-id="${esc(e.id)}">Invia notifica</button>` : ''}<button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
   }).join('');
 }
 let editId = null, armedDel = null, editingEventId = null;
@@ -4339,7 +4508,7 @@ async function loadAnalytics() {
 }
 function settingsHtml() {
   const I = (id, label, v, ph = '', type = 'text') => `<label class="f"><span>${label}</span><input type="${type}" id="${id}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
-  const m = S.match, sp = socialPublishingConfig();
+  const m = S.match, sp = socialPublishingConfig(), nt = notificationConfig();
   return `<div class="card"><h2>Partita</h2>${I('s-home', 'Squadra di casa', m.home)}${I('s-away', 'Squadra ospite', m.away, 'Nome della squadra avversaria')}
     <label class="f"><span>La nostra squadra</span><select id="s-our"><option value="home" ${m.ourSide === 'home' ? 'selected' : ''}>Gioca in casa</option><option value="away" ${m.ourSide === 'away' ? 'selected' : ''}>Gioca in trasferta</option></select></label>
     ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-time', 'Ora', m.time || '', '', 'time')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
@@ -4364,6 +4533,13 @@ function settingsHtml() {
     <div class="row2 stack"><button class="btn" data-a="saveSocialPublishing">Salva impostazioni</button><button class="btn primary" data-a="verifySocialPublishing">Verifica collegamento Meta</button></div>
     <div class="row2 stack" style="margin-top:8px"><button class="btn" data-a="refreshSocialLog">Aggiorna registro pubblicazioni</button></div>
     <div id="socialPublishLog" class="small muted" style="margin-top:8px">Il registro mostra gli ultimi invii e gli eventuali errori.</div>
+  </div>
+
+  <div class="card"><h2>Notifiche della partita</h2>
+    <p class="small muted">Le tipologie attive sono notificabili dalla regia, ma nessun invio parte automaticamente quando registri un evento. Per ogni evento autorizzato trovi il comando “Invia notifica” nella cronaca.</p>
+    <label class="check"><input type="checkbox" id="s-push-enabled" ${nt.enabled ? 'checked' : ''}> Abilita invio manuale delle notifiche</label>
+    <div class="cands">${[['kickoff','Kick Off'],['halftime','Half Time'],['fulltime','Full Time'],['goal','Goal'],['yellow','Ammonizione'],['red','Espulsione'],['sub','Sostituzione'],['mvp','Apertura votazione MVP']].map(([key,label]) => `<label class="check"><input type="checkbox" data-push-type="${key}" ${nt.types[key] ? 'checked' : ''}> ${label}</label>`).join('')}</div>
+    <button class="btn primary block" data-a="saveNotificationSettings">Salva preferenze notifiche</button>
   </div>
 
   <div class="card"><h2>Dati e backup</h2><div class="row2 stack"><button class="btn" data-a="exportbackup">Esporta copia dati</button><label class="btn" style="cursor:pointer">Carica copia dati<input type="file" id="impJson" accept="application/json" hidden></label></div>
@@ -4668,7 +4844,13 @@ document.addEventListener('click', async e => {
     case 'libraryImportGoal': { const url = L.evImg.goal || ''; if (!url) { toast('Non è presente un modello GOAL nelle Impostazioni'); break; } S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}, {goal:url}); commit(true); renderMain(); toast('Modello GOAL aggiunto alla libreria'); break; }
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
-    case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
+    case 'savemvp': {
+      const chosen = candidates(), sides = new Set(chosen.map(c => c.side));
+      if (chosen.length !== 4 || !sides.has('home') || !sides.has('away')) { toast('Seleziona esattamente quattro candidati, almeno uno per squadra'); break; }
+      S.mvp.selectedCandidates = chosen.map(c => c.key);
+      S.mvp.ourOnly = false;
+      commit(true); renderMain(); toast('Quattro candidati MVP salvati'); break;
+    }
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
     case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
@@ -4686,6 +4868,18 @@ document.addEventListener('click', async e => {
       commit(true); renderMain(); toast(enabled ? 'Pubblicazione automatica attivata per gli eventi selezionati' : 'Pubblicazione automatica sospesa');
       break;
     }
+    case 'saveNotificationSettings': {
+      const types = {};
+      $('[data-push-type]').forEach(input => { types[input.dataset.pushType] = !!input.checked; });
+      S.notifications = Object.assign(notificationConfig(), { enabled: !!$('#s-push-enabled')?.checked, types });
+      commit(true); renderMain(); toast('Preferenze notifiche salvate: l’invio resta sempre manuale dalla regia'); break;
+    }
+    case 'togglePushSubscription': await togglePushSubscription(); break;
+    case 'sendPushForEvent': await sendPushForEvent(a.dataset.id || ''); break;
+    case 'sendMvpInvite': await sendMvpInvite(); break;
+    case 'openMvpInviteGraphic': await openMvpInviteGraphic(); break;
+    case 'saveMvpInviteGraphic': if (mvpInviteBlob) await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); break;
+    case 'shareMvpInviteGraphic': await shareMvpInviteGraphic(); break;
     case 'verifySocialPublishing': await verifySocialPublishing(); break;
     case 'refreshSocialLog': await loadSocialPublicationLog(); break;
     case 'retrySocialPublication': await retrySocialPublication(a.dataset.id || ''); break;
@@ -4771,6 +4965,16 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
+  if (t.matches('[data-mvp-candidate]')) {
+    const key = t.dataset.mvpCandidate, selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+    if (t.checked) {
+      if (selected.size >= 4) { t.checked = false; toast('Puoi selezionare al massimo quattro candidati'); return; }
+      selected.add(key);
+    } else selected.delete(key);
+    S.mvp.selectedCandidates = [...selected];
+    renderMain();
+    return;
+  }
   if (t.matches('[data-attack-direction]')) { if (S.clock.phase !== 'pre') return; S.match.attackDirectionFirst = ['left','right'].includes(t.value) ? t.value : ''; commit(true); renderMain(); return; }
   if(t.matches('[data-editor-scope]')){L.editorTemplate=t.value;saveL();renderMain();return;}
   if(t.matches('[data-event-template]')){L.editorEventTemplate=t.value;renderMain();return;}

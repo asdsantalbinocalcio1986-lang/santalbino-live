@@ -14,6 +14,8 @@ const sw = fs.readFileSync('sw.js', 'utf8');
 const workflow = fs.readFileSync('.github/workflows/pages.yml', 'utf8');
 const socialFunction = fs.readFileSync('supabase/functions/santalive-social-publish/index.ts', 'utf8');
 const socialMigration = fs.readFileSync('supabase/migrations/20261123160000_santalbino_social_publications.sql', 'utf8');
+const pushMigration = fs.readFileSync('supabase/migrations/20261123171000_santalbino_push_notifications.sql', 'utf8');
+const pushFunction = fs.readFileSync('supabase/functions/santalive-push/index.ts', 'utf8');
 
 for (const file of ['home.html', 'preview.html']) {
   const page = fs.readFileSync(file, 'utf8');
@@ -78,6 +80,11 @@ JSON.parse(stateMatch[1]);
 
 assert.match(html, /rpc\(['"]cast_santalbino_mvp_vote['"]/);
 assert.match(html, /rpc\(['"]get_santalbino_mvp_vote_counts['"]/);
+assert.match(html, /function availableMvpCandidates\(\)/, 'La pagina pubblica deve usare i candidati selezionati dalla regia');
+assert.match(regia, /Seleziona esattamente quattro giocatori/, 'La regia deve limitare la votazione a quattro candidati');
+assert.match(regia, /data-mvp-candidate/, 'La regia deve consentire la selezione dei candidati MVP');
+assert.match(sql, /Candidato non selezionato dalla regia/, 'Il backend deve rifiutare candidati non selezionati dalla regia');
+
 assert.match(html, /async function refreshMvpVotes\(\)\s*\{\s*if \(TEST_MODE \|\| !db \|\| !CAN_EDIT\) return;/, 'I conteggi MVP non devono essere richiesti da visitatori anonimi o dalla simulazione');
 assert.match(html, /const STATE_TABLE = TEST_MODE \? ['"]live_test_state['"] : ['"]live_state['"]/);
 assert.ok(html.includes("const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : ''"), 'La pagina pubblica deve mostrare soltanto i convocati pubblicati');
@@ -172,6 +179,12 @@ assert.match(socialFunction, /santalbino-media\/social\//, 'La Edge Function dev
 assert.match(socialMigration, /alter table public\.santalbino_social_publications enable row level security/i, 'Il registro social deve avere RLS attivo');
 assert.match(socialMigration, /public\.is_santalbino_admin\(\)/i, 'Il registro social deve essere leggibile soltanto dall’amministratore');
 assert.match(socialMigration, /unique/i, 'Il registro social deve impedire duplicati per ID evento');
+assert.match(pushMigration, /santalbino_push_subscriptions/i, 'Tabella sottoscrizioni push mancante');
+assert.match(pushMigration, /santalbino_live_notifications/i, 'Tabella notifiche in-app mancante');
+assert.match(pushMigration, /enable row level security/i, 'Le tabelle push devono avere RLS attivo');
+assert.match(pushFunction, /approved !== true/, 'L’invio push deve richiedere approvazione esplicita');
+assert.match(pushFunction, /is_santalbino_admin|santalbino_admins/, 'L’invio push deve essere riservato alla regia');
+assert.match(pushFunction, /santalbino_live_notifications/, 'La notifica approvata deve raggiungere anche la pagina live aperta');
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PAGE_ACCESS_TOKEN/, 'La guida deve descrivere i segreti Meta richiesti');
 
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');

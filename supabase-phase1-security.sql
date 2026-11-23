@@ -128,6 +128,26 @@ begin
   if v_side not in ('home','away') or v_candidate_name='' then
     raise exception using errcode='22023', message='Candidato non valido';
   end if;
+  if jsonb_array_length(coalesce(v_state #> '{mvp,selectedCandidates}', '[]'::jsonb)) <> 4
+     or not exists (
+       select 1 from jsonb_array_elements_text(coalesce(v_state #> '{mvp,selectedCandidates}', '[]'::jsonb)) as selected(candidate_key)
+       where selected.candidate_key like 'home|%'
+     )
+     or not exists (
+       select 1 from jsonb_array_elements_text(coalesce(v_state #> '{mvp,selectedCandidates}', '[]'::jsonb)) as selected(candidate_key)
+       where selected.candidate_key like 'away|%'
+     ) then
+    raise exception using errcode='P0001', message='La regia deve selezionare quattro candidati, almeno uno per squadra';
+  end if;
+
+  if not exists (
+    select 1
+    from jsonb_array_elements_text(coalesce(v_state #> '{mvp,selectedCandidates}', '[]'::jsonb)) as selected(candidate_key)
+    where selected.candidate_key = p_candidate_key
+  ) then
+    raise exception using errcode='22023', message='Candidato non selezionato dalla regia';
+  end if;
+
   if coalesce((v_state #>> '{mvp,ourOnly}')::boolean,false)
      and v_side <> coalesce(v_state #>> '{match,ourSide}','home') then
     raise exception using errcode='22023', message='Candidato non ammesso';
