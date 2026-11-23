@@ -107,12 +107,19 @@ Deno.serve(async (req: Request) => {
       return reply(200, { ok: true, preferencesUpdated: true });
     }
 
-    if (action === "set-settings" || action === "approve-and-send") {
+    if (action === "get-settings" || action === "set-settings" || action === "approve-and-send") {
       if (!userClient || !token) return reply(401, { error: "Accesso regia richiesto" });
       const { data: userData, error: userError } = await userClient.auth.getUser(token);
       if (userError || !userData.user) return reply(401, { error: "Sessione non valida" });
       const { data: isAdmin, error: adminError } = await userClient.rpc("is_santalbino_admin");
       if (adminError || isAdmin !== true) return reply(403, { error: "Amministratore non autorizzato" });
+
+      if (action === "get-settings") {
+        const { data: settings, error } = await adminClient.from("santalbino_notification_settings")
+          .select("enabled_categories").eq("match_key", matchKey).maybeSingle();
+        if (error) throw error;
+        return reply(200, { ok: true, enabledCategories: settings?.enabled_categories ?? DEFAULT_CATEGORIES });
+      }
 
       if (action === "set-settings") {
         if (!validCategories(input?.enabledCategories)) {
