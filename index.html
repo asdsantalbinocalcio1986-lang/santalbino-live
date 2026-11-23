@@ -3732,13 +3732,86 @@ function convocatiPublicHtml() {
     <p class="small muted" style="padding:8px 14px;margin:0">Forza Sant’Albino! 💚💛</p>
   </section>`;
 }
+function notificationStorageKey() { return 'santalive-push-token:' + mvpPollKey(); }
+function notificationBase64Key(value) {
+  const padding = '='.repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+}
+async function callNotificationService(action, payload = {}) {
+  const endpoint = (cfg.supabaseUrl || '').replace(/\/$/, '') + '/functions/v1/santalive-notifications';
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey },
+    body: JSON.stringify(Object.assign({ action, matchKey: mvpPollKey() }, payload)),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Servizio notifiche non disponibile');
+  return result;
+}
+function notificationPanelHtml() {
+  if (TEST_MODE || !cfg.vapidPublicKey || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return '';
+  let active = false;
+  try { active = !!localStorage.getItem(notificationStorageKey()); } catch (_) {}
+  return '<section class="card" aria-label="Notifiche partita"><h3>Notifiche della partita</h3>' +
+    '<p class="small muted">Ricevi aggiornamenti anche quando non stai guardando SANTA Live. Puoi disattivarli in qualsiasi momento.</p>' +
+    (active
+      ? '<p class="small" style="color:var(--c-goal);font-weight:700">Notifiche attive su questo dispositivo.</p><button class="btn block" data-notification-action="disable">Disattiva notifiche</button>'
+      : '<button class="btn primary block" data-notification-action="enable">Attiva notifiche della partita</button>') +
+    '</section>';
+}
+function createSubscriptionToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+async function enableMatchNotifications() {
+  if (!cfg.vapidPublicKey) { toast('Le notifiche non sono ancora configurate.'); return; }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    toast('Questo browser non supporta le notifiche Push.'); return;
+  }
+  if (Notification.permission === 'denied') {
+    toast('Notifiche bloccate dal browser: abilita il permesso nelle impostazioni del sito.'); return;
+  }
+  const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (permission !== 'granted') { toast('Permesso notifiche non concesso.'); return; }
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: notificationBase64Key(cfg.vapidPublicKey),
+  });
+  let token = '';
+  try { token = localStorage.getItem(notificationStorageKey()) || ''; } catch (_) {}
+  if (token.length < 32) token = createSubscriptionToken();
+  await callNotificationService('subscribe', {
+    subscription: subscription.toJSON(),
+    subscriptionToken: token,
+    categories: ['kickoff', 'halftime', 'fulltime', 'goal'],
+  });
+  try { localStorage.setItem(notificationStorageKey(), token); } catch (_) {}
+  renderMain();
+  toast('Notifiche attivate per questa partita.');
+}
+async function disableMatchNotifications() {
+  let token = '';
+  try { token = localStorage.getItem(notificationStorageKey()) || ''; } catch (_) {}
+  if (token) await callNotificationService('unsubscribe', { subscriptionToken: token });
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (subscription) await subscription.unsubscribe();
+  try { localStorage.removeItem(notificationStorageKey()); } catch (_) {}
+  renderMain();
+  toast('Notifiche disattivate su questo dispositivo.');
+}
+
 function publicHtml() {
   const tabs = [['cron', 'Cronaca'], ['form', 'Formazioni']];
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
-  return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
+  return convocatiPanel + notificationPanelHtml() + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
@@ -4098,6 +4171,19 @@ function tickClock() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
+  const notificationBtn = t.closest('[data-notification-action]');
+  if (notificationBtn) {
+    notificationBtn.disabled = true;
+    try {
+      if (notificationBtn.dataset.notificationAction === 'enable') await enableMatchNotifications();
+      else await disableMatchNotifications();
+    } catch (error) {
+      console.warn('Gestione notifiche SANTA Live:', error);
+      toast(error.message || 'Operazione notifiche non riuscita.');
+      notificationBtn.disabled = false;
+    }
+    return;
+  }
   const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (['archive','season','scorers','archiveForms'].includes(L.tab)) void loadMatchArchive(true); return; }
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
