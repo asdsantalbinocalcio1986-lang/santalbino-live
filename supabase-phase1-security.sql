@@ -128,6 +128,14 @@ begin
   if v_side not in ('home','away') or v_candidate_name='' then
     raise exception using errcode='22023', message='Candidato non valido';
   end if;
+  if not exists (
+    select 1
+    from jsonb_array_elements_text(coalesce(v_state #> '{mvp,selectedCandidates}', '[]'::jsonb)) as selected(candidate_key)
+    where selected.candidate_key = p_candidate_key
+  ) then
+    raise exception using errcode='22023', message='Candidato non selezionato dalla regia';
+  end if;
+
   if coalesce((v_state #>> '{mvp,ourOnly}')::boolean,false)
      and v_side <> coalesce(v_state #>> '{match,ourSide}','home') then
     raise exception using errcode='22023', message='Candidato non ammesso';
