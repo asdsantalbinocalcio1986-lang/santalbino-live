@@ -6,6 +6,7 @@ const CATEGORIES = new Set([
   "yellow_card", "red_card", "substitution", "injury", "mvp",
 ]);
 const DEFAULT_CATEGORIES = ["kickoff", "halftime", "fulltime", "goal"];
+const ALL_CATEGORIES = [...CATEGORIES];
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -68,7 +69,7 @@ Deno.serve(async (req: Request) => {
     if (action === "subscribe") {
       const subscription = input?.subscription;
       const subscriptionToken = cleanText(input?.subscriptionToken, 160);
-      const categories = input?.categories ?? DEFAULT_CATEGORIES;
+      const categories = input?.categories ?? ALL_CATEGORIES;
       const endpoint = cleanText(subscription?.endpoint, 2000);
       const p256dh = cleanText(subscription?.keys?.p256dh, 256);
       const authKey = cleanText(subscription?.keys?.auth, 256);
