@@ -3862,7 +3862,7 @@ async function openMvpInviteGraphic() {
   x.fillStyle='#dce8dd'; x.font='700 32px Arial,sans-serif'; x.fillText('MIGLIORE IN CAMPO · SCEGLI IL TUO PREFERITO',W/2,345);
   const rowY=[485,660,835,1010];
   list.forEach((c,i)=>{
-    const y=rowY[i]; x.fillStyle='rgba(255,255,255,.08)'; x.beginPath(); x.roundRect(95,y-62,890,124,20); x.fill();
+    const y=rowY[i]; x.fillStyle='rgba(255,255,255,.08)'; rrect(x,95,y-62,890,124,20); x.fill();
     x.strokeStyle=c.side==='home'?'#b8e7c8':'#e3c66d'; x.lineWidth=3; x.stroke();
     x.fillStyle=c.side==='home'?'#b8e7c8':'#e3c66d'; x.beginPath(); x.arc(165,y,36,0,Math.PI*2); x.fill();
     x.fillStyle='#102819'; x.font='900 27px Arial,sans-serif'; x.fillText(c.num||'•',165,y+1);
