@@ -1372,7 +1372,7 @@ const SCRIPT_END = '<' + '/script>';
 const defaults = () => ({
   rev: 0,
   publication: { published: null, pending: null, publishedAt: '' },
-  socialPublishing: { enabled: false, facebook: true, instagram: true, ready: false },
+  socialPublishing: { enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false },
   match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SANTALive', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
@@ -1397,7 +1397,7 @@ let S = (() => {
   return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), socialPublishing: Object.assign(d.socialPublishing, raw.socialPublishing || {}), events: raw.events || [] });
 })();
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
-S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false }, S.socialPublishing || {});
+S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
 if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
 
 /* ================= stato locale (solo questo dispositivo) ================= */
@@ -2346,11 +2346,11 @@ function addEvent(ev, opts = {}) {
 }
 
 function socialPublishingConfig() {
-  return Object.assign({ enabled: false, facebook: true, instagram: true, ready: false }, S.socialPublishing || {});
+  return Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
 }
 async function autoPublishSocialEvent(ev) {
   const cfg = socialPublishingConfig();
-  if (TEST_MODE || !CAN_EDIT || !dbReady || !db || !cfg.enabled || !cfg.ready) return;
+  if (TEST_MODE || !CAN_EDIT || !dbReady || !db || !cfg.enabled || !cfg.ready || !cfg.publishingEnabled) return;
   if (!SOCIAL_AUTO_EVENT_TYPES.includes(ev?.type) || (!cfg.facebook && !cfg.instagram)) return;
   try {
     const blob = await cardBlob(ev);
@@ -2388,13 +2388,20 @@ async function verifySocialPublishing() {
   try {
     const { data, error } = await db.functions.invoke('santalive-social-publish', { body: { action: 'status' } });
     if (error) throw error;
-    S.socialPublishing = Object.assign(socialPublishingConfig(), { ready: !!data?.ready });
+    const current = socialPublishingConfig();
+    const ready = !!data?.ready;
+    const publishingEnabled = !!data?.publishingEnabled;
+    S.socialPublishing = Object.assign(current, {
+      ready,
+      publishingEnabled,
+      enabled: ready && publishingEnabled ? current.enabled : false
+    });
     commit(true);
     renderMain();
     if (data?.ready) toast('Collegamento Meta verificato: Facebook e Instagram pronti');
     else toast('Collegamento Meta non pronto: ' + (data?.missing?.length ? data.missing.join(', ') : (data?.message || 'configurazione da completare')));
   } catch (err) {
-    S.socialPublishing = Object.assign(socialPublishingConfig(), { ready: false });
+    S.socialPublishing = Object.assign(socialPublishingConfig(), { ready: false, publishingEnabled: false, enabled: false });
     commit(true);
     renderMain();
     console.error('Verifica collegamento Meta:', err);
@@ -4360,7 +4367,7 @@ function settingsHtml() {
     <label class="check"><input type="checkbox" id="s-social-enabled" ${sp.enabled ? "checked" : ""}> Attiva pubblicazione automatica</label>
     <label class="check"><input type="checkbox" id="s-social-facebook" ${sp.facebook ? "checked" : ""}> Facebook</label>
     <label class="check"><input type="checkbox" id="s-social-instagram" ${sp.instagram ? "checked" : ""}> Instagram</label>
-    <p class="small muted">Collegamento Meta: <b>${sp.ready ? "verificato" : "da verificare"}</b>. Le credenziali restano nei segreti Supabase e non vengono inserite nell'app o nel repository.</p>
+    <p class="small muted">Collegamento Meta: <b>${sp.ready ? "verificato" : "da verificare"}</b>. Pubblicazione lato server: <b>${sp.publishingEnabled ? "sbloccata" : "bloccata fino a test completati e autorizzazione"}</b>. Le credenziali restano nei segreti Supabase e non vengono inserite nell'app o nel repository.</p>
     <div class="row2 stack"><button class="btn" data-a="saveSocialPublishing">Salva impostazioni</button><button class="btn primary" data-a="verifySocialPublishing">Verifica collegamento Meta</button></div>
     <div class="row2 stack" style="margin-top:8px"><button class="btn" data-a="refreshSocialLog">Aggiorna registro pubblicazioni</button></div>
     <div id="socialPublishLog" class="small muted" style="margin-top:8px">Il registro mostra gli ultimi invii e gli eventuali errori.</div>
@@ -4682,7 +4689,10 @@ document.addEventListener('click', async e => {
       const facebook = !!$('#s-social-facebook')?.checked;
       const instagram = !!$('#s-social-instagram')?.checked;
       if (enabled && !facebook && !instagram) { toast('Seleziona almeno una piattaforma'); break; }
-      S.socialPublishing = Object.assign(socialPublishingConfig(), { enabled, facebook, instagram });
+      const cfg = socialPublishingConfig();
+      if (enabled && !cfg.ready) { toast('Prima verifica il collegamento Meta'); break; }
+      if (enabled && !cfg.publishingEnabled) { toast('Attivazione bloccata: test tecnici non completati o autorizzazione non concessa'); break; }
+      S.socialPublishing = Object.assign(cfg, { enabled, facebook, instagram });
       commit(true); renderMain(); toast(enabled ? 'Pubblicazione automatica attivata per gli eventi selezionati' : 'Pubblicazione automatica sospesa');
       break;
     }
