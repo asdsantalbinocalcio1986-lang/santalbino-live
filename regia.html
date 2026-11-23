@@ -3762,6 +3762,27 @@ async function openGraphic(id) {
   }
 }
 let armedMvp = false;
+
+function mvpDraftSelectorHtml() {
+  const all = allMvpCandidates();
+  const selected = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
+  const vi = voteInfo();
+  const locked = ['open', 'closed', 'done'].includes(vi.state);
+  const groups = ['home', 'away'].map(side => {
+    const players = all.filter(player => player.side === side);
+    return players.length
+      ? `<section class="mvp-team-group"><h4 class="mvp-team-title">${esc(teamName(side))}</h4><div class="cands">${players.map(player => `<label class="cand"><input type="checkbox" data-mvp-candidate value="${esc(player.key)}" ${selected.includes(player.key) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span style="flex:1"><b>${esc(player.num)}</b> ${esc(player.name)}</span></label>`).join('')}</div></section>`
+      : `<p class="small muted">Nessun giocatore inserito per ${esc(teamName(side))}.</p>`;
+  }).join('');
+  return `<div class="card" id="mvp-draft-selector">
+    <h2>Bozza candidati MVP · ${selected.length}/4</h2>
+    <p class="small muted" style="margin-top:0">Dopo aver salvato le due formazioni, seleziona qui i quattro candidati: almeno uno per squadra. La scelta viene salvata come bozza e non apre né pubblica la votazione.</p>
+    ${all.length ? groups : '<p class="muted">Salva prima le formazioni di entrambe le squadre: i candidati verranno caricati automaticamente da queste rose.</p>'}
+    <button class="btn primary block" data-a="savemvp" ${locked || all.length === 0 ? 'disabled' : ''}>Salva bozza dei 4 candidati MVP</button>
+    <p class="small muted">${locked ? 'La selezione è bloccata perché la votazione è già iniziata o conclusa.' : 'Puoi modificare la selezione fino all’apertura della votazione al fischio finale.'}</p>
+  </div>`;
+}
+
 function mvpRegiaHtml() {
   const vi = voteInfo(), C = candidates(), all = allMvpCandidates();
   const selected = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
@@ -4273,7 +4294,7 @@ function regiaHtml() {
       <label class="f" style="margin-top:10px"><span>Controlla e correggi la distinta: numero e cognome, uno per riga</span><textarea data-roster="${s}" rows="10" placeholder="1 Rossi&#10;2 Bianchi&#10;...&#10;---&#10;12 Verdi">${esc(S.rosters[s])}</textarea></label>
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva bozza</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
-  }).join('') + publicationControlsHtml();
+  }).join('') + publicationControlsHtml() + mvpDraftSelectorHtml();
   else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly aria-label="Resoconto finale completo">${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'notifications') body = notificationSettingsHtml();
