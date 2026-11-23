@@ -148,7 +148,7 @@ Deno.serve(async (req: Request) => {
       const publicKey = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
       const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
       const subject = Deno.env.get("VAPID_SUBJECT") ?? "";
-      if (!publicKey || !privateKey || !subject) return reply(503, { error: "Chiavi VAPID non configurate: nessuna notifica inviata" });
+      const hasVapid = !!(publicKey && privateKey && subject);
 
       const { data: settings } = await adminClient.from("santalbino_notification_settings")
         .select("enabled_categories").eq("match_key", matchKey).maybeSingle();
@@ -168,24 +168,42 @@ Deno.serve(async (req: Request) => {
       }
       if (outboxError || !outbox) throw outboxError ?? new Error("Outbox non disponibile");
 
-      const { data: subscribers, error: subscribersError } = await adminClient
-        .from("santalbino_notification_subscriptions")
-        .select("id,endpoint,p256dh,auth_key")
-        .eq("match_key", matchKey).eq("active", true).contains("enabled_categories", [category]);
-      if (subscribersError) throw subscribersError;
+      let inAppSent = false;
+      try {
+        const topic = "santalive-match-" + (await sha256(matchKey)).slice(0, 32);
+        const channel = adminClient.channel(topic);
+        const broadcastResult = await channel.send({
+          type: "broadcast",
+          event: "match-notification",
+          payload: { matchKey, eventId, category, title, body, url: targetUrl },
+        });
+        inAppSent = broadcastResult === "ok";
+        await adminClient.removeChannel(channel);
+      } catch (broadcastError) {
+        console.error("SANTA Live Realtime broadcast:", broadcastError);
+      }
 
-      webpush.setVapidDetails(subject, publicKey, privateKey);
-      const payload = JSON.stringify({
+      let subscribers = [];
+      if (hasVapid) {
+        const { data, error: subscribersError } = await adminClient
+          .from("santalbino_notification_subscriptions")
+          .select("id,endpoint,p256dh,auth_key")
+          .eq("match_key", matchKey).eq("active", true).contains("enabled_categories", [category]);
+        if (subscribersError) throw subscribersError;
+        subscribers = data ?? [];
+        webpush.setVapidDetails(subject, publicKey, privateKey);
+      }
+      const pushPayload = JSON.stringify({
         title, body, url: targetUrl, category,
         icon: "/santa-live-icon.svg", badge: "/santa-live-icon.svg",
         tag: `santalive-${matchKey}-${eventId}`,
       });
-      const results = await Promise.allSettled((subscribers ?? []).map(async (subscriber) => {
+      const results = hasVapid ? await Promise.allSettled(subscribers.map(async (subscriber) => {
         try {
           await webpush.sendNotification({
             endpoint: subscriber.endpoint,
             keys: { p256dh: subscriber.p256dh, auth: subscriber.auth_key },
-          }, payload, { TTL: 300, urgency: "high" });
+          }, pushPayload, { TTL: 300, urgency: "high" });
           return { id: subscriber.id, sent: true };
         } catch (error) {
           const statusCode = (error as { statusCode?: number })?.statusCode;
@@ -196,17 +214,24 @@ Deno.serve(async (req: Request) => {
           }
           throw error;
         }
-      }));
+      })) : [];
       const delivered = results.filter((r) => r.status === "fulfilled").length;
       const failed = results.length - delivered;
-      const status = failed === 0 ? "sent" : delivered === 0 ? "failed" : "sent_with_errors";
-      const errorSummary = failed ? `${failed} invii non riusciti; endpoint scaduti disattivati quando riconosciuti` : null;
+      const anyDelivery = inAppSent || delivered > 0;
+      const hasErrors = failed > 0 || !hasVapid || !inAppSent;
+      const status = !anyDelivery ? "failed" : hasErrors ? "sent_with_errors" : "sent";
+      const errorParts = [];
+      if (!inAppSent) errorParts.push("broadcast in-app non confermato");
+      if (!hasVapid) errorParts.push("chiavi VAPID non configurate: Web Push non inviato");
+      if (failed) errorParts.push(`${failed} invii Push non riusciti; endpoint scaduti disattivati quando riconosciuti`);
+      const errorSummary = errorParts.length ? errorParts.join("; ") : null;
       const { error: updateError } = await adminClient.from("santalbino_notification_outbox").update({
-        status, recipient_count: results.length, delivered_count: delivered,
-        failed_count: failed, last_error: errorSummary, completed_at: new Date().toISOString(),
+        status, in_app_sent: inAppSent, recipient_count: subscribers.length,
+        delivered_count: delivered, failed_count: failed,
+        last_error: errorSummary, completed_at: new Date().toISOString(),
       }).eq("id", outbox.id);
       if (updateError) throw updateError;
-      return reply(200, { ok: true, status, recipients: results.length, delivered, failed });
+      return reply(200, { ok: true, status, inAppSent, pushConfigured: hasVapid, recipients: subscribers.length, delivered, failed });
     }
 
     return reply(400, { error: "Azione non riconosciuta" });
