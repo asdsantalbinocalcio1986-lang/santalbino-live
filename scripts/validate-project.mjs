@@ -87,6 +87,7 @@ assert.match(html, /function scheduleContentPublication\(\)/, 'Deve essere dispo
 assert.match(html, /function publishContentImmediately\(\)/, 'Deve essere disponibile la pubblicazione immediata');
 assert.match(html, /function cancelContentPublication\(\)/, 'Deve essere disponibile l’annullamento della bozza o programmazione');
 assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la modifica di un evento già registrato');
+assert.match(regia, /function resetMatch\(\) \{[^}]*S\.match\.chronicleDraft = '';[^}]*S\.match\.chroniclePublished = '';[^}]*S\.match\.chroniclePublishedAt = '';[^}]*S\.match\.chronicleNeedsReview = false;/, 'L’azzeramento della regia deve eliminare il resoconto della partita precedente');
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');
 assert.match(regia, /data-a="editevent"/, 'La timeline della regia deve esporre il comando di modifica evento');
 assert.match(regia, /window\.addEventListener\('offline'/, 'La regia deve segnalare la perdita di connessione');
