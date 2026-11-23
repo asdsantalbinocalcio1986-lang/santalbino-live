@@ -159,11 +159,16 @@ assert.match(regia, /previewLineupStory[\s\S]*instagram-story-1080x1920/, 'La re
 
 
 assert.match(regia, /function autoPublishSocialEvent\(ev\)/, 'La regia deve avere la pubblicazione automatica degli eventi');
-assert.match(regia, /if \(TEST_MODE \|\| !CAN_EDIT \|\| !dbReady \|\| !db \|\| !cfg\.enabled \|\| !cfg\.ready\) return;/, 'La pubblicazione automatica deve essere disattivata in prova e finché Meta non è verificato');
+assert.match(regia, /if \(TEST_MODE \|\| !CAN_EDIT \|\| !dbReady \|\| !db \|\| !cfg\.enabled \|\| !cfg\.ready \|\| !cfg\.publishingEnabled\) return;/, 'La pubblicazione automatica deve restare bloccata in prova e finché Meta non è verificato e autorizzato');
 assert.match(regia, /SOCIAL_AUTO_EVENT_TYPES = \['goal', 'red', 'halftime', 'fulltime'\]/, 'Gli eventi social automatici devono restare limitati alle tipologie approvate');
 assert.match(regia, /db\.functions\.invoke\(['"]santalive-social-publish['"]/, 'La regia deve invocare la Edge Function social');
 assert.match(regia, /case ['"]retrySocialPublication['"]/, 'Il registro deve consentire un nuovo tentativo senza ripubblicare i canali già riusciti');
 assert.match(socialFunction, /auth\.getUser\(bearer\)/, 'La Edge Function deve verificare la sessione autenticata');
+assert.match(socialFunction, /META_PUBLISH_ENABLED/, 'La pubblicazione deve avere un interruttore di sicurezza lato server');
+assert.match(socialFunction, /if \(!publishingEnabled\)[\s\S]*?403/, 'La Edge Function deve rifiutare ogni pubblicazione finché il blocco server è attivo');
+assert.match(socialFunction, /connected_instagram_account/, 'La verifica Meta deve leggere l’account Instagram collegato alla Pagina');
+assert.match(socialFunction, /linkedInstagramId !== instagramId/, 'La verifica Meta deve confrontare gli ID di Pagina e account Instagram');
+assert.doesNotMatch(socialFunction, /account_type/, 'La verifica non deve dipendere dal campo account_type non documentato');
 assert.match(socialFunction, /from\(['"]santalbino_admins['"]\)/, 'La Edge Function deve verificare l’amministratore autorizzato');
 assert.match(socialFunction, /santalbino_social_publications/, 'La Edge Function deve registrare gli esiti');
 assert.match(socialFunction, /instagramId\}\/media_publish/, 'La Edge Function deve pubblicare i contenuti Instagram');
@@ -173,5 +178,6 @@ assert.match(socialMigration, /alter table public\.santalbino_social_publication
 assert.match(socialMigration, /public\.is_santalbino_admin\(\)/i, 'Il registro social deve essere leggibile soltanto dall’amministratore');
 assert.match(socialMigration, /unique/i, 'Il registro social deve impedire duplicati per ID evento');
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PAGE_ACCESS_TOKEN/, 'La guida deve descrivere i segreti Meta richiesti');
+assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PUBLISH_ENABLED/, 'La guida deve descrivere il blocco server che impedisce pubblicazioni premature');
 
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');
