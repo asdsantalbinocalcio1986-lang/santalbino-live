@@ -1372,6 +1372,7 @@ const SCRIPT_END = '<' + '/script>';
 const defaults = () => ({
   rev: 0,
   publication: { published: null, pending: null, publishedAt: '' },
+  socialPublishing: { enabled: false, facebook: true, instagram: true, ready: false },
   match: { home: "ASD Sant'Albino Terme", away: '', comp: 'Terza Categoria Toscana · Girone A', venue: '', date: '', time: '', ourSide: 'home', hashtag: '#SANTALive', standingsUrl: '', attackDirectionFirst: '', attackDirectionCurrent: '' },
   logos: { home: '', away: '' },
   rosters: { home: '', away: '' },
@@ -1393,14 +1394,16 @@ function testDefaults() {
 let S = (() => {
   let raw = {}; try { raw = JSON.parse($('#app-state').textContent) || {}; } catch (e) {}
   const d = defaults();
-  return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), events: raw.events || [] });
+  return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), socialPublishing: Object.assign(d.socialPublishing, raw.socialPublishing || {}), events: raw.events || [] });
 })();
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
+S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false }, S.socialPublishing || {});
 if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
 const CARD_TYPES = ['goal', 'foul', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
+const SOCIAL_AUTO_EVENT_TYPES = ['goal', 'red', 'halftime', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
 // Ogni apertura dell'app riparte dalla schermata iniziale, senza alterare gli altri dati locali.
@@ -2338,8 +2341,84 @@ function addEvent(ev, opts = {}) {
   if (ev.type === 'fulltime') refreshMvpVotes();
   if (opts.post) stash.set('open-post', ev.id);
   commit(true); renderMain();
+  void autoPublishSocialEvent(ev);
   return ev;
 }
+
+function socialPublishingConfig() {
+  return Object.assign({ enabled: false, facebook: true, instagram: true, ready: false }, S.socialPublishing || {});
+}
+async function autoPublishSocialEvent(ev) {
+  const cfg = socialPublishingConfig();
+  if (TEST_MODE || !CAN_EDIT || !dbReady || !db || !cfg.enabled || !cfg.ready) return;
+  if (!SOCIAL_AUTO_EVENT_TYPES.includes(ev?.type) || (!cfg.facebook && !cfg.instagram)) return;
+  try {
+    const blob = await cardBlob(ev);
+    if (!blob) throw new Error('Grafica evento non disponibile');
+    const matchKey = String(S.match.pollId || 'match').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const eventKey = String(ev.id || uid()).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const storagePath = 'social/' + matchKey + '/' + eventKey + '.jpg';
+    const storage = db.storage.from(MEDIA_BUCKET);
+    const uploaded = await storage.upload(storagePath, blob, { contentType: 'image/jpeg', cacheControl: '3600', upsert: true });
+    if (uploaded.error) throw uploaded.error;
+    const publicImage = storage.getPublicUrl(storagePath).data?.publicUrl;
+    if (!publicImage) throw new Error('URL pubblico della grafica non disponibile');
+    const result = await db.functions.invoke('santalive-social-publish', {
+      body: {
+        action: 'publish',
+        eventId: String(ev.id),
+        matchId: String(S.match.pollId || ''),
+        eventType: ev.type,
+        caption: evText(ev),
+        imageUrl: publicImage,
+        platforms: { facebook: !!cfg.facebook, instagram: !!cfg.instagram }
+      }
+    });
+    if (result.error) throw result.error;
+    const data = result.data || {};
+    if (data.status === 'published') toast('Pubblicato automaticamente su ' + [cfg.facebook ? 'Facebook' : '', cfg.instagram ? 'Instagram' : ''].filter(Boolean).join(' e '));
+    else toast('Invio social: ' + (data.message || data.status || 'controlla il registro'));
+  } catch (err) {
+    console.error('Pubblicazione social automatica:', err);
+    toast('Pubblicazione social non riuscita: controlla il registro e la connessione');
+  }
+}
+async function verifySocialPublishing() {
+  if (TEST_MODE || !CAN_EDIT || !dbReady || !db) { toast('Verifica disponibile soltanto nella regia ufficiale online'); return; }
+  try {
+    const { data, error } = await db.functions.invoke('santalive-social-publish', { body: { action: 'status' } });
+    if (error) throw error;
+    S.socialPublishing = Object.assign(socialPublishingConfig(), { ready: !!data?.ready });
+    commit(true);
+    renderMain();
+    if (data?.ready) toast('Collegamento Meta verificato: Facebook e Instagram pronti');
+    else toast('Collegamento Meta non pronto: ' + (data?.missing || [data?.message || 'configurazione da completare']).join(', '));
+  } catch (err) {
+    S.socialPublishing = Object.assign(socialPublishingConfig(), { ready: false });
+    commit(true);
+    renderMain();
+    console.error('Verifica collegamento Meta:', err);
+    toast('Verifica non riuscita: controlla Edge Function e segreti Meta');
+  }
+}
+async function loadSocialPublicationLog() {
+  const box = $('#socialPublishLog');
+  if (!box || TEST_MODE || !CAN_EDIT || !db) return;
+  box.textContent = 'Caricamento registro…';
+  const { data, error } = await db.from('santalbino_social_publications')
+    .select('event_type,caption,facebook_status,instagram_status,overall_status,created_at,facebook_error,instagram_error')
+    .order('created_at', { ascending: false }).limit(8);
+  if (error) { box.textContent = 'Registro non disponibile: applica prima la migrazione social.'; return; }
+  if (!data?.length) { box.textContent = 'Nessuna pubblicazione automatica registrata.'; return; }
+  box.innerHTML = data.map(item => {
+    const when = new Date(item.created_at).toLocaleString('it-IT');
+    const title = ({goal:'Gol',red:'Espulsione',halftime:'Intervallo',fulltime:'Fine partita'})[item.event_type] || item.event_type;
+    const fb = 'Facebook: ' + item.facebook_status + (item.facebook_error ? ' · ' + item.facebook_error : '');
+    const ig = 'Instagram: ' + item.instagram_status + (item.instagram_error ? ' · ' + item.instagram_error : '');
+    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '</div>';
+  }).join('');
+}
+
 function addPhase(type, min, extra = {}) { addEvent(Object.assign({ type, team: S.match.ourSide, min: min ?? curMinute() }, extra), { post: true }); }
 function delEvent(id) { S.events = S.events.filter(e => e.id !== id); delete L.social[id]; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true; saveL(); commit(true); renderMain(); }
 
@@ -4244,7 +4323,7 @@ async function loadAnalytics() {
 }
 function settingsHtml() {
   const I = (id, label, v, ph = '', type = 'text') => `<label class="f"><span>${label}</span><input type="${type}" id="${id}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
-  const m = S.match;
+  const m = S.match, sp = socialPublishingConfig();
   return `<div class="card"><h2>Partita</h2>${I('s-home', 'Squadra di casa', m.home)}${I('s-away', 'Squadra ospite', m.away, 'Nome della squadra avversaria')}
     <label class="f"><span>La nostra squadra</span><select id="s-our"><option value="home" ${m.ourSide === 'home' ? 'selected' : ''}>Gioca in casa</option><option value="away" ${m.ourSide === 'away' ? 'selected' : ''}>Gioca in trasferta</option></select></label>
     ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-time', 'Ora', m.time || '', '', 'time')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
@@ -4259,6 +4338,18 @@ function settingsHtml() {
       ${L.evImg[k] ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-evraw="${k}" ${L.evImgRaw[k] ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>`).join('')}</div>
   <div class="card"><h2>Facebook</h2>${I('s-fb', 'Link o nome della pagina Facebook', L.fbUrl, 'https://www.facebook.com/nomepagina')}
     <p class="small muted" style="margin-top:-4px">Non serve nessun token: ogni evento si pubblica con “Pubblica”, che copia il testo, salva l’immagine e apre la tua pagina.</p><button class="btn" data-a="savefb">Salva link</button></div>
+
+  <div class="card"><h2>Pubblicazione automatica Facebook e Instagram</h2>
+    <p class="small muted">Pubblica senza passaggi manuali gol, espulsioni, intervallo e fine partita. Le immagini vengono generate dalla grafica SANTA Live. La Partita di prova non invia mai contenuti.</p>
+    <label class="check"><input type="checkbox" id="s-social-enabled" ${sp.enabled ? "checked" : ""}> Attiva pubblicazione automatica</label>
+    <label class="check"><input type="checkbox" id="s-social-facebook" ${sp.facebook ? "checked" : ""}> Facebook</label>
+    <label class="check"><input type="checkbox" id="s-social-instagram" ${sp.instagram ? "checked" : ""}> Instagram</label>
+    <p class="small muted">Collegamento Meta: <b>${sp.ready ? "verificato" : "da verificare"}</b>. Le credenziali restano nei segreti Supabase e non vengono inserite nell'app o nel repository.</p>
+    <div class="row2 stack"><button class="btn" data-a="saveSocialPublishing">Salva impostazioni</button><button class="btn primary" data-a="verifySocialPublishing">Verifica collegamento Meta</button></div>
+    <div class="row2 stack" style="margin-top:8px"><button class="btn" data-a="refreshSocialLog">Aggiorna registro pubblicazioni</button></div>
+    <div id="socialPublishLog" class="small muted" style="margin-top:8px">Il registro mostra gli ultimi invii e gli eventuali errori.</div>
+  </div>
+
   <div class="card"><h2>Dati e backup</h2><div class="row2 stack"><button class="btn" data-a="exportbackup">Esporta copia dati</button><label class="btn" style="cursor:pointer">Carica copia dati<input type="file" id="impJson" accept="application/json" hidden></label></div>
     <p class="small muted">La copia contiene lo stato completo della partita e le impostazioni grafiche. Prima di importare viene conservata una bozza locale di sicurezza.</p>
     <div class="row2 stack" style="margin-top:10px"><button class="btn danger" data-a="newmatch">${armedNew ? 'Tocca ancora per azzerare' : 'Azzera partita'}</button></div>
@@ -4570,6 +4661,17 @@ document.addEventListener('click', async e => {
       if (vi.state === 'open' && !armedMvp) { armedMvp = true; renderMain(); setTimeout(() => { armedMvp = false; renderMain(); }, 4000); break; }
       armedMvp = false; proclaim(); break; }
     case 'savefb': L.fbUrl = $('#s-fb').value.trim(); saveL(); toast('Link salvato'); break;
+    case 'saveSocialPublishing': {
+      const enabled = !!$('#s-social-enabled')?.checked;
+      const facebook = !!$('#s-social-facebook')?.checked;
+      const instagram = !!$('#s-social-instagram')?.checked;
+      if (enabled && !facebook && !instagram) { toast('Seleziona almeno una piattaforma'); break; }
+      S.socialPublishing = Object.assign(socialPublishingConfig(), { enabled, facebook, instagram });
+      commit(true); renderMain(); toast(enabled ? 'Pubblicazione automatica attivata per gli eventi selezionati' : 'Pubblicazione automatica sospesa');
+      break;
+    }
+    case 'verifySocialPublishing': await verifySocialPublishing(); break;
+    case 'refreshSocialLog': await loadSocialPublicationLog(); break;
     case 'exportbackup': downloadStateBackup(); break;
     case 'reloadremote': await discardDraftAndReloadRemote(); break;
     case 'startTest': if (!CAN_EDIT) { toast('Accedi alla regia per avviare una simulazione'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della partita ufficiale'); break; } if (confirm('Aprire una partita di prova separata? La cronaca ufficiale resterà intatta.')) window.location.href = './regia.html?test=1'; break;
