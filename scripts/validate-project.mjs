@@ -77,6 +77,8 @@ assert.ok(stateMatch, 'Stato iniziale JSON non trovato');
 JSON.parse(stateMatch[1]);
 
 assert.match(html, /rpc\(['"]cast_santalbino_mvp_vote['"]/);
+assert.match(html, /function allMvpCandidates\(\)/, 'La pagina pubblica deve ricavare i candidati selezionati dalla regia');
+assert.match(html, /state: 'unconfigured'/, 'Il voto pubblico deve restare chiuso se mancano i quattro candidati');
 assert.match(html, /rpc\(['"]get_santalbino_mvp_vote_counts['"]/);
 assert.match(html, /async function refreshMvpVotes\(\)\s*\{\s*if \(TEST_MODE \|\| !db \|\| !CAN_EDIT\) return;/, 'I conteggi MVP non devono essere richiesti da visitatori anonimi o dalla simulazione');
 assert.match(html, /const STATE_TABLE = TEST_MODE \? ['"]live_test_state['"] : ['"]live_state['"]/);
