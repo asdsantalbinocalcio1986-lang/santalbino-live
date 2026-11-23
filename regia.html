@@ -3889,7 +3889,7 @@ async function shareMvpInviteGraphic() {
   } catch(error) { if(error?.name!=='AbortError') { await saveBlob(mvpInviteBlob,'vota-mvp-santalbino.jpg'); toast('Immagine salvata: condividila insieme al link della votazione'); } }
 }
 async function sendMvpInvite() {
-  if (TEST_MODE || !CAN_EDIT || !db || !dbReady) { toast('Invio notifiche disponibile soltanto nella regia ufficiale online'); return; }
+  if (TEST_MODE || !CAN_EDIT || !db || !dbReady || syncState !== 'ok') { toast('Attendi la sincronizzazione della regia prima di inviare una notifica'); return; }
   const cfg = notificationConfig(), vi = voteInfo();
   if (vi.state !== 'open' || !cfg.enabled || cfg.types.mvp !== true || !validMvpSelection()) { toast('La votazione MVP non è pronta o le notifiche MVP sono disattivate'); return; }
   const url = 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(mvpPollKey());
@@ -3905,7 +3905,7 @@ async function sendMvpInvite() {
   }
 }
 async function sendPushForEvent(eventId) {
-  if (TEST_MODE || !CAN_EDIT || !db || !dbReady) { toast('Invio notifiche disponibile soltanto nella regia ufficiale online'); return; }
+  if (TEST_MODE || !CAN_EDIT || !db || !dbReady || syncState !== 'ok') { toast('Attendi la sincronizzazione della regia prima di inviare una notifica'); return; }
   const ev = S.events.find(item => item.id === eventId), cfg = notificationConfig();
   if (!ev || !cfg.enabled || cfg.types[ev.type] !== true) { toast('Notifica non autorizzata: controlla le preferenze della regia'); return; }
   const index = S.events.indexOf(ev), score = scoreAt(index);
