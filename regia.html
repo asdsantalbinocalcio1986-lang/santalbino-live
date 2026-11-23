@@ -3683,8 +3683,10 @@ function voteInfo() {
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
 function allMvpCandidates() {
-  const out = [], published = publicContent();
-  ['home', 'away'].forEach(side => parseRoster(published.rosters[side]).forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name })));
+  // La regia sceglie dai roster salvati della partita, non dalla copia già pubblicata.
+  // In questo modo è possibile preparare i quattro candidati anche mentre le formazioni sono ancora bozze.
+  const out = [];
+  ['home', 'away'].forEach(side => parseRoster(S.rosters?.[side] || '').forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name })));
   return out;
 }
 function candidates() {
