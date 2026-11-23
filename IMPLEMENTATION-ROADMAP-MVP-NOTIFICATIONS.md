@@ -86,8 +86,8 @@ Collaudo obbligatorio in partita di prova:
 - Preparato lo script `supabase-phase3-notifications-setup.sql` con tabelle private per impostazioni partita, sottoscrizioni e outbox; RLS attiva e accesso diretto anon/authenticated revocato.
 - Preparata la Edge Function `supabase/functions/santalive-notifications/index.ts` per consenso/sottoscrizione, revoca, preferenze, impostazioni regia e invio esplicitamente approvato.
 - Preparata la gestione Push nel Service Worker; versione cache incrementata.
-- Le chiavi VAPID non sono presenti e non sono state configurate; l'invio resta quindi non attivabile.
-- Non è ancora presente l'interfaccia pubblica di iscrizione né il pannello regia per invio/override; non è ancora collegato il canale in-app Realtime.
+- Le chiavi VAPID non sono presenti e non sono state configurate; il Web Push non è attivabile. Il canale in-app Realtime è predisposto nel codice ma richiede il deploy della Edge Function.
+- L'interfaccia pubblica di iscrizione/revoca e il pannello regia per preferenze e invio/override sono presenti nel branch.
 - Lo script SQL e la funzione Edge non sono stati applicati/distribuiti nel progetto Supabase di produzione.
 - Il controllo MVP lato database usa la rosa pubblicata quando disponibile, in coerenza con i candidati mostrati dalla pagina pubblica, e normalizza il marcatore GK.
 
@@ -109,7 +109,7 @@ Collaudo obbligatorio in partita di prova:
 
 ### In-app Realtime
 
-- La Edge Function invia un broadcast sul canale privato-nel-nome (topic non contiene dati partita in chiaro), esclusivamente dopo l'approvazione esplicita della regia.
+- La Edge Function invia un broadcast su un topic derivato da hash (senza esporre il codice partita nel nome del canale), esclusivamente dopo l'approvazione esplicita della regia.
 - La pagina pubblica ascolta il canale della partita e mostra il messaggio mentre l'utente sta seguendo la diretta.
 - Il broadcast non richiede il permesso browser Push; il Web Push resta un canale separato per chi non ha la pagina aperta.
 - L'outbox registra separatamente il flag `in_app_sent`.
