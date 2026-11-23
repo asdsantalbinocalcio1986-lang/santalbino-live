@@ -2401,12 +2401,26 @@ async function verifySocialPublishing() {
     toast('Verifica non riuscita: controlla Edge Function e segreti Meta');
   }
 }
+async function retrySocialPublication(eventId) {
+  if (TEST_MODE || !CAN_EDIT || !dbReady || !db) { toast('Nuovo tentativo disponibile solo nella regia ufficiale online'); return; }
+  const { data: item, error } = await db.from('santalbino_social_publications')
+    .select('event_id,match_id,event_type,caption,image_url,platforms')
+    .eq('event_id', eventId).maybeSingle();
+  if (error || !item) { toast('Evento non trovato nel registro social'); return; }
+  const { data, error: invokeError } = await db.functions.invoke('santalive-social-publish', {
+    body: { action: 'publish', eventId: item.event_id, matchId: item.match_id, eventType: item.event_type,
+      caption: item.caption, imageUrl: item.image_url, platforms: item.platforms }
+  });
+  if (invokeError) { toast('Nuovo tentativo non riuscito: controlla i segreti Meta'); return; }
+  toast(data?.status === 'published' ? 'Pubblicazione completata' : 'Nuovo tentativo: ' + (data?.status || 'esito in verifica'));
+  await loadSocialPublicationLog();
+}
 async function loadSocialPublicationLog() {
   const box = $('#socialPublishLog');
   if (!box || TEST_MODE || !CAN_EDIT || !db) return;
   box.textContent = 'Caricamento registro…';
   const { data, error } = await db.from('santalbino_social_publications')
-    .select('event_type,caption,facebook_status,instagram_status,overall_status,created_at,facebook_error,instagram_error')
+    .select('event_id,match_id,event_type,caption,image_url,platforms,facebook_status,instagram_status,overall_status,created_at,facebook_error,instagram_error')
     .order('created_at', { ascending: false }).limit(8);
   if (error) { box.textContent = 'Registro non disponibile: applica prima la migrazione social.'; return; }
   if (!data?.length) { box.textContent = 'Nessuna pubblicazione automatica registrata.'; return; }
@@ -2415,7 +2429,8 @@ async function loadSocialPublicationLog() {
     const title = ({goal:'Gol',red:'Espulsione',halftime:'Intervallo',fulltime:'Fine partita'})[item.event_type] || item.event_type;
     const fb = 'Facebook: ' + item.facebook_status + (item.facebook_error ? ' · ' + item.facebook_error : '');
     const ig = 'Instagram: ' + item.instagram_status + (item.instagram_error ? ' · ' + item.instagram_error : '');
-    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '</div>';
+    const retry = item.overall_status === 'published' ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
+    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div></div>';
   }).join('');
 }
 
@@ -4672,6 +4687,7 @@ document.addEventListener('click', async e => {
     }
     case 'verifySocialPublishing': await verifySocialPublishing(); break;
     case 'refreshSocialLog': await loadSocialPublicationLog(); break;
+    case 'retrySocialPublication': await retrySocialPublication(a.dataset.id || ''); break;
     case 'exportbackup': downloadStateBackup(); break;
     case 'reloadremote': await discardDraftAndReloadRemote(); break;
     case 'startTest': if (!CAN_EDIT) { toast('Accedi alla regia per avviare una simulazione'); break; } if (syncState !== 'ok') { toast('Attendi il completamento della sincronizzazione della partita ufficiale'); break; } if (confirm('Aprire una partita di prova separata? La cronaca ufficiale resterà intatta.')) window.location.href = './regia.html?test=1'; break;
