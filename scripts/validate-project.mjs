@@ -44,9 +44,10 @@ assert.doesNotMatch(workflow, /^  id-token: write$/m, 'id-token:write non deve e
 assert.match(html, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La pagina pubblica deve esporre un landmark main');
 assert.match(regia, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La regia deve esporre un landmark main');
 assert.match(html, /<textarea data-convocati-preview rows="10" readonly aria-label="Testo del post pre-partita">/, 'L’anteprima del post deve avere un nome accessibile');
-assert.match(html, /<textarea id="matchReport" rows="22" readonly aria-label="Resoconto finale">/, 'Il resoconto finale deve avere un nome accessibile');
+assert.match(html, /function reportHtml\(\) \{\s*return `<section><h2>Statistiche finali<\/h2>\$\{statsHtml\(\)\}<\/section>`;/, 'Il resoconto finale deve contenere solo statistiche');
+assert.doesNotMatch(html, /<textarea id="matchReport"/, 'Il resoconto finale non deve contenere l’articolo della cronaca');
 assert.match(html, /<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">/, 'L’editor del testo evento deve avere un nome accessibile');
-assert.match(html, /<textarea rows="10" readonly aria-label="Resoconto finale completo">/, 'Il resoconto completo pubblico deve avere un nome accessibile');
+assert.doesNotMatch(regia, /Articolo di fine partita|Resoconto finale completo/, 'La regia non deve mostrare l’articolo della cronaca nel resoconto finale');
 assert.equal((html.match(/<meta name="theme-color"/g) || []).length, 1, 'La pagina pubblica non deve duplicare theme-color');
 assert.equal((regia.match(/<meta name="theme-color"/g) || []).length, 1, 'La regia non deve duplicare theme-color');
 for (const [file, source] of [['home.html', home], ['preview.html', preview], ['index.html', html], ['regia.html', regia]]) {
