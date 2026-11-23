@@ -82,6 +82,12 @@ create policy "Only the designated admin can update live state"
   using (public.is_santalbino_admin())
   with check (public.is_santalbino_admin());
 
+-- La tabella live è pubblica in lettura; scrittura solo per l'amministratore autenticato.
+-- RLS continua a verificare l'identità. Nessun ruolo API deve avere DELETE o TRUNCATE.
+revoke all on table public.live_state from public, anon, authenticated;
+grant select on table public.live_state to anon, authenticated;
+grant insert, update on table public.live_state to authenticated;
+
 insert into public.live_state (id, state) values (1, '{"rev":0}'::jsonb)
 on conflict (id) do nothing;
 

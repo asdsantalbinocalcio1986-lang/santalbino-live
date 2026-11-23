@@ -5,6 +5,13 @@
 
 begin;
 
+-- 0-bis) Privilegi minimi sulla tabella live: lettura pubblica, scrittura admin autenticato.
+-- La tabella live è pubblica in lettura; scrittura solo per l'amministratore autenticato.
+-- RLS continua a verificare l'identità. Nessun ruolo API deve avere DELETE o TRUNCATE.
+revoke all on table public.live_state from public, anon, authenticated;
+grant select on table public.live_state to anon, authenticated;
+grant insert, update on table public.live_state to authenticated;
+
 -- 0) L'amministratore legge esclusivamente il proprio record.
 -- La verifica passa a SECURITY INVOKER: nessuna funzione helper privilegiata esposta.
 alter table public.santalbino_admins enable row level security;

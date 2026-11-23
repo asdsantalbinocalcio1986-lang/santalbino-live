@@ -8,6 +8,8 @@ const testMigration = fs.readFileSync('supabase/migrations/20261120133534_isolat
 const testGrantMigration = fs.readFileSync('supabase/migrations/20261120133845_tighten_test_state_grants.sql', 'utf8');
 const testRpcGrantMigration = fs.readFileSync('supabase/migrations/20261120133923_restrict_test_state_rpc_to_authenticated.sql', 'utf8');
 const sql = fs.readFileSync('supabase-phase1-security.sql', 'utf8');
+const setupSql = fs.readFileSync('supabase-setup.sql', 'utf8');
+const liveStateGrantMigration = fs.readFileSync('supabase/migrations/20261123105100_restrict_live_state_table_grants.sql', 'utf8');
 const home = fs.readFileSync('home.html', 'utf8');
 const preview = fs.readFileSync('preview.html', 'utf8');
 const sw = fs.readFileSync('sw.js', 'utf8');
@@ -109,6 +111,13 @@ assert.doesNotMatch(html, /from\(['"]live_state['"]\)\.upsert/, 'L’app deve us
 for (const fn of ['cast_santalbino_mvp_vote','get_santalbino_mvp_vote_counts','save_santalbino_live_state']) {
   assert.ok(sql.includes('function public.' + fn), 'Funzione SQL mancante: ' + fn);
 }
+assert.match(setupSql, /revoke all on table public\.live_state from public, anon, authenticated/i, 'Il setup iniziale deve rimuovere i privilegi eccessivi su live_state');
+assert.match(sql, /revoke all on table public\.live_state from public, anon, authenticated/i, 'La migrazione di sicurezza deve rimuovere i privilegi eccessivi su live_state');
+assert.match(liveStateGrantMigration, /revoke all on table public\.live_state from public, anon, authenticated/i);
+assert.match(liveStateGrantMigration, /grant select on table public\.live_state to anon, authenticated/i);
+assert.match(liveStateGrantMigration, /grant insert, update on table public\.live_state to authenticated/i);
+assert.doesNotMatch(liveStateGrantMigration, /grant\s+[^;]*(delete|truncate)/i, 'La migrazione non deve concedere DELETE o TRUNCATE su live_state');
+
 assert.match(sql, /revoke all on table public\.mvp_votes from public, anon, authenticated/i);
 assert.match(sql, /create policy ["']Only SantAlbino admin can read MVP votes["']/i);
 assert.match(sql, /if not public\.is_santalbino_admin\(\) then return; end if;/i, 'I conteggi MVP devono restare riservati all’amministratore');
