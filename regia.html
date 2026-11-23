@@ -4171,8 +4171,67 @@ function matchTimelineHtml() {
     <div class="match-tl-lane opponent-label">Avversari</div>
   </div>`;
 }
+const NOTIFICATION_CATEGORY_LABELS = [
+  ['kickoff', 'Kick Off'], ['halftime', 'Half Time'], ['fulltime', 'Full Time'], ['goal', 'Goal'],
+  ['yellow_card', 'Ammonizione'], ['red_card', 'Espulsione'], ['substitution', 'Sostituzione'],
+  ['injury', 'Infortunio'], ['mvp', 'Apertura voto MVP'],
+];
+const DEFAULT_NOTIFICATION_CATEGORIES = ['kickoff', 'halftime', 'fulltime', 'goal'];
+let notificationEnabledCategories = [...DEFAULT_NOTIFICATION_CATEGORIES];
+let notificationSettingsLoaded = false;
+function notificationCategory(type) {
+  return ({kickoff:'kickoff',halftime:'halftime',fulltime:'fulltime',goal:'goal',yellow:'yellow_card',red:'red_card',sub:'substitution',injury:'injury'})[type] || '';
+}
+async function regiaNotificationRequest(action, payload = {}) {
+  const { data, error: sessionError } = await db.auth.getSession();
+  const accessToken = data?.session?.access_token;
+  if (sessionError || !accessToken) throw new Error('Accedi alla regia per gestire le notifiche');
+  const response = await fetch((cfg.supabaseUrl || '').replace(/\/$/, '') + '/functions/v1/santalive-notifications', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json',apikey:cfg.supabaseAnonKey,Authorization:'Bearer '+accessToken},
+    body: JSON.stringify(Object.assign({action,matchKey:mvpPollKey()},payload)),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) { const err = new Error(result.error || 'Operazione notifiche non riuscita'); err.status=response.status; throw err; }
+  return result;
+}
+async function loadNotificationSettings() {
+  try {
+    const result = await regiaNotificationRequest('get-settings');
+    notificationEnabledCategories = result.enabledCategories || [...DEFAULT_NOTIFICATION_CATEGORIES];
+    notificationSettingsLoaded = true;
+    renderMain();
+  } catch (error) { toast(error.message || 'Impossibile caricare le preferenze notifiche'); }
+}
+function notificationSettingsHtml() {
+  return '<div class="card"><h2>Notifiche della partita</h2><p class="small muted">Le categorie selezionate sono abilitate come impostazione predefinita. L’invio non è automatico: per ogni evento devi comunque premere “Invia notifica” nella cronaca.</p><div class="cands">' +
+    NOTIFICATION_CATEGORY_LABELS.map(([key,label]) => '<label class="cand"><input type="checkbox" data-notify-category="'+key+'" '+(notificationEnabledCategories.includes(key)?'checked':'')+'><span style="flex:1">'+label+(DEFAULT_NOTIFICATION_CATEGORIES.includes(key)?' · predefinita':'')+'</span></label>').join('') +
+    '</div><button class="btn primary block" data-a="saveNotificationSettings">Salva preferenze</button><p class="small muted">'+(notificationSettingsLoaded?'Preferenze caricate dal server.':'Valori iniziali mostrati: carica le preferenze del server per verificare lo stato corrente.')+'</p><button class="btn block" data-a="reloadNotificationSettings">Ricarica preferenze</button></div>';
+}
+async function saveNotificationSettings() {
+  const categories = $('[data-notify-category]:checked').map(input => input.dataset.notifyCategory);
+  await regiaNotificationRequest('set-settings',{enabledCategories:categories});
+  notificationEnabledCategories=categories; notificationSettingsLoaded=true; renderMain(); toast('Preferenze notifiche salvate.');
+}
+async function sendEventNotification(event) {
+  const category=notificationCategory(event.type);
+  if(!category){toast('Questo tipo di evento non prevede notifiche.');return;}
+  const labels=Object.fromEntries(NOTIFICATION_CATEGORY_LABELS);
+  const targetUrl=new URL('./index.html?view=live',location.href).pathname+'?view=live';
+  const payload={eventId:String(event.id),category,title:'SANTA Live · '+(labels[category]||'Aggiornamento'),body:(evText(event)||'Aggiornamento della partita').slice(0,500),targetUrl};
+  try { await regiaNotificationRequest('approve-and-send',payload); toast('Notifica inviata.'); }
+  catch(error) {
+    if(error.status===409 && String(error.message).includes('Categoria disattivata')) {
+      if(!confirm('Questa categoria è disattivata. Vuoi inviare comunque questa singola notifica?'))return;
+      await regiaNotificationRequest('approve-and-send',Object.assign({},payload,{override:true}));
+      toast('Notifica inviata con override della regia.'); return;
+    }
+    throw error;
+  }
+}
+
 function regiaHtml() {
-  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['analytics', 'Statistiche'], ['set', 'Impost.']];
+  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['notifications', 'Notifiche'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['analytics', 'Statistiche'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
@@ -4198,6 +4257,7 @@ function regiaHtml() {
   }).join('') + publicationControlsHtml();
   else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Articolo di fine partita</h2><textarea rows="10" readonly aria-label="Resoconto finale completo">${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
+  else if (t === 'notifications') body = notificationSettingsHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();
   else if (t === 'analytics') body = analyticsHtml();
@@ -4550,7 +4610,7 @@ document.addEventListener('click', async e => {
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
   const archiveMatchBtn = t.closest('[data-archive-match]'); if (archiveMatchBtn) { L.archiveFormationId = archiveMatchBtn.dataset.archiveMatch; saveL(); renderMain(); return; }
-  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); return; }
+  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); if (L.rtab === 'notifications') await loadNotificationSettings(); return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
@@ -4697,6 +4757,9 @@ document.addEventListener('click', async e => {
       commit(true); renderMain(); toast('I quattro candidati MVP sono stati salvati'); break;
     }
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
+    case 'saveNotificationSettings': try { await saveNotificationSettings(); } catch (error) { toast(error.message || 'Salvataggio preferenze non riuscito'); } break;
+    case 'reloadNotificationSettings': await loadNotificationSettings(); break;
+    case 'notifyEvent': if (ev) { try { await sendEventNotification(ev); } catch (error) { toast(error.message || 'Invio notifica non riuscito'); } } break;
     case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
     case 'rmmvptpl': S.mvp.tpl = ''; S.mvp.raw = false; commit(true); renderMain(); break;
