@@ -90,7 +90,30 @@ assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la mod
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');
 assert.match(regia, /data-a="editevent"/, 'La timeline della regia deve esporre il comando di modifica evento');
 assert.match(regia, /window\.addEventListener\('offline'/, 'La regia deve segnalare la perdita di connessione');
-assert.match(regia, /window\.__santalbinoConnectionWatch/, 'La regia deve controllare periodicamente il riallineamento');
+assert.match(regia, /window\.__santalbinoConnectionWatch/
+
+for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
+  assert.match(source, /let pendingLocalSync = false/, 'Stato delle modifiche locali non sincronizzate mancante in ' + file);
+  assert.match(source, /pendingLocalSync = true/, 'Le modifiche devono essere marcate come pendenti in ' + file);
+  assert.match(source, /pendingLocalSync = false/, 'Il completamento del salvataggio deve azzerare lo stato pendente in ' + file);
+  assert.match(source, /function handleNetworkOnline\(reason = ['"]network-online['"]\)/, 'La riconnessione deve gestire il salvataggio pendente in ' + file);
+  assert.match(source, /window\.addEventListener\(['"]online['"], \(\) => handleNetworkOnline\(['"]network-online['"]\)\)/, 'Il ritorno online deve richiamare la gestione della sincronizzazione in ' + file);
+  assert.match(source, /remoteRefreshBusy \|\| publishing \|\| pendingLocalSync \|\| syncState !== ['"]ok['"]/, 'Il riallineamento remoto non deve sovrascrivere una bozza pendente in ' + file);
+  assert.match(source, /!publishing && !pendingLocalSync && syncState === ['"]ok['"]/, 'Realtime non deve sostituire modifiche locali pendenti in ' + file);
+}
+function extractSyncPolicy(source, file) {
+  const match = source.match(/function shouldRetryPendingSync\(state\)\s*\{[\s\S]*?\n\}/);
+  assert.ok(match, 'Policy di riconnessione mancante in ' + file);
+  return vm.runInNewContext('(' + match[0] + ')');
+}
+for (const [file, source] of [['index.html', html], ['regia.html', regia]]) {
+  const policy = extractSyncPolicy(source, file);
+  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,syncState:'error',syncDetail:'dispositivo offline'}), true, 'Le modifiche locali devono essere ritentate dopo la riconnessione in ' + file);
+  assert.equal(policy({pending:true,canEdit:true,localOnly:false,dbReady:true,syncState:'error',syncDetail:'conflitto: versione online aggiornata altrove'}), false, 'Un conflitto non deve essere sovrascritto automaticamente in ' + file);
+  assert.equal(policy({pending:false,canEdit:true,localOnly:false,dbReady:true,syncState:'error',syncDetail:'lettura database'}), false, 'Senza modifiche pendenti va ricaricato lo stato, non pubblicato quello locale, in ' + file);
+  assert.equal(policy({pending:true,canEdit:false,localOnly:false,dbReady:true,syncState:'error',syncDetail:'offline'}), false, 'La riconnessione non deve scrivere senza autorizzazione in ' + file);
+}
+, 'La regia deve controllare periodicamente il riallineamento');
 const publicationMigration = fs.readFileSync('supabase/migrations/20261122174518_scheduled_public_content.sql', 'utf8');
 assert.match(publicationMigration, /create extension if not exists pg_cron/i, 'La pubblicazione programmata deve usare il cron server-side');
 assert.match(publicationMigration, /function public\.publish_santalbino_scheduled_content\(\)/i, 'Funzione server-side di pubblicazione programmata mancante');
