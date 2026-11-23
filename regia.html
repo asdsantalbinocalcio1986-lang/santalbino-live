@@ -1378,7 +1378,7 @@ const defaults = () => ({
   rosters: { home: '', away: '' },
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
-  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false },
+  mvp: { link: '', ourOnly: false, votes: {}, tpl: '', raw: false, selectedCandidates: [] },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
@@ -3661,13 +3661,25 @@ function voteInfo() {
   const ft = [...S.events].reverse().find(e => e.type === 'fulltime');
   if (!ft) return { state: 'none' };
   const end = ft.ts + VOTE_MS, mv = S.events.find(e => e.type === 'mvp');
-  return { state: mv ? 'done' : (Date.now() < end ? 'open' : 'closed'), end, mv };
+  if (mv) return { state: 'done', end, mv };
+  if (!validMvpSelection()) return { state: 'setup', end, mv: null };
+  return { state: Date.now() < end ? 'open' : 'closed', end, mv: null };
 }
 function leftText(ms) { const m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; }
-function candidates() {
+function availableMvpCandidates() {
   const out = [], published = publicContent();
-  ['home', 'away'].forEach(s => { if (S.mvp.ourOnly && s !== S.match.ourSide) return; parseRoster(published.rosters[s]).forEach(p => out.push({ side: s, num: p.num, name: p.name, key: s + '|' + p.name })); });
+  ['home', 'away'].forEach(side => {
+    parseRoster(published.rosters[side]).forEach(p => out.push({ side, num: p.num, name: p.name, key: side + '|' + p.name }));
+  });
   return out;
+}
+function candidates() {
+  const selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+  return availableMvpCandidates().filter(candidate => selected.has(candidate.key));
+}
+function validMvpSelection(list = candidates()) {
+  const sides = new Set(list.map(candidate => candidate.side));
+  return list.length === 4 && sides.has('home') && sides.has('away');
 }
 
 
@@ -3683,7 +3695,10 @@ function mvpPublicHtml() {
   })();
 
   if (vi.state === 'none') {
-    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre automaticamente al fischio finale e resta aperta 12 ore.</div>`;
+    return `<div class="empty"><h3>Migliore in campo</h3>La votazione si apre al fischio finale, dopo la scelta dei quattro candidati da parte della regia, e resta aperta 12 ore.</div>`;
+  }
+  if (vi.state === 'setup') {
+    return `<div class="empty"><h3>Votazione in preparazione</h3>La regia sta completando la selezione dei quattro candidati. Torna qui tra poco.</div>`;
   }
 
   if (vi.state === 'open') {
@@ -3734,22 +3749,32 @@ async function openGraphic(id) {
 }
 let armedMvp = false;
 function mvpRegiaHtml() {
-  const vi = voteInfo(), C = candidates();
-  const st = { none: 'La votazione parte automaticamente al fischio finale e dura 12 ore.', open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`, closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.', done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.` }[vi.state];
+  const vi = voteInfo(), C = candidates(), available = availableMvpCandidates();
+  const selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+  const st = {
+    none: 'Prepara quattro candidati: almeno uno per squadra. La votazione si aprirà al fischio finale e durerà 12 ore.',
+    setup: 'La partita è terminata: completa e salva la selezione dei quattro candidati per aprire la votazione.',
+    open: `Votazione aperta: chiude tra <b id="mvpCount">${leftText((vi.end || 0) - Date.now())}</b>.`,
+    closed: 'Votazione chiusa. Controlla i risultati e proclama il migliore.',
+    done: `Proclamato: <b>${esc(vi.mv ? vi.mv.player : '')}</b>.`
+  }[vi.state];
   const tally = k => (mvpVoteCounts[k] || S.mvp.votes[k] || 0);
   const sorted = [...C].sort((a, b) => tally(b.key) - tally(a.key));
+  const sideCounts = { home: C.filter(c => c.side === 'home').length, away: C.filter(c => c.side === 'away').length };
   return `<div class="card"><h2>Votazione MVP</h2><p style="margin-top:0">${st}</p>
-    <label class="check"><input type="checkbox" id="m-our" ${S.mvp.ourOnly ? 'checked' : ''}> Candidati: solo i giocatori della nostra squadra</label>
-    <button class="btn primary block" data-a="savemvp">Salva impostazioni</button>
+    <p class="small muted">Seleziona esattamente quattro giocatori tra le formazioni pubblicate. Deve esserci almeno un candidato per squadra; gli altri due posti sono liberi. Puoi modificare la selezione prima dell’apertura del voto.</p>
+    <div class="row2"><div><b>${selected.size}/4</b><div class="small muted">${esc(teamName('home'))}: ${sideCounts.home} · ${esc(teamName('away'))}: ${sideCounts.away}</div></div></div>
+    <div class="cands" style="margin-top:10px">${available.map(c => `<label class="cand"><input type="checkbox" data-mvp-candidate="${esc(c.key)}" ${selected.has(c.key) ? 'checked' : ''} ${selected.size >= 4 && !selected.has(c.key) ? 'disabled' : ''}><span style="flex:1"><b>${esc(c.num || '–')}</b> ${esc(c.name)} <span class="small muted">· ${esc(teamName(c.side))}</span></span></label>`).join('') || '<p class="muted">Pubblica prima le formazioni di entrambe le squadre.</p>'}</div>
+    <button class="btn primary block" data-a="savemvp" ${validMvpSelection(C) ? '' : 'disabled'}>Salva i quattro candidati</button>
     <button class="btn block" data-a="refreshvotes">Aggiorna conteggio voti</button>
-    <p class="small muted">Il pubblico vota direttamente dalla scheda MVP della pagina live. Un voto per dispositivo e partita.</p></div>
-  <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow\"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Inserisci prima le formazioni: i candidati vengono da lì.</p>'}</div>
+    <p class="small muted">Il pubblico vota dalla pagina live. Un voto per dispositivo e partita.</p></div>
+  <div class="card"><h2>Voti ricevuti</h2>${C.length ? `${sorted.map(c => `<div class="vrow"><span>${esc(c.num)} ${esc(c.name)} <span class="muted small">· ${esc(teamName(c.side))}</span></span><b>${tally(c.key)}</b></div>`).join('')}` : '<p class="muted" style="margin:0">Seleziona i quattro candidati per visualizzare i voti.</p>'}</div>
   <div class="card"><h2>Immagine MVP</h2><p class="small muted" style="margin-top:0">Sfondo della grafica del migliore in campo. Compaiono nome, logo della squadra e voti.</p>
     ${S.mvp.tpl ? `<img class="thumb" style="max-height:120px" src="${S.mvp.tpl}" alt="Sfondo MVP">` : ''}
     <div class="row2 stack"><label class="btn sm" style="cursor:pointer">${S.mvp.tpl ? 'Cambia immagine' : 'Carica immagine'}<input type="file" accept="image/*" data-mvptpl hidden></label>${S.mvp.tpl ? '<button class="btn sm danger" data-a="rmmvptpl">Togli</button>' : ''}</div>
     ${S.mvp.tpl ? `<label class="check" style="margin-top:6px"><input type="checkbox" data-mvpraw ${S.mvp.raw ? 'checked' : ''}> Solo immagine, senza dati sopra</label>` : ''}</div>
   <div class="card"><h2>Proclama</h2>${C.length ? `<label class="f"><span>Migliore in campo</span><select id="m-win">${sorted.map(c => `<option value="${esc(c.key)}">${esc(c.num)} ${esc(c.name)} (${esc(teamName(c.side))}) · ${tally(c.key)} voti</option>`).join('')}</select></label>
-    <button class="btn primary block" data-a="proclaim" ${vi.state === 'none' || vi.state === 'open' ? 'disabled' : ''}>${vi.state === 'done' ? 'Cambia MVP e rifai l’immagine' : 'Proclama MVP e crea l’immagine'}</button>` : '<p class="muted" style="margin:0">Servono le formazioni.</p>'}</div>`;
+    <button class="btn primary block" data-a="proclaim" ${vi.state === 'none' || vi.state === 'setup' || vi.state === 'open' ? 'disabled' : ''}>${vi.state === 'done' ? 'Cambia MVP e rifai l’immagine' : 'Proclama MVP e crea l’immagine'}</button>` : '<p class="muted" style="margin:0">Seleziona i quattro candidati.</p>'}</div>`;
 }
 function proclaim() {
   const key = $('#m-win').value, side = key.split('|')[0], name = key.split('|').slice(1).join('|'), n = mvpVoteCounts[key] || S.mvp.votes[key] || 0;
@@ -4103,7 +4128,8 @@ function publicHtml() {
   tabs.push(['stat','Statistiche'],['season','Stagione'],['scorers','Marcatori'],['archive','Archivio'],['archiveForms','Storico']);
   if (S.match.standingsUrl) tabs.push(['standings', 'Classifica']); if (voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']); if (S.clock.phase === 'ft') tabs.push(['report', 'Resoconto']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
-  return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
+  const mvpPrompt = voteInfo().state === 'open' ? '<div class="mvp-box"><h3>Vota l’MVP di giornata</h3><p class="small muted">La votazione è aperta: scegli il migliore in campo tra i quattro candidati.</p><button class="btn primary block" data-tab="mvp">VOTA ORA</button></div>' : '';
+  return mvpPrompt + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
     (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'report' ? reportHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
 }
 
@@ -4668,7 +4694,13 @@ document.addEventListener('click', async e => {
     case 'libraryImportGoal': { const url = L.evImg.goal || ''; if (!url) { toast('Non è presente un modello GOAL nelle Impostazioni'); break; } S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}, {goal:url}); commit(true); renderMain(); toast('Modello GOAL aggiunto alla libreria'); break; }
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
-    case 'savemvp': S.mvp.ourOnly = $('#m-our').checked; commit(true); toast('Impostazioni MVP salvate'); break;
+    case 'savemvp': {
+      const chosen = candidates(), sides = new Set(chosen.map(c => c.side));
+      if (chosen.length !== 4 || !sides.has('home') || !sides.has('away')) { toast('Seleziona esattamente quattro candidati, almeno uno per squadra'); break; }
+      S.mvp.selectedCandidates = chosen.map(c => c.key);
+      S.mvp.ourOnly = false;
+      commit(true); renderMain(); toast('Quattro candidati MVP salvati'); break;
+    }
     case 'refreshvotes': await refreshMvpVotes(); toast('Conteggio voti aggiornato'); break;
     case 'copyreport': await copyText(buildMatchReport()); break;
     case 'savevotes': { const v = {}; $$('[data-vote]').forEach(i => { const n = parseInt(i.value, 10); if (n > 0) v[i.dataset.vote] = n; }); S.mvp.votes = v; commit(true); toast('Voti salvati'); break; }
@@ -4771,6 +4803,16 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
+  if (t.matches('[data-mvp-candidate]')) {
+    const key = t.dataset.mvpCandidate, selected = new Set(Array.isArray(S.mvp.selectedCandidates) ? S.mvp.selectedCandidates : []);
+    if (t.checked) {
+      if (selected.size >= 4) { t.checked = false; toast('Puoi selezionare al massimo quattro candidati'); return; }
+      selected.add(key);
+    } else selected.delete(key);
+    S.mvp.selectedCandidates = [...selected];
+    renderMain();
+    return;
+  }
   if (t.matches('[data-attack-direction]')) { if (S.clock.phase !== 'pre') return; S.match.attackDirectionFirst = ['left','right'].includes(t.value) ? t.value : ''; commit(true); renderMain(); return; }
   if(t.matches('[data-editor-scope]')){L.editorTemplate=t.value;saveL();renderMain();return;}
   if(t.matches('[data-event-template]')){L.editorEventTemplate=t.value;renderMain();return;}
