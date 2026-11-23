@@ -153,7 +153,7 @@ assert.match(regia, /previewLineupStory[\s\S]*instagram-story-1080x1920/, 'La re
 assert.match(regia, /function autoPublishSocialEvent\(ev\)/, 'La regia deve avere la pubblicazione automatica degli eventi');
 assert.match(regia, /if \(TEST_MODE \|\| !CAN_EDIT \|\| !dbReady \|\| !db \|\| !cfg\.enabled \|\| !cfg\.ready\) return;/, 'La pubblicazione automatica deve essere disattivata in prova e finché Meta non è verificato');
 assert.match(regia, /SOCIAL_AUTO_EVENT_TYPES = \['goal', 'red', 'halftime', 'fulltime'\]/, 'Gli eventi social automatici devono restare limitati alle tipologie approvate');
-assert.match(regia, /db\.functions\.invoke\(['"]santalbino-social-publish['"]/, 'La regia deve invocare la Edge Function social');
+assert.match(regia, /db\.functions\.invoke\(['"]santalive-social-publish['"]/, 'La regia deve invocare la Edge Function social');
 assert.match(regia, /case ['"]retrySocialPublication['"]/, 'Il registro deve consentire un nuovo tentativo senza ripubblicare i canali già riusciti');
 assert.match(socialFunction, /auth\.getUser\(bearer\)/, 'La Edge Function deve verificare la sessione autenticata');
 assert.match(socialFunction, /from\(['"]santalbino_admins['"]\)/, 'La Edge Function deve verificare l’amministratore autorizzato');
