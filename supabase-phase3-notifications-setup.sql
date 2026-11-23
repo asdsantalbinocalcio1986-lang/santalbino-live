@@ -6,7 +6,7 @@ begin;
 
 create table if not exists public.santalbino_notification_settings (
   match_key text primary key,
-  enabled_categories text[] not null default array['kickoff','halftime','fulltime','goal']::text[],
+  enabled_categories text[] not null default array['kickoff','halftime','fulltime','goal','yellow_card','red_card','substitution','injury','mvp']::text[],
   updated_at timestamptz not null default now(),
   updated_by uuid references auth.users(id) on delete set null,
   constraint santalbino_notification_settings_categories_check check (
