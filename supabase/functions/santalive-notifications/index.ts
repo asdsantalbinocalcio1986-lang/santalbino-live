@@ -149,6 +149,7 @@ Deno.serve(async (req: Request) => {
       const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
       const subject = Deno.env.get("VAPID_SUBJECT") ?? "";
       const hasVapid = !!(publicKey && privateKey && subject);
+      if (hasVapid) webpush.setVapidDetails(subject, publicKey, privateKey);
 
       const { data: settings } = await adminClient.from("santalbino_notification_settings")
         .select("enabled_categories").eq("match_key", matchKey).maybeSingle();
@@ -191,7 +192,6 @@ Deno.serve(async (req: Request) => {
           .eq("match_key", matchKey).eq("active", true).contains("enabled_categories", [category]);
         if (subscribersError) throw subscribersError;
         subscribers = data ?? [];
-        webpush.setVapidDetails(subject, publicKey, privateKey);
       }
       const pushPayload = JSON.stringify({
         title, body, url: targetUrl, category,
