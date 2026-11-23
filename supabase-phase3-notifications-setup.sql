@@ -57,6 +57,7 @@ create table if not exists public.santalbino_notification_outbox (
   approved_by uuid not null references auth.users(id),
   approved_at timestamptz not null default now(),
   status text not null default 'sending' check (status in ('sending','sent','sent_with_errors','failed')),
+  in_app_sent boolean not null default false,
   recipient_count integer not null default 0,
   delivered_count integer not null default 0,
   failed_count integer not null default 0,
