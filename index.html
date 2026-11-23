@@ -66,7 +66,7 @@
   .standings-frame iframe{height:940px}
 }
 @media(max-width:600px){#graphicEditorPreview [style*="grid-template-columns:minmax(0,1fr) 76px 76px"]{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}#graphicEditorPreview input{min-width:0;max-width:100%}#editorDragFrame{touch-action:none;max-width:100%}.tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}.tabs .tab{flex:0 0 auto;min-height:44px;white-space:nowrap}.btn,.tabs .tab{touch-action:manipulation}.row2.stack{grid-template-columns:minmax(0,1fr)!important}.ev .meta{flex-wrap:wrap}.sync{position:sticky;top:0;z-index:20}}
-</style><meta name="theme-color" content="#0b3b22"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
+</style><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"><style id="app-css">
 /* Layout: tabellone con campo stilizzato in alto; sotto, cronaca a timeline per il pubblico e schede di regia per chi gestisce la partita */
 :root{
   --bg:#eef2ec; --surface:#ffffff; --surface2:#e4eae2; --ink:#10201a; --muted:#56655c; --line:#d3dcd1;
@@ -1328,7 +1328,7 @@ html.santa-test-mode .test-banner{margin:0 0 12px;padding:10px 12px;border:1px s
 html.santa-test-mode [data-tab="archive"],html.santa-test-mode [data-tab="season"],html.santa-test-mode [data-tab="scorers"],html.santa-test-mode [data-tab="archiveForms"],html.santa-test-mode [data-tab="mvp"],html.santa-test-mode [data-rtab="archive"],html.santa-test-mode [data-rtab="analytics"]{display:none!important}
 html.santa-test-mode [data-a="archiveCurrentMatch"],html.santa-test-mode [data-a="deleteArchivedMatch"]{display:none!important}
 </style>
-</head><body><div id="root"></div>
+</head><body><div id="root" role="main" aria-label="Contenuto SANTA Live"></div>
 <footer id="copyright-footer" style="max-width:720px;margin:22px auto 0;padding:14px 10px 8px;text-align:center;color:#69766e;font:12px/1.6 system-ui,sans-serif;border-top:1px solid #d3dcd1">
   <strong>© 2026 ASD Sant'Albino Terme — SANTA Live.</strong> Tutti i diritti riservati.<br>
   Software, interfaccia e grafiche originali protetti dal diritto d'autore. Riproduzione, modifica e redistribuzione non autorizzate.<br>
@@ -1352,7 +1352,7 @@ html.santa-test-mode [data-a="archiveCurrentMatch"],html.santa-test-mode [data-a
     if(root && !root.textContent.trim()) show('Lo script principale non ha avviato l’interfaccia','La pagina è stata caricata, ma il contenuto non è stato disegnato. Controllare caricamento degli script e console del browser.');
   },5000);
 })();
-</script><script type="application/json" id="app-state">{"rev":4,"match":{"home":"ASD Sant'Albino Terme","away":"","comp":"Terza Categoria Toscana · Girone A","venue":"","date":"","ourSide":"home","hashtag":"#SantAlbinoTerme"},"logos":{"home":"./assets/logo-home.png","away":"./assets/logo-away.png"},"rosters":{"home":"","away":""},"clock":{"phase":"pre","t0":0},"mvp":{"link":"","ourOnly":false,"votes":{},"tpl":"","raw":false},"events":[]}</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script><script src="./config.js"></script><script id="app-js">
+</script><script type="application/json" id="app-state">{"rev":4,"match":{"home":"ASD Sant'Albino Terme","away":"","comp":"Terza Categoria Toscana · Girone A","venue":"","date":"","ourSide":"home","hashtag":"#SantAlbinoTerme"},"logos":{"home":"./assets/logo-home.png","away":"./assets/logo-away.png"},"rosters":{"home":"","away":""},"clock":{"phase":"pre","t0":0},"mvp":{"link":"","ourOnly":false,"votes":{},"tpl":"","raw":false},"events":[]}</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script><script src="./config.js"></script><script id="app-js">
 'use strict';
 const TEST_PARAMS = new URLSearchParams(window.location.search);
 const TEST_MODE = TEST_PARAMS.get('test') === '1';
@@ -1614,7 +1614,7 @@ function convocatiRegiaHtml() {
       <button class="btn block" style="margin-top:8px" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button></div>
     <div class="card"><h2>Post pre-partita</h2>
       <p class="small muted" style="margin-top:0">Il testo riepiloga le informazioni della partita e non contiene i nomi dei convocati.</p>
-      <textarea data-convocati-preview rows="10" readonly>${esc(generated)}</textarea>
+      <textarea data-convocati-preview rows="10" readonly aria-label="Testo del post pre-partita">${esc(generated)}</textarea>
       <button class="btn primary block" data-a="copyconvocati">Salva e copia testo del post</button></div>`;
 }
 function resolvePlayer(side, str) {
@@ -3660,7 +3660,7 @@ async function openMatchResult() {
   }
 }
 function reportHtml() {
-  return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita, con le formazioni di entrambe le squadre. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="22" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
+  return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita, con le formazioni di entrambe le squadre. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="22" readonly aria-label="Resoconto finale">${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
 }
 
 /* ================= vista pubblica ================= */
@@ -3731,7 +3731,7 @@ function feedHtml(list) {
   return list.map(e => {
     const so = socialOf(e.id), editing = editId === e.id, txt = evText(e);
     return `<div class="ev" data-id="${e.id}"><div class="m">${esc(e.min || '–')}${e.min ? '′' : ''}</div><div>
-      ${editing ? `<textarea data-edtext rows="5">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
+      ${editing ? `<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
       <div class="meta"><span class="chip ${so.status}">${so.status === 'pubblicato' ? 'Su Facebook' : 'Da pubblicare'}</span>
       ${editing ? `<button class="btn sm primary" data-a="saveedit">Salva testo</button><button class="btn sm" data-a="canceledit">Annulla</button>`
         : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
@@ -3795,7 +3795,7 @@ function regiaHtml() {
       <div class="small muted" style="margin:-6px 0 12px">I primi 11 sono titolari. Una riga <code>---</code> separa la panchina. <span data-count="${s}">${ns} titolari · ${pl.length - ns} in panchina</span></div>
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva bozza</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('') + publicationControlsHtml();
-  else if (t === 'social') body = `<div class="card"><h2>Cronaca narrativa</h2><p class="small muted">Testo generato dagli eventi registrati. Puoi modificarlo e salvarlo come bozza; la pagina pubblica lo mostrerà soltanto dopo la tua pubblicazione esplicita.</p><label class="f"><span>Testo della cronaca</span><textarea id="chronicleEditor" rows="18">${esc(S.match.chronicleDraft || buildChronicleDraft())}</textarea></label><div class="row2 stack"><button class="btn" data-a="saveChronicleDraft">Salva bozza</button><button class="btn" data-a="regenerateChronicle">Rigenera dagli eventi</button></div><button class="btn primary block" data-a="publishChronicle">Pubblica cronaca sulla pagina live</button><p class="small muted">${S.match.chroniclePublished ? S.match.chronicleNeedsReview ? 'ATTENZIONE: gli eventi sono cambiati dopo l’ultima pubblicazione. La cronaca pubblica non è stata aggiornata: controlla la bozza e premi Pubblica quando è pronta.' : 'Una cronaca è attualmente pubblicata. La nuova versione la sostituirà soltanto quando premi Pubblica.' : 'Nessuna cronaca narrativa è attualmente pubblicata.'}</p></div><div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Resoconto finale completo</h2><textarea rows="10" readonly>${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca eventi</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
+  else if (t === 'social') body = `<div class="card"><h2>Cronaca narrativa</h2><p class="small muted">Testo generato dagli eventi registrati. Puoi modificarlo e salvarlo come bozza; la pagina pubblica lo mostrerà soltanto dopo la tua pubblicazione esplicita.</p><label class="f"><span>Testo della cronaca</span><textarea id="chronicleEditor" rows="18">${esc(S.match.chronicleDraft || buildChronicleDraft())}</textarea></label><div class="row2 stack"><button class="btn" data-a="saveChronicleDraft">Salva bozza</button><button class="btn" data-a="regenerateChronicle">Rigenera dagli eventi</button></div><button class="btn primary block" data-a="publishChronicle">Pubblica cronaca sulla pagina live</button><p class="small muted">${S.match.chroniclePublished ? S.match.chronicleNeedsReview ? 'ATTENZIONE: gli eventi sono cambiati dopo l’ultima pubblicazione. La cronaca pubblica non è stata aggiornata: controlla la bozza e premi Pubblica quando è pronta.' : 'Una cronaca è attualmente pubblicata. La nuova versione la sostituirà soltanto quando premi Pubblica.' : 'Nessuna cronaca narrativa è attualmente pubblicata.'}</p></div><div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<div class="card"><h2>Resoconto finale completo</h2><textarea rows="10" readonly aria-label="Resoconto finale completo">${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca eventi</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();

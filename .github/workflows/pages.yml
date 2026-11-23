@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   # Keep pull-request validation separate from production Pages deployment.
@@ -36,6 +34,10 @@ jobs:
     name: Deploy GitHub Pages
     if: github.event_name != 'pull_request'
     needs: validate
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

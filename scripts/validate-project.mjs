@@ -11,6 +11,7 @@ const sql = fs.readFileSync('supabase-phase1-security.sql', 'utf8');
 const home = fs.readFileSync('home.html', 'utf8');
 const preview = fs.readFileSync('preview.html', 'utf8');
 const sw = fs.readFileSync('sw.js', 'utf8');
+const workflow = fs.readFileSync('.github/workflows/pages.yml', 'utf8');
 
 for (const file of ['home.html', 'preview.html']) {
   const page = fs.readFileSync(file, 'utf8');
@@ -28,8 +29,25 @@ const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 assert.ok(manifest.icons?.some(icon => icon.src.split('?')[0] === './santa-live-icon.svg' && icon.sizes === '192x192'), 'Icona PWA SVG 192px mancante');
 assert.ok(manifest.icons?.some(icon => icon.src.split('?')[0] === './santa-live-icon.svg' && icon.sizes === '512x512'), 'Icona PWA SVG 512px mancante');
 assert.ok(fs.existsSync('santa-live-icon.svg'), 'Asset logo SVG mancante');
+assert.match(sw, /const CACHE_PREFIX = 'santa-live-shell-';/, 'Il service worker deve usare un namespace cache dedicato');
+assert.match(sw, /key\.startsWith\(CACHE_PREFIX\) && key !== CACHE/, 'Il service worker deve eliminare soltanto le proprie cache obsolete');
+assert.doesNotMatch(sw, /caches\.match\(/, 'Il service worker non deve leggere cache di altre applicazioni sullo stesso dominio');
+assert.match(sw, /cache\.match\(request\)/, 'Le richieste offline devono leggere dalla cache SANTA Live');
+assert.match(workflow, /^permissions:\n  contents: read$/m, 'I permessi globali del workflow devono restare in sola lettura');
+assert.match(workflow, /^  deploy:[\s\S]*?^    permissions:\n      contents: read\n      pages: write\n      id-token: write/m, 'I permessi di pubblicazione devono essere assegnati soltanto al job deploy');
+assert.doesNotMatch(workflow, /^  pages: write$/m, 'pages:write non deve essere globale');
+assert.doesNotMatch(workflow, /^  id-token: write$/m, 'id-token:write non deve essere globale');
+
+assert.match(html, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La pagina pubblica deve esporre un landmark main');
+assert.match(regia, /<div id="root" role="main" aria-label="Contenuto SANTA Live">/, 'La regia deve esporre un landmark main');
+assert.match(html, /<textarea data-convocati-preview rows="10" readonly aria-label="Testo del post pre-partita">/, 'L’anteprima del post deve avere un nome accessibile');
+assert.match(html, /<textarea id="matchReport" rows="22" readonly aria-label="Resoconto finale">/, 'Il resoconto finale deve avere un nome accessibile');
+assert.match(html, /<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">/, 'L’editor del testo evento deve avere un nome accessibile');
+assert.match(html, /<textarea rows="10" readonly aria-label="Resoconto finale completo">/, 'Il resoconto completo pubblico deve avere un nome accessibile');
+assert.equal((html.match(/<meta name="theme-color"/g) || []).length, 1, 'La pagina pubblica non deve duplicare theme-color');
+assert.equal((regia.match(/<meta name="theme-color"/g) || []).length, 1, 'La regia non deve duplicare theme-color');
 for (const [file, source] of [['home.html', home], ['preview.html', preview], ['index.html', html], ['regia.html', regia]]) {
-  assert.match(source, /@supabase\/supabase-js@2\.119\.1/, 'Versione Supabase JS non fissata in ' + file);
+  assert.match(source, /@supabase\/supabase-js@2\.119\.2/, 'Versione Supabase JS non fissata in ' + file);
 }
 assert.match(home, /\.range\(start,start\+PAGE_SIZE-1\)/, 'Archivio non paginato');
 assert.match(sw, /'\.\/index\.html'/, 'Shell offline senza pagina regia');
