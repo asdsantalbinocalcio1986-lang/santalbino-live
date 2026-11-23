@@ -3835,6 +3835,25 @@ function proclaim() {
   S.events = S.events.filter(e => e.type !== 'mvp');
   addEvent({ type: 'mvp', team: side, min: '', player: name, votes: n }, { post: true });
 }
+async function sendPushForEvent(eventId) {
+  if (TEST_MODE || !CAN_EDIT || !db || !dbReady) { toast('Invio notifiche disponibile soltanto nella regia ufficiale online'); return; }
+  const ev = S.events.find(item => item.id === eventId), cfg = notificationConfig();
+  if (!ev || !cfg.enabled || cfg.types[ev.type] !== true) { toast('Notifica non autorizzata: controlla le preferenze della regia'); return; }
+  const index = S.events.indexOf(ev), score = scoreAt(index);
+  const labels = { kickoff: 'Kick Off', halftime: 'Half Time', fulltime: 'Full Time', goal: 'Goal', yellow: 'Ammonizione', red: 'Espulsione', sub: 'Sostituzione', mvp: 'Votazione MVP' };
+  const title = 'SANTALive · ' + (labels[ev.type] || 'Aggiornamento partita');
+  const body = teamName('home') + ' ' + score[0] + '–' + score[1] + ' ' + teamName('away') + (ev.player ? ' · ' + ev.player : '');
+  const url = 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(mvpPollKey());
+  try {
+    const { data, error } = await db.functions.invoke('santalive-push', { body: { action: 'send', approved: true, eventId: String(ev.id), eventType: ev.type, title, body, url } });
+    if (error) throw error;
+    toast(data?.status === 'sent' ? 'Notifica inviata a ' + Number(data.sent || 0) + ' dispositivi' : (data?.message || 'Esito invio: ' + (data?.status || 'non disponibile')));
+  } catch (error) {
+    console.error('Invio notifica SANTA Live:', error);
+    toast(error?.message || 'Invio notifiche non riuscito: verifica la configurazione push');
+  }
+}
+
 
 /* ================= resoconto automatico di fine partita ================= */
 function buildMatchReport() {
@@ -4193,11 +4212,12 @@ function feedHtml(list) {
   if (!list.length) return '<div class="empty">Nessun evento. Premi “Fischio d’inizio” o aggiungi un evento.</div>';
   return list.map(e => {
     const so = socialOf(e.id), editing = editId === e.id, txt = evText(e);
+    const notify = notificationConfig().enabled && notificationConfig().types[e.type] === true;
     return `<div class="ev" data-id="${e.id}"><div class="m">${esc(e.min || '–')}${e.min ? '′' : ''}</div><div>
       ${editing ? `<textarea data-edtext rows="5" aria-label="Modifica testo dell’evento">${esc(txt)}</textarea>` : `<div class="t">${esc(txt)}</div>`}
       <div class="meta"><span class="chip ${so.status}">${so.status === 'pubblicato' ? 'Su Facebook' : 'Da pubblicare'}</span>
       ${editing ? `<button class="btn sm primary" data-a="saveedit">Salva testo</button><button class="btn sm" data-a="canceledit">Annulla</button>`
-        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button><button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
+        : `<button class="btn sm primary" data-a="post">Pubblica</button><button class="btn sm" data-a="edit">Testo social</button><button class="btn sm" data-a="editevent">Modifica evento</button>${notify ? `<button class="btn sm" data-a="sendPushForEvent" data-id="${esc(e.id)}">Invia notifica</button>` : ''}<button class="btn sm danger" data-a="del">${armedDel === e.id ? 'Tocca ancora' : 'Elimina'}</button>`}</div></div></div>`;
   }).join('');
 }
 let editId = null, armedDel = null, editingEventId = null;
@@ -4419,7 +4439,7 @@ async function loadAnalytics() {
 }
 function settingsHtml() {
   const I = (id, label, v, ph = '', type = 'text') => `<label class="f"><span>${label}</span><input type="${type}" id="${id}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
-  const m = S.match, sp = socialPublishingConfig();
+  const m = S.match, sp = socialPublishingConfig(), nt = notificationConfig();
   return `<div class="card"><h2>Partita</h2>${I('s-home', 'Squadra di casa', m.home)}${I('s-away', 'Squadra ospite', m.away, 'Nome della squadra avversaria')}
     <label class="f"><span>La nostra squadra</span><select id="s-our"><option value="home" ${m.ourSide === 'home' ? 'selected' : ''}>Gioca in casa</option><option value="away" ${m.ourSide === 'away' ? 'selected' : ''}>Gioca in trasferta</option></select></label>
     ${I('s-comp', 'Campionato', m.comp)}${I('s-venue', 'Campo', m.venue, 'Es. Campo comunale')}${I('s-date', 'Data', m.date, '', 'date')}${I('s-time', 'Ora', m.time || '', '', 'time')}${I('s-tag', 'Hashtag nei post', m.hashtag, '#SantAlbinoTerme')}
@@ -4444,6 +4464,13 @@ function settingsHtml() {
     <div class="row2 stack"><button class="btn" data-a="saveSocialPublishing">Salva impostazioni</button><button class="btn primary" data-a="verifySocialPublishing">Verifica collegamento Meta</button></div>
     <div class="row2 stack" style="margin-top:8px"><button class="btn" data-a="refreshSocialLog">Aggiorna registro pubblicazioni</button></div>
     <div id="socialPublishLog" class="small muted" style="margin-top:8px">Il registro mostra gli ultimi invii e gli eventuali errori.</div>
+  </div>
+
+  <div class="card"><h2>Notifiche della partita</h2>
+    <p class="small muted">Le tipologie attive sono notificabili dalla regia, ma nessun invio parte automaticamente quando registri un evento. Per ogni evento autorizzato trovi il comando “Invia notifica” nella cronaca.</p>
+    <label class="check"><input type="checkbox" id="s-push-enabled" ${nt.enabled ? 'checked' : ''}> Abilita invio manuale delle notifiche</label>
+    <div class="cands">${[['kickoff','Kick Off'],['halftime','Half Time'],['fulltime','Full Time'],['goal','Goal'],['yellow','Ammonizione'],['red','Espulsione'],['sub','Sostituzione'],['mvp','Apertura votazione MVP']].map(([key,label]) => `<label class="check"><input type="checkbox" data-push-type="${key}" ${nt.types[key] ? 'checked' : ''}> ${label}</label>`).join('')}</div>
+    <button class="btn primary block" data-a="saveNotificationSettings">Salva preferenze notifiche</button>
   </div>
 
   <div class="card"><h2>Dati e backup</h2><div class="row2 stack"><button class="btn" data-a="exportbackup">Esporta copia dati</button><label class="btn" style="cursor:pointer">Carica copia dati<input type="file" id="impJson" accept="application/json" hidden></label></div>
@@ -4772,6 +4799,14 @@ document.addEventListener('click', async e => {
       commit(true); renderMain(); toast(enabled ? 'Pubblicazione automatica attivata per gli eventi selezionati' : 'Pubblicazione automatica sospesa');
       break;
     }
+    case 'saveNotificationSettings': {
+      const types = {};
+      $('[data-push-type]').forEach(input => { types[input.dataset.pushType] = !!input.checked; });
+      S.notifications = Object.assign(notificationConfig(), { enabled: !!$('#s-push-enabled')?.checked, types });
+      commit(true); renderMain(); toast('Preferenze notifiche salvate: l’invio resta sempre manuale dalla regia'); break;
+    }
+    case 'togglePushSubscription': await togglePushSubscription(); break;
+    case 'sendPushForEvent': await sendPushForEvent(a.dataset.id || ''); break;
     case 'verifySocialPublishing': await verifySocialPublishing(); break;
     case 'refreshSocialLog': await loadSocialPublicationLog(); break;
     case 'retrySocialPublication': await retrySocialPublication(a.dataset.id || ''); break;
