@@ -8,6 +8,7 @@ const testMigration = fs.readFileSync('supabase/migrations/20261120133534_isolat
 const testGrantMigration = fs.readFileSync('supabase/migrations/20261120133845_tighten_test_state_grants.sql', 'utf8');
 const testRpcGrantMigration = fs.readFileSync('supabase/migrations/20261120133923_restrict_test_state_rpc_to_authenticated.sql', 'utf8');
 const sql = fs.readFileSync('supabase-phase1-security.sql', 'utf8');
+const mvpCandidateMigration = fs.readFileSync('supabase-phase2-mvp-candidates.sql', 'utf8');
 const home = fs.readFileSync('home.html', 'utf8');
 const preview = fs.readFileSync('preview.html', 'utf8');
 const sw = fs.readFileSync('sw.js', 'utf8');
@@ -79,6 +80,11 @@ JSON.parse(stateMatch[1]);
 assert.match(html, /rpc\(['"]cast_santalbino_mvp_vote['"]/);
 assert.match(html, /function allMvpCandidates\(\)/, 'La pagina pubblica deve ricavare i candidati selezionati dalla regia');
 assert.match(html, /state: 'unconfigured'/, 'Il voto pubblico deve restare chiuso se mancano i quattro candidati');
+assert.match(mvpCandidateMigration, /jsonb_array_length\(v_state #> '\{mvp,candidateKeys\}'\),0\) <> 4/i, 'Il database deve richiedere esattamente quattro candidati');
+assert.match(mvpCandidateMigration, /count\(distinct split_part\(value,'\|',1\)\)[\s\S]*?<> 2/i, 'Il database deve richiedere almeno un candidato per squadra');
+assert.match(mvpCandidateMigration, /selected\.value = p_candidate_key/i, 'Il database deve accettare voti soltanto per i candidati selezionati');
+assert.match(html, /function allMvpCandidates\(\)/, 'La pagina pubblica deve ricavare i candidati selezionati dalla regia');
+assert.match(html, /state: 'unconfigured'/, 'Il voto pubblico deve restare chiuso se mancano i quattro candidati');
 assert.match(html, /rpc\(['"]get_santalbino_mvp_vote_counts['"]/);
 assert.match(html, /async function refreshMvpVotes\(\)\s*\{\s*if \(TEST_MODE \|\| !db \|\| !CAN_EDIT\) return;/, 'I conteggi MVP non devono essere richiesti da visitatori anonimi o dalla simulazione');
 assert.match(html, /const STATE_TABLE = TEST_MODE \? ['"]live_test_state['"] : ['"]live_state['"]/);
@@ -148,6 +154,9 @@ for (const [index, attrs, body] of regiaScripts) {
   regiaChecked++;
 }
 assert.ok(regiaChecked >= 1, 'Script inline della regia mancante o non verificabile');
+assert.match(regia, /function mvpDraftSelectorHtml\(\)/, 'La regia deve mostrare il selettore dei quattro candidati MVP');
+assert.match(regia, /S\.mvp\.candidateKeys = keys/, 'La selezione MVP deve essere salvata nello stato della partita');
+assert.match(regia, /publicationControlsHtml\(\) \+ mvpDraftSelectorHtml\(\)/, 'Il selettore MVP deve essere presente nella scheda Formazioni');
 assert.match(regia, /story \? 1080 : 1600[\s\S]*story \? 1920 : 1100/, 'La grafica singola deve supportare il formato Storie Instagram 9:16');
 assert.match(regia, /const watermarkLogo = panel\.key === 'home' \? homeLogo : awayLogo/, 'La grafica singola deve usare il logo della squadra come filigrana');
 assert.match(regia, /x\.fillText\(p\.name \|\| '', textX, yy\)/, 'I nomi devono essere collocati accanto ai numeri di maglia');
