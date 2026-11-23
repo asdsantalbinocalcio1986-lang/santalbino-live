@@ -38,4 +38,24 @@ alter table public.santalbino_push_deliveries enable row level security;
 revoke all on table public.santalbino_push_subscriptions from public, anon, authenticated;
 revoke all on table public.santalbino_push_deliveries from public, anon, authenticated;
 
+
+create table if not exists public.santalbino_live_notifications (
+  event_id text primary key,
+  match_id text not null,
+  event_type text not null,
+  title text not null,
+  body text not null,
+  url text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.santalbino_live_notifications enable row level security;
+revoke all on table public.santalbino_live_notifications from public, anon, authenticated;
+grant select on table public.santalbino_live_notifications to anon, authenticated;
+create policy "Public can read approved SANTA Live notifications"
+  on public.santalbino_live_notifications for select to anon, authenticated
+  using (true);
+
+alter publication supabase_realtime add table public.santalbino_live_notifications;
+
 commit;
