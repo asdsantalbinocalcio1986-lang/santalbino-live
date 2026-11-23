@@ -79,3 +79,14 @@ Collaudo obbligatorio in partita di prova:
 - L'utente deve poter revocare il consenso.
 - La regia mantiene il controllo editoriale: registrazione, pubblicazione e notifica sono operazioni distinte.
 - Le notifiche predefinite Kick Off, Half Time, Full Time e Goal sono selezionate come impostazione iniziale, ma l'invio richiede comunque l'azione esplicita della regia.
+
+
+## Stato implementazione tecnica (branch di sviluppo)
+
+- Preparato lo script `supabase-phase3-notifications-setup.sql` con tabelle private per impostazioni partita, sottoscrizioni e outbox; RLS attiva e accesso diretto anon/authenticated revocato.
+- Preparata la Edge Function `supabase/functions/santalive-notifications/index.ts` per consenso/sottoscrizione, revoca, preferenze, impostazioni regia e invio esplicitamente approvato.
+- Preparata la gestione Push nel Service Worker; versione cache incrementata.
+- Le chiavi VAPID non sono presenti e non sono state configurate; l'invio resta quindi non attivabile.
+- Non è ancora presente l'interfaccia pubblica di iscrizione né il pannello regia per invio/override; non è ancora collegato il canale in-app Realtime.
+- Lo script SQL e la funzione Edge non sono stati applicati/distribuiti nel progetto Supabase di produzione.
+- Il controllo MVP lato database usa la rosa pubblicata quando disponibile, in coerenza con i candidati mostrati dalla pagina pubblica, e normalizza il marcatore GK.
