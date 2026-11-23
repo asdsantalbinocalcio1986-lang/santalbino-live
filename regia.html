@@ -1378,7 +1378,7 @@ const defaults = () => ({
   rosters: { home: '', away: '' },
   convocati: '',
   clock: { phase: 'pre', t0: 0 },
-  mvp: { link: '', ourOnly: false, candidateKeys: [], votes: {}, tpl: '', raw: false },
+  mvp: { link: '', ourOnly: false, candidateKeys: [], candidatePlayers: [], votes: {}, tpl: '', raw: false },
   media: { evOne: {}, evImg: {}, evImgRaw: {}, library: { goal: '', formation: '' }, graphicEditor: { global: { accent: '#e3c66d', overlay: 0, border: 3, sponsor: true }, templates: {} } },
   events: []
 });
@@ -3681,6 +3681,10 @@ function allMvpCandidates() {
   return out;
 }
 function candidates() {
+  const saved = Array.isArray(S.mvp.candidatePlayers) ? S.mvp.candidatePlayers : [];
+  if (saved.length === 4 && new Set(saved.map(p => p.key)).size === 4 &&
+      saved.every(p => p && ['home', 'away'].includes(p.side) && p.name && p.key === p.side + '|' + p.name) &&
+      new Set(saved.map(p => p.side)).size === 2) return saved;
   const all = allMvpCandidates();
   const keys = Array.isArray(S.mvp.candidateKeys) ? S.mvp.candidateKeys : [];
   if (keys.length !== 4 || new Set(keys).size !== 4) return [];
@@ -4088,7 +4092,7 @@ async function openMatchResult() {
   }
 }
 function reportHtml() {
-  return `<div class="card"><h2>Resoconto finale</h2><p class="small muted">Articolo generato automaticamente dagli eventi registrati durante la partita, con le formazioni di entrambe le squadre. Controlla il testo prima di pubblicarlo.</p><textarea id="matchReport" rows="22" readonly aria-label="Resoconto finale">${esc(buildMatchReport())}</textarea><button class="btn primary block" data-a="copyreport">Copia articolo completo</button></div>`;
+  return `<section><h2>Statistiche finali</h2>${statsHtml()}</section>`;
 }
 
 /* ================= vista pubblica ================= */
@@ -4720,6 +4724,7 @@ document.addEventListener('click', async e => {
       if (keys.length !== 4 || new Set(keys).size !== 4 || chosen.length !== 4) { toast('Seleziona esattamente quattro giocatori presenti nelle formazioni.'); break; }
       if (new Set(chosen.map(player => player.side)).size !== 2) { toast('Deve essere selezionato almeno un giocatore per ciascuna squadra.'); break; }
       S.mvp.candidateKeys = keys;
+      S.mvp.candidatePlayers = chosen.map(player => ({ side: player.side, num: player.num, name: player.name, key: player.key }));
       S.mvp.ourOnly = false;
       commit(true); renderMain(); toast('I quattro candidati MVP sono stati salvati'); break;
     }
