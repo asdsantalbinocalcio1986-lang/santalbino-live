@@ -4714,7 +4714,7 @@ document.addEventListener('click', async e => {
     case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
     case 'savemvp': {
-      const keys = $('[data-mvp-candidate]:checked').map(input => input.value);
+      const keys = $$('[data-mvp-candidate]:checked').map(input => input.value);
       const all = allMvpCandidates();
       const chosen = keys.map(key => all.find(player => player.key === key)).filter(Boolean);
       if (keys.length !== 4 || new Set(keys).size !== 4 || chosen.length !== 4) { toast('Seleziona esattamente quattro giocatori presenti nelle formazioni.'); break; }
