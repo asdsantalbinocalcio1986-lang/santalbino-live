@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
     const pageId = Deno.env.get("META_PAGE_ID") || "";
     const pageToken = Deno.env.get("META_PAGE_ACCESS_TOKEN") || "";
     const instagramId = Deno.env.get("META_IG_USER_ID") || "";
+    const publishingEnabled = Deno.env.get("META_PUBLISH_ENABLED") === "true";
     if (!/^v\d+\.\d+$/.test(graphVersion)) {
       return json({ ready: false, missing: ["META_GRAPH_API_VERSION"], message: "Versione Graph API non valida" });
     }
@@ -94,25 +95,56 @@ Deno.serve(async (req: Request) => {
         ...(!pageToken ? ["META_PAGE_ACCESS_TOKEN"] : []),
         ...(!instagramId ? ["META_IG_USER_ID"] : []),
       ];
-      if (missing.length) return json({ ready: false, missing, message: "Inserisci i segreti Meta in Supabase" });
+      if (missing.length) return json({ ready: false, publishingEnabled, missing, message: "Inserisci i segreti Meta in Supabase" });
       try {
-        const page = await graphGet(pageId, { fields: "id,name", access_token: pageToken });
-        const instagram = await graphGet(instagramId, { fields: "id,username,account_type", access_token: pageToken });
-        const professional = ["BUSINESS", "MEDIA_CREATOR", "CREATOR"].includes(String(instagram.account_type || "").toUpperCase());
-        if (!professional) {
-          return json({ ready: false, missing: [], message: "L'account Instagram collegato non risulta professionale (Business o Creator)" });
+        const page = await graphGet(pageId, {
+          fields: "id,name,connected_instagram_account",
+          access_token: pageToken,
+        });
+        const linkedInstagramId = String(page.connected_instagram_account?.id || "");
+        if (!linkedInstagramId) {
+          return json({
+            ready: false,
+            publishingEnabled,
+            missing: [],
+            message: "La Pagina Facebook non restituisce un account Instagram collegato. Controlla Account collegati nelle impostazioni della Pagina.",
+          });
+        }
+        if (linkedInstagramId !== instagramId) {
+          return json({
+            ready: false,
+            publishingEnabled,
+            missing: [],
+            message: "L'ID Instagram configurato non coincide con l'account collegato alla Pagina Facebook.",
+          });
+        }
+        const instagram = await graphGet(instagramId, {
+          fields: "id,username",
+          access_token: pageToken,
+        });
+        if (String(instagram.id || "") !== instagramId) {
+          return json({
+            ready: false,
+            publishingEnabled,
+            missing: [],
+            message: "Meta non ha confermato l'account Instagram configurato.",
+          });
         }
         return json({
           ready: true,
+          publishingEnabled,
           page: { id: page.id, name: page.name || "" },
-          instagram: { id: instagram.id, username: instagram.username || "", accountType: instagram.account_type },
+          instagram: { id: instagram.id, username: instagram.username || "" },
         });
       } catch (error) {
-        return json({ ready: false, missing: [], message: safeError(error, pageToken) });
+        return json({ ready: false, publishingEnabled, missing: [], message: safeError(error, pageToken) });
       }
     }
 
     if (body.action !== "publish") return json({ error: "Azione non riconosciuta" }, 400);
+    if (!publishingEnabled) {
+      return json({ error: "Pubblicazione bloccata lato server: META_PUBLISH_ENABLED non è attivo." }, 403);
+    }
     const eventId = String(body.eventId || "").trim();
     const matchId = String(body.matchId || "").trim().slice(0, 180);
     const eventType = String(body.eventType || "");
