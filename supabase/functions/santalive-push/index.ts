@@ -109,8 +109,11 @@ Deno.serve(async (req: Request) => {
     const { data: live, error: liveError } = await service.from("live_state").select("state").eq("id", 1).maybeSingle();
     if (liveError || !live?.state) return json({ error: "Stato partita non disponibile" }, 409, origin);
     const state = live.state;
+    const defaultTypes: Record<string, boolean> = { kickoff: true, halftime: true, fulltime: true, goal: true, yellow: false, red: false, sub: false, mvp: false };
     const prefs = state.notifications || {};
-    if (prefs.enabled !== true || prefs.types?.[eventType] !== true) {
+    const enabled = prefs.enabled !== false;
+    const typeEnabled = prefs.types ? prefs.types[eventType] === true : defaultTypes[eventType] === true;
+    if (!enabled || !typeEnabled) {
       return json({ error: "Questa tipologia è disattivata nelle preferenze della regia" }, 403, origin);
     }
     const isMvpInvite = eventType === "mvp" && eventId === String(state.match?.pollId || "") + ":mvp";
