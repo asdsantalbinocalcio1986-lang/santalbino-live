@@ -273,3 +273,9 @@ create policy "SANTA Live admins can update post-match graphics"
   on storage.objects for update to authenticated
   using (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin())
   with check (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin());
+
+drop policy if exists "SANTA Live admins can delete post-match graphics" on storage.objects;
+create policy "SANTA Live admins can delete post-match graphics"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin());
+
