@@ -34,7 +34,7 @@ create or replace function public.is_santalbino_admin()
 returns boolean
 language sql
 stable
-security invoker
+security definer
 set search_path = ''
 as $$
   select exists (
