@@ -22,14 +22,14 @@ select * from public.save_santalbino_postmatch_revision(
   'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 );
 
-do $
+do $block$
 begin
   if (select count(*) from public.santalbino_postmatch_editions) <> 2 then
     raise exception 'Admin could not read the expected post-match revisions through RLS';
   end if;
-end $;
+end $block$;
 
-do $
+do $block$
 begin
   if (select status from public.santalbino_postmatch_editions where revision = 1) <> 'superseded' then
     raise exception 'Saving a second draft did not supersede the first draft';
@@ -37,7 +37,7 @@ begin
   if (select status from public.santalbino_postmatch_editions where revision = 2) <> 'draft' then
     raise exception 'The newest revision is not a draft';
   end if;
-end $$;
+end $block$;
 
 select * from public.approve_santalbino_postmatch_revision(
   (select id from public.santalbino_postmatch_editions where revision = 2), 2
@@ -131,14 +131,14 @@ reset role;
 set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
 set role authenticated;
 
-do $
+do $block$
 begin
   if (select count(*) from public.santalbino_postmatch_editions) <> 0 then
     raise exception 'Non-admin could read post-match revisions through RLS';
   end if;
-end $;
+end $block$;
 
-do $
+do $block$
 begin
   begin
     perform * from public.save_santalbino_postmatch_revision(
@@ -150,7 +150,7 @@ begin
   exception when insufficient_privilege then
     null;
   end;
-end $$;
+end $block$;
 
 reset role;
 select 'Post-match SQL integration tests passed' as result;
