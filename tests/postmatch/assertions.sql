@@ -47,8 +47,11 @@ begin
   end if;
 end $$;
 
--- Content changes must be rejected after approval.
-do $$
+-- Test the immutability trigger as the table owner: the authenticated
+-- application role is intentionally denied direct UPDATE by table grants,
+-- which would otherwise prevent the trigger itself from being exercised.
+reset role;
+do $
 begin
   begin
     update public.santalbino_postmatch_editions set caption = 'Alterata'
@@ -58,7 +61,8 @@ begin
     if sqlerrm = 'Approved revision content was mutable' then raise; end if;
     if sqlerrm <> 'Post-match revision content is immutable' then raise; end if;
   end;
-end $$;
+end $;
+set role authenticated;
 
 -- A new draft supersedes the approved edition but preserves its audit metadata.
 select * from public.save_santalbino_postmatch_revision(
