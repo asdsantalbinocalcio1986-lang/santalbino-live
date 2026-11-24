@@ -4173,6 +4173,7 @@ async function saveMatchResultRevision() {
   const button = $('[data-a="savePostmatchRevision"]');
   if (button) { button.disabled = true; button.textContent = 'Salvataggio…'; }
   let uploadedPath = '';
+  let recordSaved = false;
   try {
     const caption = String($('#matchResultPost')?.value || '').trim();
     if (!caption) throw new Error('Inserisci il testo del post prima di salvare.');
@@ -4201,15 +4202,20 @@ async function saveMatchResultRevision() {
     if (error) throw error;
     const saved = Array.isArray(data) ? data[0] : data;
     if (!saved?.id) throw new Error('Il database non ha restituito la revisione salvata.');
+    recordSaved = true;
     matchResultEditor.graphicPath = graphicPath;
     matchResultEditor.graphicSha256 = graphicSha256;
     matchResultEditor.graphicBlob = null;
-    await loadMatchResultEditions();
-    const edition = matchResultEditor.editions.find(x => x.id === saved.id);
-    if (edition) await displayMatchResultEdition(edition);
+    try {
+      await loadMatchResultEditions();
+      const edition = matchResultEditor.editions.find(x => x.id === saved.id);
+      if (edition) await displayMatchResultEdition(edition);
+    } catch (refreshError) {
+      matchResultEditor.dbError = 'La bozza è stata salvata, ma lo storico non si è aggiornato: ' + (refreshError?.message || 'errore');
+    }
     toast('Bozza post-partita salvata · revisione ' + saved.revision);
   } catch (error) {
-    if (uploadedPath) { try { await db.storage.from('santalbino-postmatch').remove([uploadedPath]); } catch (_) {} }
+    if (uploadedPath && !recordSaved) { try { await db.storage.from('santalbino-postmatch').remove([uploadedPath]); } catch (_) {} }
     throw error;
   } finally {
     matchResultEditor.busy = false;
@@ -4218,14 +4224,23 @@ async function saveMatchResultRevision() {
 async function approveMatchResultRevision() {
   const edition = matchResultEditor.active;
   if (!edition || edition.status !== 'draft') throw new Error('Seleziona una bozza da approvare.');
-  const { data, error } = await db.rpc('approve_santalbino_postmatch_revision', {
+  const { error } = await db.rpc('approve_santalbino_postmatch_revision', {
     p_id: edition.id,
     p_expected_revision: edition.revision
   });
   if (error) throw error;
-  await loadMatchResultEditions();
-  const approved = matchResultEditor.editions.find(x => x.id === edition.id);
-  if (approved) await displayMatchResultEdition(approved);
+  edition.status = 'approved';
+  edition.approved_at = new Date().toISOString();
+  const currentImage = $('.graphic-preview')?.src || '';
+  const currentCaption = $('#matchResultPost')?.value || edition.caption;
+  try {
+    await loadMatchResultEditions();
+    const approved = matchResultEditor.editions.find(x => x.id === edition.id);
+    if (approved) await displayMatchResultEdition(approved);
+  } catch (refreshError) {
+    matchResultEditor.dbError = 'Approvazione registrata; aggiornamento storico non riuscito: ' + (refreshError?.message || 'errore');
+    $('#graphicDlg').innerHTML = matchResultEditorHtml(currentImage, currentCaption, edition);
+  }
   toast('Revisione ' + edition.revision + ' approvata. Nessuna pubblicazione social è stata avviata.');
 }
 async function openMatchResult() {
