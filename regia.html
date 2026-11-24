@@ -4155,6 +4155,7 @@ function matchResultEditorHtml(imageUrl, caption, edition) {
   }).join(' ');
   const canSave = !!(db && CAN_EDIT && !matchResultEditor.dbError);
   const canApprove = !!edition && edition.status === 'draft' && canSave;
+  const canShare = !!edition && edition.status === 'approved' && !TEST_MODE;
   return '<div class="sheethead"><h2>MATCH RESULT · ' + status + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div>' +
     '<img class="graphic-preview" src="' + esc(imageUrl) + '" alt="Grafica MATCH RESULT salvata">' +
     '<label class="f"><span>Post con mini riassunto · modificabile</span><textarea id="matchResultPost" rows="7">' + esc(caption) + '</textarea></label>' +
@@ -4163,7 +4164,7 @@ function matchResultEditorHtml(imageUrl, caption, edition) {
     '<p class="small muted">L’approvazione è solo editoriale: non pubblica sui social. Ogni salvataggio crea una nuova revisione.</p>' +
     (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '') +
     '<div class="row2 stack"><button class="btn" data-a="saveMatchResultGraphic">Scarica grafica</button>' +
-    '<button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost">Condividi su WhatsApp</button></div>' +
+    '<button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost" ' + (canShare ? '' : 'disabled') + '>Condividi su WhatsApp</button></div>' +
     (history ? '<div class="card"><b>Revisioni precedenti</b><div class="row2 stack">' + history + '</div></div>' : '');
 }
 async function saveMatchResultRevision() {
@@ -4829,7 +4830,17 @@ document.addEventListener('click', async e => {
     case 'approvePostmatchRevision': try { await approveMatchResultRevision(); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
     case 'saveMatchResultGraphic': { if (matchResultEditor.graphicBlob) saveBlob(matchResultEditor.graphicBlob,'match-result.jpg'); else if (matchResultEditor.graphicPath) { const url=await matchResultSignedUrl(matchResultEditor.graphicPath); const response=await fetch(url); if(!response.ok) throw new Error('Download grafica non riuscito'); saveBlob(await response.blob(),'match-result.jpg'); } break; }
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || ''); break;
-    case 'shareMatchResultPost': { if (TEST_MODE) { toast('Condivisione esterna disattivata in modalità prova.'); break; } const txt=$('#matchResultPost')?.value || ''; const pollId=matchResultEditor.snapshot?.match?.pollId; const url=pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
+    case 'shareMatchResultPost': {
+      const approved = matchResultEditor.active;
+      const txt = String($('#matchResultPost')?.value || '').trim();
+      if (TEST_MODE) { toast('Condivisione esterna disattivata in modalità prova.'); break; }
+      if (!approved || approved.status !== 'approved') { toast('Puoi condividere solo una revisione approvata.'); break; }
+      if (txt !== String(approved.caption || '').trim()) { toast('Il testo è stato modificato: salva una nuova bozza e falla approvare prima di condividerlo.'); break; }
+      const pollId=approved.snapshot?.match?.pollId;
+      const url=pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
+      window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener');
+      break;
+    }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'previewLineupStory': await openLineupGraphic(a.dataset.s || 'home', 'story'); break;
     case 'previewLineupStandard': await openLineupGraphic(a.dataset.s || 'home', 'standard'); break;
