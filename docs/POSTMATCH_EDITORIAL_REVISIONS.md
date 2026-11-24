@@ -30,6 +30,20 @@ Saving creates a new revision. Any previous unapproved draft becomes `superseded
 - No call to `santalive-social-publish` is added here. Approval is editorial approval only; social dispatch remains a separately scoped phase.
 - Existing automatic FULL TIME publication and MVP flow are not changed.
 
+## UI implementation in this branch
+
+The regia editor now has a first implementation on the feature branch:
+
+- Opens the current generated result preview and loads saved revisions for the current environment.
+- Shows the latest revision for the current match, and a history selector spanning previous matches (so a match reset does not hide old editions).
+- Saves the exact caption, a reduced match snapshot (match metadata, logos and event facts only; no MVP votes/candidates or roster payload), the JPEG and its SHA-256 as one revision record.
+- Reloads the exact saved JPEG via a short-lived signed URL; it does not regenerate an already-saved graphic.
+- Allows explicit approval of the selected draft revision. Approval is not connected to the social publisher.
+- Disables external WhatsApp sharing in test mode.
+- If the proposed table/bucket is not installed, the preview remains available and the editor reports that persistent saving is not yet configured.
+
+This is code on an unmerged feature branch. It cannot persist anything until the proposal is reviewed, converted to a migration, and installed in an isolated Supabase test project.
+
 ## Proposed UI flow
 
 1. Open MATCH RESULT after full time.
