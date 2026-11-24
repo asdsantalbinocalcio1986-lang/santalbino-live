@@ -161,8 +161,12 @@ async function main() {
   await upload(secondPath, adminToken, jpeg, true, [400, 401, 403, 409]);
   await request('/storage/v1/object/santalbino-postmatch', {
     method: 'DELETE', token: adminToken, body: { prefixes: [secondPath] },
-    expected: [400, 401, 403, 404]
+    expected: [200, 400, 401, 403, 404]
   });
+  const referencedAfterDelete = await fetch(api + '/storage/v1/object/authenticated/santalbino-postmatch/' + secondPath.split('/').map(encodeURIComponent).join('/'), {
+    headers: { apikey: anon, Authorization: `Bearer ${adminToken}` }
+  });
+  assert.equal(referencedAfterDelete.status, 200, 'A referenced post-match graphic was deleted or became inaccessible');
 
   const orphanPath = `postmatch/test/${matchId}/orphan-${randomUUID()}.jpg`;
   await upload(orphanPath, adminToken, jpeg);
@@ -170,6 +174,10 @@ async function main() {
     method: 'DELETE', token: adminToken, body: { prefixes: [orphanPath] },
     expected: [200]
   });
+  const orphanAfterDelete = await fetch(api + '/storage/v1/object/authenticated/santalbino-postmatch/' + orphanPath.split('/').map(encodeURIComponent).join('/'), {
+    headers: { apikey: anon, Authorization: `Bearer ${adminToken}` }
+  });
+  assert.equal(orphanAfterDelete.status, 404, 'An unreferenced post-match graphic could not be deleted');
 
   // A regular authenticated user can neither read revisions nor invoke privileged RPCs or Storage writes.
   const nonAdminHistory = await request(
