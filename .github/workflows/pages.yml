@@ -30,6 +30,35 @@ jobs:
       - name: Validate application and security migration
         run: node scripts/validate-project.mjs
 
+  postmatch-sql-tests:
+    name: Post-match SQL integration tests (ephemeral PostgreSQL)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare disposable PostgreSQL fixtures
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/setup.sql
+      - name: Apply post-match SQL proposal
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/postmatch_editorial_revisions.sql
+      - name: Verify revision lifecycle, authorization and immutability
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/assertions.sql
+
   deploy:
     name: Deploy GitHub Pages
     if: github.event_name != 'pull_request'
