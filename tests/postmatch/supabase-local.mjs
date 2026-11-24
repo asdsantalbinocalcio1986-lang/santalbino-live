@@ -71,8 +71,14 @@ async function main() {
   const adminId = await createUser(adminEmail);
   await createUser(nonAdminEmail);
 
-  const setup = readFileSync('supabase-setup.sql', 'utf8')
-    .replaceAll('INSERISCI_EMAIL_AMMINISTRATORE', adminEmail);
+  const setupTemplate = readFileSync('supabase-setup.sql', 'utf8');
+  assert.ok(setupTemplate.includes("admin_email text := 'INSERISCI_EMAIL_AMMINISTRATORE';"),
+    'The setup SQL admin email placeholder was not found; refusing to run with an unknown admin configuration.');
+  const setup = setupTemplate
+    .replace("admin_email text := 'INSERISCI_EMAIL_AMMINISTRATORE';", `admin_email text := '${adminEmail}';`)
+    .replace("if admin_email = 'INSERISCI_EMAIL_AMMINISTRATORE' or", "if admin_email = '' or");
+  assert.ok(!setup.includes('INSERISCI_EMAIL_AMMINISTRATORE'),
+    'The local setup SQL still contains the admin email placeholder.');
   const setupPath = '/tmp/santalbino-local-setup.sql';
   writeFileSync(setupPath, setup);
   psql(setupPath, true);
