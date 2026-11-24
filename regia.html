@@ -4590,8 +4590,8 @@ async function openPost(id) {
       <div class="card" style="margin-top:12px"><h3>Condividi l’evento</h3>
         <a class="btn block" style="margin-bottom:8px" data-a="sharewa" href="#">Condividi su WhatsApp</a>
         ${isCard ? '<button class="btn block" style="margin-bottom:8px" data-a="shareig">Condividi immagine su Instagram</button>' : '<button class="btn block" style="margin-bottom:8px" data-a="copyig">Copia testo per Instagram</button>'}
-        <a class="btn primary block" href="${esc(fbLink())}" target="_blank" rel="noopener">Apri Facebook</a>
-        <p class="small muted" style="margin-bottom:0">WhatsApp apre la scelta dei destinatari. Instagram usa la condivisione del dispositivo se disponibile; altrimenti salva la grafica e apre Instagram per il caricamento manuale.</p>
+        <button class="btn primary block" data-a="sharefb">Condividi su Facebook</button>
+        <p class="small muted" style="margin-bottom:0">WhatsApp apre la scelta dei destinatari. Facebook apre il dialogo di condivisione del link della partita e copia il testo da incollare. Instagram usa la condivisione del dispositivo se disponibile; altrimenti salva la grafica e apre Instagram per il caricamento manuale.</p>
       </div>
       <button class="btn block" data-a="markdone">${so.status === 'pubblicato' ? 'Segna come da pubblicare' : 'Fatto: segna come pubblicato'}</button>`;
   } catch (err) {
@@ -4646,7 +4646,7 @@ document.addEventListener('click', async e => {
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
-  if (TEST_MODE && ['copyig','shareig','markdone'].includes(act)) { toast('Le azioni di pubblicazione social sono disattivate nella simulazione.'); return; }
+  if (TEST_MODE && ['copyig','shareig','markdone','sharewa','sharefb'].includes(act)) { toast('Le azioni di pubblicazione e condivisione social sono disattivate nella simulazione.'); return; }
   switch (act) {
     case 'refreshAnalytics': if (!TEST_MODE) await loadAnalytics(); break;
     case 'login': $('#authDlg').showModal(); break;
@@ -4708,6 +4708,13 @@ document.addEventListener('click', async e => {
     case 'del': if (armedDel === ev.id) { armedDel = null; delEvent(ev.id); } else { armedDel = ev.id; renderMain(); setTimeout(() => { if (armedDel === ev.id) { armedDel = null; renderMain(); } }, 3500); } break;
     case 'postclose': $('#postDlg').close(); break;
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
+    case 'sharefb': {
+      const so = socialOf(postId); so.text = $('#postText').value; saveL();
+      const popup = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(socialDraftMatchUrl()), '_blank', 'noopener');
+      await copyText(so.text);
+      toast(popup ? 'Testo copiato: incollalo nella finestra di condivisione Facebook.' : 'Popup Facebook bloccato: abilita i popup e riprova.');
+      break;
+    }
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
       const matchUrl = TEST_MODE
