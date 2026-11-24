@@ -79,6 +79,10 @@ jobs:
           version: 2.84.2
       - name: Initialize disposable local Supabase project
         run: supabase init
+      - name: Keep hosted migration chain out of disposable local boot
+        run: |
+          mv supabase/migrations /tmp/santalbino-hosted-migrations
+          mkdir -p supabase/migrations
       - name: Start local Supabase services
         run: supabase start --exclude studio,edge-runtime,logflare,vector,postgres-meta,mailpit,supavisor,imgproxy
       - name: Export local-only Supabase credentials
