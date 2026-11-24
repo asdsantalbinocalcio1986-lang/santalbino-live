@@ -51,7 +51,7 @@ end $$;
 -- application role is intentionally denied direct UPDATE by table grants,
 -- which would otherwise prevent the trigger itself from being exercised.
 reset role;
-do $
+do $$
 begin
   begin
     update public.santalbino_postmatch_editions set caption = 'Alterata'
@@ -61,7 +61,7 @@ begin
     if sqlerrm = 'Approved revision content was mutable' then raise; end if;
     if sqlerrm <> 'Post-match revision content is immutable' then raise; end if;
   end;
-end $;
+end $$;
 set role authenticated;
 
 -- A new draft supersedes the approved edition but preserves its audit metadata.
