@@ -148,13 +148,15 @@ async function main() {
     await page.locator('#matchResultPost').fill(captionTwo);
     await page.locator('[data-a="savePostmatchRevision"]').click();
     await page.getByText('Bozza post-partita salvata', { exact: false }).waitFor({ timeout: 30000 });
-    await page.getByRole('button', { name: /Rev\. 1 · Superata/ }).waitFor({ timeout: 30000 });
-    await page.getByRole('button', { name: /Rev\. 2 · Bozza/ }).waitFor({ timeout: 30000 });
+    const revisionOne = page.locator('[data-postmatch-revision]').filter({ hasText: "ASD Sant'Albino Terme · TEST" }).filter({ hasText: 'Rev. 1' });
+    const revisionTwo = page.locator('[data-postmatch-revision]').filter({ hasText: "ASD Sant'Albino Terme · TEST" }).filter({ hasText: 'Rev. 2' });
+    await revisionOne.waitFor({ timeout: 30000 });
+    await revisionTwo.waitFor({ timeout: 30000 });
 
-    // Historical revisions can be reopened independently.
-    await page.getByRole('button', { name: /Rev\. 1 · Superata/ }).click();
+    // Historical revisions can be reopened independently, scoped to this seeded match.
+    await revisionOne.click();
     assert.equal(await page.locator('#matchResultPost').inputValue(), captionOne, 'Revision 1 history did not restore its original caption.');
-    await page.getByRole('button', { name: /Rev\. 2 · Bozza/ }).click();
+    await revisionTwo.click();
     assert.equal(await page.locator('#matchResultPost').inputValue(), captionTwo, 'Revision 2 history did not restore its original caption.');
 
     await page.locator('[data-a="approvePostmatchRevision"]').click();
