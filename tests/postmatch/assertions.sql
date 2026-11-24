@@ -113,7 +113,7 @@ select * from public.approve_santalbino_postmatch_revision(
   (select id from public.santalbino_postmatch_editions where revision = 3), 3
 );
 
-do $$
+do $
 begin
   if (select status from public.santalbino_postmatch_editions where revision = 2) <> 'superseded' then
     raise exception 'Previous approved revision was not superseded on replacement approval';
@@ -125,7 +125,49 @@ begin
   if (select status from public.santalbino_postmatch_editions where revision = 3) <> 'approved' then
     raise exception 'New revision was not approved';
   end if;
-end $$;
+end $;
+
+-- Storage must preserve the exact graphic referenced by an approved revision.
+-- Admins may clean up orphan uploads after a failed save, but cannot replace or
+-- delete an object already referenced by any revision.
+insert into storage.objects(bucket_id, name)
+values ('santalbino-postmatch', 'postmatch/test/orphan/unused.jpg');
+
+update storage.objects
+   set name = 'postmatch/test/match_01/tampered.jpg'
+ where bucket_id = 'santalbino-postmatch'
+   and name = 'postmatch/test/match_01/rev3.jpg';
+delete from storage.objects
+ where bucket_id = 'santalbino-postmatch'
+   and name = 'postmatch/test/match_01/rev3.jpg';
+delete from storage.objects
+ where bucket_id = 'santalbino-postmatch'
+   and name = 'postmatch/test/orphan/unused.jpg';
+
+do $block$
+begin
+  if not exists (
+    select 1 from storage.objects
+     where bucket_id = 'santalbino-postmatch'
+       and name = 'postmatch/test/match_01/rev3.jpg'
+  ) then
+    raise exception 'Referenced approved graphic was changed or deleted';
+  end if;
+  if exists (
+    select 1 from storage.objects
+     where bucket_id = 'santalbino-postmatch'
+       and name = 'postmatch/test/orphan/unused.jpg'
+  ) then
+    raise exception 'An unreferenced orphan graphic could not be cleaned up';
+  end if;
+  if exists (
+    select 1 from storage.objects
+     where bucket_id = 'santalbino-postmatch'
+       and name = 'postmatch/test/match_01/tampered.jpg'
+  ) then
+    raise exception 'A referenced graphic was replaced';
+  end if;
+end $block$;
 
 reset role;
 set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
