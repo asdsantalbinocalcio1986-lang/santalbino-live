@@ -177,7 +177,11 @@ async function main() {
   const orphanAfterDelete = await fetch(api + '/storage/v1/object/authenticated/santalbino-postmatch/' + orphanPath.split('/').map(encodeURIComponent).join('/'), {
     headers: { apikey: anon, Authorization: `Bearer ${adminToken}` }
   });
-  assert.equal(orphanAfterDelete.status, 404, 'An unreferenced post-match graphic could not be deleted');
+  const orphanAfterDeleteBody = await orphanAfterDelete.text();
+  assert.ok(
+    [400, 404].includes(orphanAfterDelete.status) && /not found/i.test(orphanAfterDeleteBody),
+    `An unreferenced post-match graphic could not be deleted or is still accessible (HTTP ${orphanAfterDelete.status}: ${orphanAfterDeleteBody.slice(0, 500)})`
+  );
 
   // A regular authenticated user can neither read revisions nor invoke privileged RPCs or Storage writes.
   const nonAdminHistory = await request(
