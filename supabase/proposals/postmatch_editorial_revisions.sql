@@ -60,7 +60,7 @@ create policy "SANTA Live admins can read post-match editions"
 create or replace function public.guard_santalbino_postmatch_edition_update()
 returns trigger
 language plpgsql
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 begin
   if old.status = 'superseded' then
@@ -123,7 +123,7 @@ create or replace function public.save_santalbino_postmatch_revision(
 returns table (id uuid, revision integer, status text)
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_revision integer;
@@ -156,7 +156,7 @@ begin
     raise exception 'Post-match graphic object not found' using errcode = 'P0002';
   end if;
 
-  perform pg_advisory_xact_lock(hashtextextended(p_environment || ':' || p_match_id, 0));
+  perform pg_advisory_xact_lock(pg_catalog.hashtextextended(p_environment || ':' || p_match_id, 0));
 
   update public.santalbino_postmatch_editions e
      set status = 'superseded'
@@ -194,7 +194,7 @@ create or replace function public.approve_santalbino_postmatch_revision(
 returns table (id uuid, revision integer, status text, approved_at timestamptz)
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = ''
 as $$
 declare
   v_environment text;
@@ -214,7 +214,7 @@ begin
     raise exception 'Post-match revision not found' using errcode = 'P0002';
   end if;
 
-  perform pg_advisory_xact_lock(hashtextextended(v_environment || ':' || v_match_id, 0));
+  perform pg_advisory_xact_lock(pg_catalog.hashtextextended(v_environment || ':' || v_match_id, 0));
 
   perform 1
     from public.santalbino_postmatch_editions e
