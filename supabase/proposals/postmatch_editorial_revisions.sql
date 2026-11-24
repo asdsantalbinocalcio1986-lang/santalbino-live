@@ -67,7 +67,7 @@ begin
     raise exception 'Superseded post-match revisions are immutable';
   end if;
 
-  if old.status <> 'draft' and (
+  if (
     new.environment is distinct from old.environment
     or new.match_id is distinct from old.match_id
     or new.revision is distinct from old.revision
@@ -81,7 +81,7 @@ begin
     or new.approved_by is distinct from old.approved_by
     or new.approved_at is distinct from old.approved_at
   ) then
-    raise exception 'Approved post-match revision content is immutable';
+    raise exception 'Post-match revision content is immutable';
   end if;
 
   if old.status = 'approved' and new.status <> 'superseded' then
@@ -139,6 +139,14 @@ begin
      or p_graphic_sha256 !~ '^[a-f0-9]{64}$'
   then
     raise exception 'Invalid post-match revision payload' using errcode = '22023';
+  end if;
+
+  if not exists (
+    select 1 from storage.objects o
+     where o.bucket_id = 'santalbino-postmatch'
+       and o.name = p_graphic_path
+  ) then
+    raise exception 'Post-match graphic object not found' using errcode = 'P0002';
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(p_environment || ':' || p_match_id, 0));
@@ -208,6 +216,16 @@ begin
 
   if not found then
     raise exception 'Post-match revision not found' using errcode = 'P0002';
+  end if;
+
+  if not exists (
+    select 1 from storage.objects o
+     where o.bucket_id = 'santalbino-postmatch'
+       and o.name = (
+         select e.graphic_path from public.santalbino_postmatch_editions e where e.id = p_id
+       )
+  ) then
+    raise exception 'Post-match graphic object not found' using errcode = 'P0002';
   end if;
 
   select max(e.revision)
