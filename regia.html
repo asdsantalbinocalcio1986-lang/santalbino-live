@@ -4250,6 +4250,9 @@ async function openMatchResult() {
   if (!dlg.open) dlg.showModal();
   try {
     const [canvas] = await Promise.all([renderMatchResultGraphic()]);
+    if (JSON.stringify(capturePostmatchSnapshot()) !== JSON.stringify(matchResultEditor.snapshot)) {
+      throw new Error('La partita è cambiata durante la preparazione. Riapri MATCH RESULT per acquisire una versione coerente.');
+    }
     matchResultEditor.graphicBlob = await matchResultBlob(canvas);
     const previewUrl = URL.createObjectURL(matchResultEditor.graphicBlob);
     const generatedCaption = buildMatchSummary();
@@ -4261,13 +4264,12 @@ async function openMatchResult() {
       matchResultEditor.dbError = 'Accesso amministratore necessario per salvare e recuperare le revisioni.';
     }
     if (!dlg.open) { URL.revokeObjectURL(previewUrl); return; }
-    const currentMatchId = matchResultSafeId(S);
+    const currentMatchId = matchResultSafeId(matchResultEditor.snapshot);
     const latest = editions.find(item => item.match_id === currentMatchId);
     if (latest) {
       URL.revokeObjectURL(previewUrl);
       await displayMatchResultEdition(latest);
     } else {
-      matchResultEditor.snapshot = capturePostmatchSnapshot();
       dlg.innerHTML = matchResultEditorHtml(previewUrl, generatedCaption, null) +
         '<p class="small muted">Anteprima della partita corrente. Le revisioni delle partite precedenti restano disponibili nello storico qui sotto.</p>' +
         (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '');
