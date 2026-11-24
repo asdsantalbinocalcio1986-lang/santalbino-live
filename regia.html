@@ -271,6 +271,7 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);min-width:0}
 textarea{min-height:110px;resize:vertical;line-height:1.4}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.publication-action-row + .publication-action-row{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
 @media (max-width:420px){.row2.stack{grid-template-columns:1fr}}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .seg button{min-height:46px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font-weight:600;padding:4px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3615,7 +3616,7 @@ function publicationControlsHtml() {
   const status = pending?.status === 'scheduled'
     ? 'Pubblicazione programmata per '+new Date(pending.scheduledAt).toLocaleString('it-IT')
     : pending?.status === 'draft' ? 'Bozza salvata: non visibile al pubblico' : 'Nessuna bozza o programmazione in attesa';
-  return '<div class="card"><h2>Pubblicazione contenuti</h2><p class="small muted">Le modifiche salvate come bozza non compaiono nella pagina pubblica. Puoi pubblicarle subito oppure programmarle: il database esegue la pubblicazione anche se la regia è chiusa.</p><p class="small" aria-live="polite"><b>'+esc(status)+'</b></p><label class="f"><span>Data e ora di pubblicazione</span><input id="contentScheduleAt" type="datetime-local" value="'+esc(localDateTimeValue(pending?.scheduledAt))+'"></label><div class="row2 stack"><button class="btn" data-a="saveContentDraft">Salva bozza</button><button class="btn primary" data-a="scheduleContent">Programma pubblicazione</button></div><div class="row2 stack"><button class="btn primary" data-a="publishContentNow">Pubblica ora</button><button class="btn danger" data-a="cancelContentSchedule" '+(pending ? '' : 'disabled')+'>Annulla bozza/programmazione</button></div></div>';
+  return '<div class="card"><h2>Pubblicazione contenuti</h2><p class="small muted">Le modifiche salvate come bozza non compaiono nella pagina pubblica. Puoi pubblicarle subito oppure programmarle: il database esegue la pubblicazione anche se la regia è chiusa.</p><p class="small" aria-live="polite"><b>'+esc(status)+'</b></p><label class="f"><span>Data e ora di pubblicazione</span><input id="contentScheduleAt" type="datetime-local" value="'+esc(localDateTimeValue(pending?.scheduledAt))+'"></label><div class="row2 stack publication-action-row"><button class="btn" data-a="saveContentDraft">Salva bozza</button><button class="btn primary" data-a="scheduleContent">Programma pubblicazione</button></div><div class="row2 stack publication-action-row"><button class="btn primary" data-a="publishContentNow">Pubblica ora</button><button class="btn danger" data-a="cancelContentSchedule" '+(pending ? '' : 'disabled')+'>Annulla bozza/programmazione</button></div></div>';
 }
 function capturePublicationContent() {
   document.querySelectorAll('[data-roster]').forEach(el => { S.rosters[el.dataset.roster] = el.value; });
