@@ -33,6 +33,9 @@ create table if not exists public.santalbino_postmatch_editions (
   )
 );
 
+comment on column public.santalbino_postmatch_editions.environment is
+  'Logical UI namespace only; not a security boundary when test and production share one Supabase project.';
+
 create index if not exists santalbino_postmatch_editions_match_history_idx
   on public.santalbino_postmatch_editions (environment, match_id, revision desc);
 
