@@ -26,7 +26,10 @@ create table if not exists public.santalbino_postmatch_editions (
   check (
     (status = 'approved' and approved_by is not null and approved_at is not null)
     or
-    (status <> 'approved' and approved_by is null and approved_at is null)
+    (status <> 'approved' and (
+      (approved_by is null and approved_at is null)
+      or (approved_by is not null and approved_at is not null)
+    ))
   )
 );
 
@@ -119,7 +122,8 @@ begin
     raise exception 'Not authorized' using errcode = '42501';
   end if;
 
-  if p_environment not in ('production', 'test')
+  if p_environment is null
+     or p_environment not in ('production', 'test')
      or p_match_id is null
      or p_match_id !~ '^[A-Za-z0-9_-]{1,120}$'
      or p_caption is null
@@ -186,14 +190,22 @@ begin
   select e.environment, e.match_id
     into v_environment, v_match_id
     from public.santalbino_postmatch_editions e
-   where e.id = p_id
-   for update;
+   where e.id = p_id;
 
   if not found then
     raise exception 'Post-match revision not found' using errcode = 'P0002';
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(v_environment || ':' || v_match_id, 0));
+
+  perform 1
+    from public.santalbino_postmatch_editions e
+   where e.id = p_id
+   for update;
+
+  if not found then
+    raise exception 'Post-match revision not found' using errcode = 'P0002';
+  end if;
 
   select max(e.revision)
     into v_current_revision
