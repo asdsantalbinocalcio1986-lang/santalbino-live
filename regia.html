@@ -4224,6 +4224,10 @@ async function saveMatchResultRevision() {
 async function approveMatchResultRevision() {
   const edition = matchResultEditor.active;
   if (!edition || edition.status !== 'draft') throw new Error('Seleziona una bozza da approvare.');
+  const editedCaption = String($('#matchResultPost')?.value || '').trim();
+  if (editedCaption !== String(edition.caption || '').trim()) {
+    throw new Error('Hai modificato il testo dopo l’ultimo salvataggio. Salva una nuova bozza prima di approvare, così approvi esattamente il contenuto visualizzato.');
+  }
   const { error } = await db.rpc('approve_santalbino_postmatch_revision', {
     p_id: edition.id,
     p_expected_revision: edition.revision
