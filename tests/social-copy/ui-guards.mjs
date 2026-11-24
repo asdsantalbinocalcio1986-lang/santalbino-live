@@ -23,5 +23,8 @@ assert.match(source, /if \(TEST_MODE\) \{ toast\('Condivisione esterna disattiva
   'External sharing must remain blocked in test mode.');
 assert.match(source, /facebook\.com\/sharer\/sharer\.php\?u=/, 'Facebook must open its link-sharing dialog.');
 assert.match(source, /wa\.me\/\?text=/, 'WhatsApp must open with a prefilled message.');
+assert.match(source, /data-a="sharefb">Condividi su Facebook/, 'Event sharing must offer Facebook sharing.');
+assert.match(source, /'sharewa','sharefb'/, 'External event sharing must be blocked in test mode.');
+assert.match(source, /case 'sharefb':[\s\S]{0,500}facebook\.com\/sharer\/sharer\.php/, 'Event Facebook sharing must open the share dialog.');
 
 console.log('Social copy editor guard tests passed');
