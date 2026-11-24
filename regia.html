@@ -4086,7 +4086,22 @@ async function renderMatchResultGraphic() {
   await addSponsorToGraphic(canvas,'matchday');
   return canvas;
 }
-let matchResultEditor = { snapshot: null, graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false };
+let matchResultEditor = { snapshot: null, graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false, dbError: '' };
+function capturePostmatchSnapshot() {
+  return {
+    rev: Number(S.rev || 0),
+    match: {
+      pollId: String(S.match.pollId || ''), home: String(S.match.home || ''), away: String(S.match.away || ''),
+      comp: String(S.match.comp || ''), venue: String(S.match.venue || ''), date: String(S.match.date || ''),
+      time: String(S.match.time || ''), ourSide: S.match.ourSide === 'away' ? 'away' : 'home', hashtag: String(S.match.hashtag || '')
+    },
+    logos: { home: String(S.logos?.home || ''), away: String(S.logos?.away || '') },
+    events: (Array.isArray(S.events) ? S.events : []).map(e => ({
+      id: String(e.id || ''), type: String(e.type || ''), team: String(e.team || ''),
+      player: String(e.player || ''), min: String(e.min || ''), kind: String(e.kind || '')
+    }))
+  };
+}
 
 function matchResultSafeId(snapshot) {
   const raw = snapshot?.match?.pollId || [snapshot?.match?.date, snapshot?.match?.home, snapshot?.match?.away].filter(Boolean).join('_');
@@ -4138,7 +4153,7 @@ function matchResultEditorHtml(imageUrl, caption, edition) {
       esc(item.status === 'approved' ? 'Approvata' : item.status === 'superseded' ? 'Superata' : 'Bozza') +
       '</button>';
   }).join(' ');
-  const canSave = !!(db && CAN_EDIT);
+  const canSave = !!(db && CAN_EDIT && !matchResultEditor.dbError);
   const canApprove = !!edition && edition.status === 'draft' && canSave;
   return '<div class="sheethead"><h2>MATCH RESULT · ' + status + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div>' +
     '<img class="graphic-preview" src="' + esc(imageUrl) + '" alt="Grafica MATCH RESULT salvata">' +
@@ -4146,6 +4161,7 @@ function matchResultEditorHtml(imageUrl, caption, edition) {
     '<div class="row2 stack"><button class="btn primary" data-a="savePostmatchRevision" ' + (canSave ? '' : 'disabled') + '>Salva nuova bozza</button>' +
     '<button class="btn" data-a="approvePostmatchRevision" ' + (canApprove ? '' : 'disabled') + '>Approva questa revisione</button></div>' +
     '<p class="small muted">L’approvazione è solo editoriale: non pubblica sui social. Ogni salvataggio crea una nuova revisione.</p>' +
+    (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '') +
     '<div class="row2 stack"><button class="btn" data-a="saveMatchResultGraphic">Scarica grafica</button>' +
     '<button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost">Condividi su WhatsApp</button></div>' +
     (history ? '<div class="card"><b>Revisioni precedenti</b><div class="row2 stack">' + history + '</div></div>' : '');
@@ -4214,7 +4230,7 @@ async function approveMatchResultRevision() {
 }
 async function openMatchResult() {
   const dlg = $('#graphicDlg');
-  matchResultEditor = { snapshot: JSON.parse(JSON.stringify(S)), graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false };
+  matchResultEditor = { snapshot: capturePostmatchSnapshot(), graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false, dbError: '' };
   dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica e recupero bozze…</p>';
   if (!dlg.open) dlg.showModal();
   try {
@@ -4223,7 +4239,12 @@ async function openMatchResult() {
     const previewUrl = URL.createObjectURL(matchResultEditor.graphicBlob);
     const generatedCaption = buildMatchSummary();
     let editions = [];
-    if (db && CAN_EDIT) editions = await loadMatchResultEditions();
+    if (db && CAN_EDIT) {
+      try { editions = await loadMatchResultEditions(); }
+      catch (loadError) { matchResultEditor.dbError = loadError?.message || 'Tabella o archivio non ancora configurati'; }
+    } else {
+      matchResultEditor.dbError = 'Accesso amministratore necessario per salvare e recuperare le revisioni.';
+    }
     if (!dlg.open) { URL.revokeObjectURL(previewUrl); return; }
     const currentMatchId = matchResultSafeId(S);
     const latest = editions.find(item => item.match_id === currentMatchId);
@@ -4231,9 +4252,10 @@ async function openMatchResult() {
       URL.revokeObjectURL(previewUrl);
       await displayMatchResultEdition(latest);
     } else {
-      matchResultEditor.snapshot = JSON.parse(JSON.stringify(S));
+      matchResultEditor.snapshot = capturePostmatchSnapshot();
       dlg.innerHTML = matchResultEditorHtml(previewUrl, generatedCaption, null) +
-        '<p class="small muted">Anteprima della partita corrente. Le revisioni delle partite precedenti restano disponibili nello storico qui sotto.</p>';
+        '<p class="small muted">Anteprima della partita corrente. Le revisioni delle partite precedenti restano disponibili nello storico qui sotto.</p>' +
+        (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '');
     }
   } catch (err) {
     dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nel caricamento della bozza') + '</p>';
@@ -4784,9 +4806,9 @@ document.addEventListener('click', async e => {
     case 'cancelContentSchedule': if (confirm('Annullare la bozza o la programmazione? I contenuti già pubblicati resteranno visibili.')) cancelContentPublication(); break;
     case 'savePostmatchRevision': try { await saveMatchResultRevision(); } catch (error) { toast('Salvataggio non riuscito: ' + (error?.message || 'errore')); } break;
     case 'approvePostmatchRevision': try { await approveMatchResultRevision(); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
-    case 'saveMatchResultGraphic': { if (matchResultEditor.graphicBlob) saveBlob(matchResultEditor.graphicBlob,'match-result.jpg'); else if (matchResultEditor.graphicPath) { const url=await matchResultSignedUrl(matchResultEditor.graphicPath); window.open(url,'_blank','noopener'); } break; }
+    case 'saveMatchResultGraphic': { if (matchResultEditor.graphicBlob) saveBlob(matchResultEditor.graphicBlob,'match-result.jpg'); else if (matchResultEditor.graphicPath) { const url=await matchResultSignedUrl(matchResultEditor.graphicPath); const response=await fetch(url); if(!response.ok) throw new Error('Download grafica non riuscito'); saveBlob(await response.blob(),'match-result.jpg'); } break; }
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || ''); break;
-    case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); const url=S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
+    case 'shareMatchResultPost': { if (TEST_MODE) { toast('Condivisione esterna disattivata in modalità prova.'); break; } const txt=$('#matchResultPost')?.value || ''; const pollId=matchResultEditor.snapshot?.match?.pollId; const url=pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'previewLineupStory': await openLineupGraphic(a.dataset.s || 'home', 'story'); break;
     case 'previewLineupStandard': await openLineupGraphic(a.dataset.s || 'home', 'standard'); break;
