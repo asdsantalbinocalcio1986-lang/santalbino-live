@@ -90,7 +90,7 @@ jobs:
         run: |
           supabase status -o env > /tmp/supabase-local.env
           grep -E '^(API_URL|DB_URL|ANON_KEY|SERVICE_ROLE_KEY)=' /tmp/supabase-local.env \
-            | sed -E 's/^([A-Z_]+)="(.*)"$/\\1=\\2/' >> "$GITHUB_ENV"
+            | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
