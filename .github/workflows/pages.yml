@@ -61,6 +61,41 @@ jobs:
       - name: Verify editorial approval and sharing UI guards
         run: node tests/postmatch/ui-guards.mjs
 
+  postmatch-local-supabase-tests:
+    name: Post-match integration tests (isolated local Supabase)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.84.2
+      - name: Initialize disposable local Supabase project
+        run: supabase init
+      - name: Start local Supabase services
+        run: supabase start --exclude studio,edge-runtime,logflare,vector,postgres-meta,mailpit,supavisor,imgproxy
+      - name: Export local-only Supabase credentials
+        shell: bash
+        run: |
+          supabase status -o env > /tmp/supabase-local.env
+          grep -E '^(API_URL|DB_URL|ANON_KEY|SERVICE_ROLE_KEY)=' /tmp/supabase-local.env >> "$GITHUB_ENV"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Verify Auth, RLS, Storage and post-match revision lifecycle
+        run: node tests/postmatch/supabase-local.mjs
+      - name: Stop disposable local Supabase services
+        if: always()
+        run: supabase stop --no-backup
+
   deploy:
     name: Deploy GitHub Pages
     if: github.event_name != 'pull_request'
