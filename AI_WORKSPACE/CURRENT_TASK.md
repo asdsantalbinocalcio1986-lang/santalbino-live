@@ -7,7 +7,7 @@
 - **Independent reviewer:** Gemini
 - **Scope:** read-only audit only
 - **Baseline:** repository `main`; record the exact commit SHA used before inspecting files
-- **Specification baseline:** `SANTALive – Specifica Tecnica Post-Partita v3.1` supplied in the current project conversation. If the full text is not available to the assistant, stop and request the exact missing document; do not substitute the older `SANTALive_Analisi_PostPartita.md`.
+- **Specification baseline:** the repository audit is independent of the full v3.1 document. Use `PROJECT_STATUS.md` and `DECISIONS.md` as the canonical project constraints. Do not ask the user to resend the old specification. ChatGPT will map verified repository findings to v3.1 after the audit.
 
 ## Objective
 
@@ -54,7 +54,7 @@ The audit is complete only when:
 - every material claim has a repository or database evidence reference;
 - unknowns are explicitly listed with the exact access/evidence needed;
 - conflicts with v3.1 are mapped to its sections;
-- the output ends with blockers for phase 1, blockers for later phases, and a go/no-go recommendation.
+- the output ends with blockers for phase 1, blockers for later phases, and a go/no-go recommendation. Do not require access to the v3.1 document to complete this repository audit; identify relevant code/database facts so ChatGPT can map them to v3.1.
 
 ## Handoff protocol
 
