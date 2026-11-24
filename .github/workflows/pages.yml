@@ -58,6 +58,8 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/postmatch_editorial_revisions.sql
       - name: Verify revision lifecycle, authorization and immutability
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/assertions.sql
+      - name: Verify editorial approval and sharing UI guards
+        run: node tests/postmatch/ui-guards.mjs
 
   deploy:
     name: Deploy GitHub Pages
