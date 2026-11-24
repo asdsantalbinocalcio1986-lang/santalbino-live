@@ -39,7 +39,7 @@ The regia editor now has a first implementation on the feature branch:
 - Saves the exact caption, a reduced match snapshot (match metadata, logos and event facts only; no MVP votes/candidates or roster payload), the JPEG and its SHA-256 as one revision record.
 - Reloads the exact saved JPEG via a short-lived signed URL; it does not regenerate an already-saved graphic.
 - Allows explicit approval of the selected draft revision. Approval is not connected to the social publisher.
-- Disables external WhatsApp sharing in test mode.
+- Disables external WhatsApp sharing in test mode and permits sharing only for an explicitly approved revision; it also rejects caption edits that differ from the approved text.
 - If the proposed table/bucket is not installed, the preview remains available and the editor reports that persistent saving is not yet configured.
 
 This is code on an unmerged feature branch. It cannot persist anything until the proposal is reviewed, converted to a migration, and installed in a separate Supabase test project. The current `?test=1` mode shares the production Supabase project and is not suitable for installing or validating this schema.
