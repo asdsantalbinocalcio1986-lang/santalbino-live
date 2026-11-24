@@ -60,6 +60,7 @@ create table storage.objects (
   name text not null,
   unique (bucket_id, name)
 );
+alter table storage.objects enable row level security;
 
 grant usage on schema storage to authenticated;
 grant select, insert, update, delete on storage.objects to authenticated;
