@@ -1399,6 +1399,7 @@ let S = (() => {
 })();
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
 S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
+S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts || {});
 if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
 
 /* ================= stato locale (solo questo dispositivo) ================= */
@@ -1585,10 +1586,26 @@ function matchDateTime() {
   const time = String(S.match.time || '').trim();
   return [date, time].filter(Boolean).join(' · ');
 }
+function buildMatchDayText() {
+  const m = S.match, opponent = teamName(other(m.ourSide));
+  return [
+    '⚽ MATCH DAY',
+    teamName(m.ourSide).toUpperCase() + ' vs ' + opponent.toUpperCase(),
+    '',
+    'Oggi si torna in campo: pronti a sostenere i nostri colori!',
+    '',
+    '📅 ' + (matchDateTime() || 'Data e ora da definire'),
+    '🏆 ' + (m.comp || 'Girone da definire'),
+    '🏟️ ' + (m.venue || 'Stadio da definire'),
+    '',
+    'Forza Sant’Albino! 💚💛',
+    m.hashtag || ''
+  ].filter(Boolean).join('\\n');
+}
 function buildConvocatiText() {
   const m = S.match, opponent = teamName(other(m.ourSide));
   return [
-    '📋 CONVOCATI · MATCH DAY',
+    '📋 CONVOCATI',
     teamName(m.ourSide).toUpperCase() + ' vs ' + opponent.toUpperCase(),
     '',
     '⚽ Si avvicina il prossimo appuntamento: siamo pronti a scendere in campo!',
@@ -1602,7 +1619,8 @@ function buildConvocatiText() {
   ].filter(Boolean).join('\n');
 }
 function convocatiRegiaHtml() {
-  const generated = buildConvocatiText();
+  const generated = S.socialDrafts?.convocati || buildConvocatiText();
+  const matchDay = S.socialDrafts?.matchDay || buildMatchDayText();
   const count = parseRoster(S.convocati).length;
   return `<div class="card"><h2>Lista convocati</h2>
     <p class="small muted" style="margin-top:0">Inserisci i convocati, uno per riga. I nominativi saranno riportati nella grafica MATCH DAY, ma non nel testo del post.</p>
@@ -1619,8 +1637,12 @@ function convocatiRegiaHtml() {
       <button class="btn block" style="margin-top:8px" data-a="saveMatchDayGraphic">Salva immagine MATCH DAY</button></div>
     <div class="card"><h2>Post pre-partita</h2>
       <p class="small muted" style="margin-top:0">Il testo riepiloga le informazioni della partita e non contiene i nomi dei convocati.</p>
-      <textarea data-convocati-preview rows="10" readonly aria-label="Testo del post pre-partita">${esc(generated)}</textarea>
-      <button class="btn primary block" data-a="copyconvocati">Salva e copia testo del post</button></div>`;
+      <textarea data-convocati-preview rows="10" aria-label="Testo del post convocati">${esc(generated)}</textarea>
+      <button class="btn primary block" data-a="copyconvocati">Salva e copia testo convocati</button></div>
+    <div class="card"><h2>Testo MATCH DAY</h2>
+      <p class="small muted" style="margin-top:0">Testo pre-partita generato dai dati della gara. Puoi personalizzarlo, salvarlo come bozza e copiarlo senza pubblicarlo.</p>
+      <textarea data-matchday-preview rows="10" aria-label="Testo MATCH DAY">${esc(matchDay)}</textarea>
+      <button class="btn primary block" data-a="copyMatchDayText">Salva e copia testo MATCH DAY</button></div>`;
 }
 function resolvePlayer(side, str) {
   str = (str || '').trim();
@@ -4714,7 +4736,8 @@ document.addEventListener('click', async e => {
     case 'readlist': await readLineup(a.dataset.s, document.querySelector('[data-ocrstat="' + a.dataset.s + '"]')); break;
     case 'savelineup': { const s = a.dataset.s; S.rosters[s] = $(`[data-roster="${s}"]`).value; saveContentDraft(); break; }
     case 'saveconvocati': S.convocati = $('[data-convocati]').value; saveContentDraft(); break;
-    case 'copyconvocati': { S.convocati = $('[data-convocati]').value; saveContentDraft(); copyText(buildConvocatiText()); break; }
+    case 'copyconvocati': { const text = $('[data-convocati-preview]')?.value || buildConvocatiText(); S.convocati = $('[data-convocati]').value; S.socialDrafts = Object.assign({matchDay:'',convocati:''}, S.socialDrafts || {}, {convocati:text}); saveContentDraft(); commit(true); copyText(text); break; }
+    case 'copyMatchDayText': { const text = $('[data-matchday-preview]')?.value || buildMatchDayText(); S.socialDrafts = Object.assign({matchDay:'',convocati:''}, S.socialDrafts || {}, {matchDay:text}); commit(true); copyText(text); toast('Bozza MATCH DAY salvata'); break; }
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
     case 'libraryUseGoal': { const url = S.media?.library?.goal || ''; if (!url) { toast('Carica prima un modello GOAL'); break; } L.evImg.goal = url; L.evImgRaw.goal = false; commit(true); renderMain(); toast('Modello GOAL collegato agli eventi'); break; }
