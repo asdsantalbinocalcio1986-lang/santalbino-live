@@ -1602,6 +1602,34 @@ function buildMatchDayText() {
     m.hashtag || ''
   ].filter(Boolean).join('\n');
 }
+function socialDraftMatchUrl() {
+  return TEST_MODE
+    ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/index.html?test=1&view=public'
+    : (S.match.pollId
+      ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId)
+      : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html');
+}
+function socialDraftText(kind) {
+  const selector = kind === 'matchDay' ? '[data-matchday-preview]' : '[data-convocati-preview]';
+  const text = $(selector)?.value || (kind === 'matchDay' ? buildMatchDayText() : buildConvocatiText());
+  S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts || {}, { [kind]: text });
+  commit(true);
+  return text;
+}
+async function shareSocialDraft(kind, platform) {
+  if (TEST_MODE) { toast('Condivisione esterna disattivata nella simulazione.'); return; }
+  const text = socialDraftText(kind);
+  const matchUrl = socialDraftMatchUrl();
+  const shareText = [text, S.match.hashtag || '#SANTALive', 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\\n\\n');
+  if (platform === 'whatsapp') {
+    window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
+    toast('WhatsApp pronto: scegli i destinatari e conferma l’invio.');
+    return;
+  }
+  await copyText(text);
+  window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank', 'noopener');
+  toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
+}
 function buildConvocatiText() {
   const m = S.match, opponent = teamName(other(m.ourSide));
   return [
@@ -1639,12 +1667,14 @@ function convocatiRegiaHtml() {
       <p class="small muted" style="margin-top:0">Il testo riepiloga le informazioni della partita e non contiene i nomi dei convocati.</p>
       <textarea data-convocati-preview rows="10" aria-label="Testo del post convocati">${esc(generated)}</textarea>
       <button class="btn block" data-a="regenerateConvocatiText">Rigenera dai dati gara</button>
-      <button class="btn primary block" data-a="copyconvocati">Salva e copia testo convocati</button></div>
+      <button class="btn primary block" data-a="copyconvocati">Salva e copia testo convocati</button>
+      <div class="row2 stack"><button class="btn" data-a="shareSocialWhatsApp" data-kind="convocati">Condividi su WhatsApp</button><button class="btn" data-a="shareSocialFacebook" data-kind="convocati">Condividi su Facebook</button></div></div>
     <div class="card"><h2>Testo MATCH DAY</h2>
       <p class="small muted" style="margin-top:0">Testo pre-partita generato dai dati della gara. Puoi personalizzarlo, salvarlo come bozza e copiarlo senza pubblicarlo.</p>
       <textarea data-matchday-preview rows="10" aria-label="Testo MATCH DAY">${esc(matchDay)}</textarea>
       <button class="btn block" data-a="regenerateMatchDayText">Rigenera dai dati gara</button>
-      <button class="btn primary block" data-a="copyMatchDayText">Salva e copia testo MATCH DAY</button></div>`;
+      <button class="btn primary block" data-a="copyMatchDayText">Salva e copia testo MATCH DAY</button>
+      <div class="row2 stack"><button class="btn" data-a="shareSocialWhatsApp" data-kind="matchDay">Condividi su WhatsApp</button><button class="btn" data-a="shareSocialFacebook" data-kind="matchDay">Condividi su Facebook</button></div></div>`;
 }
 function resolvePlayer(side, str) {
   str = (str || '').trim();
@@ -4742,6 +4772,8 @@ document.addEventListener('click', async e => {
     case 'regenerateMatchDayText': { S.socialDrafts.matchDay = buildMatchDayText(); commit(true); renderMain(); toast('Testo MATCH DAY rigenerato dai dati gara'); break; }
     case 'copyconvocati': { const text = $('[data-convocati-preview]')?.value || buildConvocatiText(); S.convocati = $('[data-convocati]').value; S.socialDrafts = Object.assign({matchDay:'',convocati:''}, S.socialDrafts || {}, {convocati:text}); saveContentDraft(); commit(true); copyText(text); break; }
     case 'copyMatchDayText': { const text = $('[data-matchday-preview]')?.value || buildMatchDayText(); S.socialDrafts = Object.assign({matchDay:'',convocati:''}, S.socialDrafts || {}, {matchDay:text}); commit(true); copyText(text); toast('Bozza MATCH DAY salvata'); break; }
+    case 'shareSocialWhatsApp': await shareSocialDraft(a.dataset.kind === 'matchDay' ? 'matchDay' : 'convocati', 'whatsapp'); break;
+    case 'shareSocialFacebook': await shareSocialDraft(a.dataset.kind === 'matchDay' ? 'matchDay' : 'convocati', 'facebook'); break;
     case 'fblineup': { const s = a.dataset.s; copyText(lineupText(s)); break; }
     case 'savematch': saveMatch(); break;
     case 'libraryUseGoal': { const url = S.media?.library?.goal || ''; if (!url) { toast('Carica prima un modello GOAL'); break; } L.evImg.goal = url; L.evImgRaw.goal = false; commit(true); renderMain(); toast('Modello GOAL collegato agli eventi'); break; }
