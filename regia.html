@@ -4086,17 +4086,153 @@ async function renderMatchResultGraphic() {
   await addSponsorToGraphic(canvas,'matchday');
   return canvas;
 }
+let matchResultEditor = { snapshot: null, graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false };
+
+function matchResultSafeId(snapshot) {
+  const raw = snapshot?.match?.pollId || [snapshot?.match?.date, snapshot?.match?.home, snapshot?.match?.away].filter(Boolean).join('_');
+  const id = String(raw || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
+  if (!id) throw new Error('Identificativo partita mancante: impossibile salvare la revisione.');
+  return id;
+}
+async function matchResultBlob(canvas) {
+  return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Impossibile preparare la grafica JPEG.')), 'image/jpeg', .93));
+}
+async function matchResultHash(blob) {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+async function matchResultSignedUrl(path) {
+  const { data, error } = await db.storage.from('santalbino-postmatch').createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+async function loadMatchResultEditions() {
+  if (!db || !CAN_EDIT) throw new Error('Accesso amministratore necessario.');
+  const matchId = matchResultSafeId(S);
+  const environment = TEST_MODE ? 'test' : 'production';
+  const { data, error } = await db.from('santalbino_postmatch_editions')
+    .select('id,environment,match_id,revision,status,caption,snapshot,source_state_rev,graphic_path,graphic_sha256,created_at,approved_at')
+    .eq('environment', environment).eq('match_id', matchId)
+    .order('revision', { ascending: false }).limit(20);
+  if (error) throw error;
+  matchResultEditor.editions = data || [];
+  return matchResultEditor.editions;
+}
+async function displayMatchResultEdition(edition) {
+  const url = await matchResultSignedUrl(edition.graphic_path);
+  matchResultEditor.active = edition;
+  matchResultEditor.snapshot = edition.snapshot;
+  matchResultEditor.graphicBlob = null;
+  matchResultEditor.graphicPath = edition.graphic_path;
+  matchResultEditor.graphicSha256 = edition.graphic_sha256;
+  const dlg = $('#graphicDlg');
+  dlg.innerHTML = matchResultEditorHtml(url, edition.caption, edition);
+}
+function matchResultEditorHtml(imageUrl, caption, edition) {
+  const status = edition ? (edition.status === 'approved' ? 'Approvata' : edition.status === 'superseded' ? 'Superata' : 'Bozza') : 'Non salvata';
+  const history = matchResultEditor.editions.map(item =>
+    '<button type="button" class="btn sm" data-postmatch-revision="' + esc(item.id) + '">' +
+    'Rev. ' + Number(item.revision) + ' · ' + esc(item.status === 'approved' ? 'Approvata' : item.status === 'superseded' ? 'Superata' : 'Bozza') +
+    '</button>'
+  ).join(' ');
+  const canSave = !!(db && CAN_EDIT);
+  const canApprove = !!edition && edition.status === 'draft' && canSave;
+  return '<div class="sheethead"><h2>MATCH RESULT · ' + status + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div>' +
+    '<img class="graphic-preview" src="' + esc(imageUrl) + '" alt="Grafica MATCH RESULT salvata">' +
+    '<label class="f"><span>Post con mini riassunto · modificabile</span><textarea id="matchResultPost" rows="7">' + esc(caption) + '</textarea></label>' +
+    '<div class="row2 stack"><button class="btn primary" data-a="savePostmatchRevision" ' + (canSave ? '' : 'disabled') + '>Salva nuova bozza</button>' +
+    '<button class="btn" data-a="approvePostmatchRevision" ' + (canApprove ? '' : 'disabled') + '>Approva questa revisione</button></div>' +
+    '<p class="small muted">L’approvazione è solo editoriale: non pubblica sui social. Ogni salvataggio crea una nuova revisione.</p>' +
+    '<div class="row2 stack"><button class="btn" data-a="saveMatchResultGraphic">Scarica grafica</button>' +
+    '<button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost">Condividi su WhatsApp</button></div>' +
+    (history ? '<div class="card"><b>Revisioni precedenti</b><div class="row2 stack">' + history + '</div></div>' : '');
+}
+async function saveMatchResultRevision() {
+  if (!db || !CAN_EDIT || !authUser) throw new Error('Devi accedere come amministratore per salvare una bozza.');
+  if (matchResultEditor.busy) return;
+  matchResultEditor.busy = true;
+  const button = $('[data-a="savePostmatchRevision"]');
+  if (button) { button.disabled = true; button.textContent = 'Salvataggio…'; }
+  let uploadedPath = '';
+  try {
+    const caption = String($('#matchResultPost')?.value || '').trim();
+    if (!caption) throw new Error('Inserisci il testo del post prima di salvare.');
+    const snapshot = matchResultEditor.snapshot || JSON.parse(JSON.stringify(S));
+    const matchId = matchResultSafeId(snapshot);
+    const environment = TEST_MODE ? 'test' : 'production';
+    let graphicPath = matchResultEditor.graphicPath;
+    let graphicSha256 = matchResultEditor.graphicSha256;
+    if (matchResultEditor.graphicBlob) {
+      graphicSha256 = await matchResultHash(matchResultEditor.graphicBlob);
+      graphicPath = 'postmatch/' + environment + '/' + matchId + '/' + crypto.randomUUID() + '.jpg';
+      const { error: uploadError } = await db.storage.from('santalbino-postmatch').upload(graphicPath, matchResultEditor.graphicBlob, { contentType: 'image/jpeg', upsert: false });
+      if (uploadError) throw uploadError;
+      uploadedPath = graphicPath;
+    }
+    if (!graphicPath || !/^[a-f0-9]{64}$/.test(graphicSha256 || '')) throw new Error('Grafica o impronta SHA-256 non disponibili. Riapri MATCH RESULT e riprova.');
+    const { data, error } = await db.rpc('save_santalbino_postmatch_revision', {
+      p_environment: environment,
+      p_match_id: matchId,
+      p_caption: caption,
+      p_snapshot: snapshot,
+      p_source_state_rev: Number(snapshot.rev || 0),
+      p_graphic_path: graphicPath,
+      p_graphic_sha256: graphicSha256
+    });
+    if (error) throw error;
+    const saved = Array.isArray(data) ? data[0] : data;
+    if (!saved?.id) throw new Error('Il database non ha restituito la revisione salvata.');
+    matchResultEditor.graphicPath = graphicPath;
+    matchResultEditor.graphicSha256 = graphicSha256;
+    matchResultEditor.graphicBlob = null;
+    await loadMatchResultEditions();
+    const edition = matchResultEditor.editions.find(x => x.id === saved.id);
+    if (edition) await displayMatchResultEdition(edition);
+    toast('Bozza post-partita salvata · revisione ' + saved.revision);
+  } catch (error) {
+    if (uploadedPath) { try { await db.storage.from('santalbino-postmatch').remove([uploadedPath]); } catch (_) {} }
+    throw error;
+  } finally {
+    matchResultEditor.busy = false;
+  }
+}
+async function approveMatchResultRevision() {
+  const edition = matchResultEditor.active;
+  if (!edition || edition.status !== 'draft') throw new Error('Seleziona una bozza da approvare.');
+  const { data, error } = await db.rpc('approve_santalbino_postmatch_revision', {
+    p_id: edition.id,
+    p_expected_revision: edition.revision
+  });
+  if (error) throw error;
+  await loadMatchResultEditions();
+  const approved = matchResultEditor.editions.find(x => x.id === edition.id);
+  if (approved) await displayMatchResultEdition(approved);
+  toast('Revisione ' + edition.revision + ' approvata. Nessuna pubblicazione social è stata avviata.');
+}
 async function openMatchResult() {
-  const dlg=$('#graphicDlg');
-  dlg.innerHTML='<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica e riepilogo…</p>';
-  if(!dlg.open)dlg.showModal();
+  const dlg = $('#graphicDlg');
+  matchResultEditor = { snapshot: JSON.parse(JSON.stringify(S)), graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false };
+  dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica e recupero bozze…</p>';
+  if (!dlg.open) dlg.showModal();
   try {
     const [canvas] = await Promise.all([renderMatchResultGraphic()]);
-    const url=canvas.toDataURL('image/jpeg',.93);
-    if(!dlg.open)return;
-    dlg.innerHTML='<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><img class="graphic-preview" src="'+url+'" alt="Grafica MATCH RESULT"><button class="btn primary block" data-a="saveMatchResultGraphic">Salva immagine MATCH RESULT</button><label class="f"><span>Post con mini riassunto · modificabile</span><textarea id="matchResultPost" rows="7">'+esc(buildMatchSummary())+'</textarea></label><div class="row2 stack"><button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost">Condividi su WhatsApp</button></div>';
-  } catch(err) {
-    dlg.innerHTML='<div class="sheethead"><h2>Grafica non disponibile</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">'+esc(err?.message||'Errore nella generazione')+'</p>';
+    matchResultEditor.graphicBlob = await matchResultBlob(canvas);
+    const previewUrl = URL.createObjectURL(matchResultEditor.graphicBlob);
+    const generatedCaption = buildMatchSummary();
+    let editions = [];
+    if (db && CAN_EDIT) editions = await loadMatchResultEditions();
+    if (!dlg.open) { URL.revokeObjectURL(previewUrl); return; }
+    const latest = editions[0];
+    if (latest) {
+      URL.revokeObjectURL(previewUrl);
+      await displayMatchResultEdition(latest);
+    } else {
+      matchResultEditor.snapshot = JSON.parse(JSON.stringify(S));
+      dlg.innerHTML = matchResultEditorHtml(previewUrl, generatedCaption, null) +
+        '<p class="small muted">Anteprima appena generata. Salva una bozza per conservarla e poterla recuperare in seguito.</p>';
+    }
+  } catch (err) {
+    dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nel caricamento della bozza') + '</p>';
   }
 }
 /* ================= vista pubblica ================= */
@@ -4582,6 +4718,12 @@ function tickClock() {
 /* ================= eventi dell'interfaccia ================= */
 document.addEventListener('click', async e => {
   const t = e.target;
+  const revisionBtn = t.closest('[data-postmatch-revision]');
+  if (revisionBtn) {
+    const edition = matchResultEditor.editions.find(x => x.id === revisionBtn.dataset.postmatchRevision);
+    if (edition) { try { await displayMatchResultEdition(edition); } catch (error) { toast('Impossibile aprire la revisione: ' + (error?.message || 'errore')); } }
+    return;
+  }
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
   const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (['archive','season','scorers','archiveForms'].includes(L.tab)) void loadMatchArchive(true); return; }
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
@@ -4636,8 +4778,10 @@ document.addEventListener('click', async e => {
     case 'scheduleContent': scheduleContentPublication(); break;
     case 'publishContentNow': if (confirm('Pubblicare ora convocati e formazioni sulla pagina pubblica?')) publishContentImmediately(); break;
     case 'cancelContentSchedule': if (confirm('Annullare la bozza o la programmazione? I contenuti già pubblicati resteranno visibili.')) cancelContentPublication(); break;
-    case 'saveMatchResultGraphic': { const cv=await renderMatchResultGraphic(); cv.toBlob(blob=>{if(blob)saveBlob(blob,'match-result.jpg');},'image/jpeg',.94); break; }
-    case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || buildMatchSummary()); break;
+    case 'savePostmatchRevision': try { await saveMatchResultRevision(); } catch (error) { toast('Salvataggio non riuscito: ' + (error?.message || 'errore')); } break;
+    case 'approvePostmatchRevision': try { await approveMatchResultRevision(); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
+    case 'saveMatchResultGraphic': { if (matchResultEditor.graphicBlob) saveBlob(matchResultEditor.graphicBlob,'match-result.jpg'); else if (matchResultEditor.graphicPath) { const url=await matchResultSignedUrl(matchResultEditor.graphicPath); window.open(url,'_blank','noopener'); } break; }
+    case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || ''); break;
     case 'shareMatchResultPost': { const txt=$('#matchResultPost')?.value || buildMatchSummary(); const url=S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html'; window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener'); break; }
     case 'viewConvocatiGraphic': S.convocati = $('[data-convocati]').value; commit(true); await openConvocatiGraphic(); break;
     case 'previewLineupStory': await openLineupGraphic(a.dataset.s || 'home', 'story'); break;
