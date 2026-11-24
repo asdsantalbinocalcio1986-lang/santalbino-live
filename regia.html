@@ -4108,12 +4108,11 @@ async function matchResultSignedUrl(path) {
 }
 async function loadMatchResultEditions() {
   if (!db || !CAN_EDIT) throw new Error('Accesso amministratore necessario.');
-  const matchId = matchResultSafeId(S);
   const environment = TEST_MODE ? 'test' : 'production';
   const { data, error } = await db.from('santalbino_postmatch_editions')
     .select('id,environment,match_id,revision,status,caption,snapshot,source_state_rev,graphic_path,graphic_sha256,created_at,approved_at')
-    .eq('environment', environment).eq('match_id', matchId)
-    .order('revision', { ascending: false }).limit(20);
+    .eq('environment', environment)
+    .order('created_at', { ascending: false }).limit(50);
   if (error) throw error;
   matchResultEditor.editions = data || [];
   return matchResultEditor.editions;
@@ -4130,11 +4129,15 @@ async function displayMatchResultEdition(edition) {
 }
 function matchResultEditorHtml(imageUrl, caption, edition) {
   const status = edition ? (edition.status === 'approved' ? 'Approvata' : edition.status === 'superseded' ? 'Superata' : 'Bozza') : 'Non salvata';
-  const history = matchResultEditor.editions.map(item =>
-    '<button type="button" class="btn sm" data-postmatch-revision="' + esc(item.id) + '">' +
-    'Rev. ' + Number(item.revision) + ' · ' + esc(item.status === 'approved' ? 'Approvata' : item.status === 'superseded' ? 'Superata' : 'Bozza') +
-    '</button>'
-  ).join(' ');
+  const history = matchResultEditor.editions.map(item => {
+    const match = item.snapshot?.match || {};
+    const title = [match.home || 'Casa', match.away || 'Ospiti'].join(' – ');
+    const date = match.date ? ' · ' + match.date : '';
+    return '<button type="button" class="btn sm" data-postmatch-revision="' + esc(item.id) + '">' +
+      esc(title) + esc(date) + ' · Rev. ' + Number(item.revision) + ' · ' +
+      esc(item.status === 'approved' ? 'Approvata' : item.status === 'superseded' ? 'Superata' : 'Bozza') +
+      '</button>';
+  }).join(' ');
   const canSave = !!(db && CAN_EDIT);
   const canApprove = !!edition && edition.status === 'draft' && canSave;
   return '<div class="sheethead"><h2>MATCH RESULT · ' + status + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div>' +
@@ -4222,14 +4225,15 @@ async function openMatchResult() {
     let editions = [];
     if (db && CAN_EDIT) editions = await loadMatchResultEditions();
     if (!dlg.open) { URL.revokeObjectURL(previewUrl); return; }
-    const latest = editions[0];
+    const currentMatchId = matchResultSafeId(S);
+    const latest = editions.find(item => item.match_id === currentMatchId);
     if (latest) {
       URL.revokeObjectURL(previewUrl);
       await displayMatchResultEdition(latest);
     } else {
       matchResultEditor.snapshot = JSON.parse(JSON.stringify(S));
       dlg.innerHTML = matchResultEditorHtml(previewUrl, generatedCaption, null) +
-        '<p class="small muted">Anteprima appena generata. Salva una bozza per conservarla e poterla recuperare in seguito.</p>';
+        '<p class="small muted">Anteprima della partita corrente. Le revisioni delle partite precedenti restano disponibili nello storico qui sotto.</p>';
     }
   } catch (err) {
     dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nel caricamento della bozza') + '</p>';
