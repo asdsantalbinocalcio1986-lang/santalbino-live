@@ -118,8 +118,8 @@ async function main() {
 
   try {
     await page.goto(`http://127.0.0.1:${address.port}/regia.html?test=1`, { waitUntil: 'domcontentloaded' });
-    await page.locator('[data-a="login"]').waitFor({ state: 'visible', timeout: 30000 });
-    await page.locator('[data-a="login"]').click();
+    await page.locator('[data-a="login"]').first().waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('[data-a="login"]').first().click();
     await page.locator('#authEmail').fill(email);
     await page.locator('#authPassword').fill(password);
     await page.locator('#authForm button[type="submit"]').click();
