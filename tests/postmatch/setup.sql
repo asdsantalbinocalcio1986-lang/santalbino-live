@@ -43,12 +43,7 @@ returns boolean
 language sql
 stable
 set search_path = public, pg_temp
-as $
-  select exists (
-    select 1 from public.santalbino_admins
-    where user_id = (select auth.uid())
-  )
-$;
+as 'select exists (select 1 from public.santalbino_admins where user_id = (select auth.uid()))';
 grant execute on function public.is_santalbino_admin() to authenticated;
 
 create table storage.buckets (
