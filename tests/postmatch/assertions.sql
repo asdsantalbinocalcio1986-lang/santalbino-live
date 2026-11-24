@@ -99,14 +99,14 @@ begin
   if (select status from public.santalbino_postmatch_editions where revision = 3) <> 'draft' then
     raise exception 'Stale approval changed the current draft';
   end if;
-end $;
+end $$;
 
 -- Approving the new revision atomically supersedes the previously approved one.
 select * from public.approve_santalbino_postmatch_revision(
   (select id from public.santalbino_postmatch_editions where revision = 3), 3
 );
 
-do $
+do $$
 begin
   if (select status from public.santalbino_postmatch_editions where revision = 2) <> 'superseded' then
     raise exception 'Previous approved revision was not superseded on replacement approval';
@@ -118,7 +118,7 @@ begin
   if (select status from public.santalbino_postmatch_editions where revision = 3) <> 'approved' then
     raise exception 'New revision was not approved';
   end if;
-end $;
+end $$;
 
 reset role;
 set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
