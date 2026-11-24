@@ -1620,15 +1620,16 @@ async function shareSocialDraft(kind, platform) {
   if (TEST_MODE) { toast('Condivisione esterna disattivata nella simulazione.'); return; }
   const text = socialDraftText(kind);
   const matchUrl = socialDraftMatchUrl();
-  const shareText = [text, S.match.hashtag || '#SANTALive', 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\\n\\n');
+  const shareText = [text, S.match.hashtag || '#SANTALive', 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\n\n');
   if (platform === 'whatsapp') {
     window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
     toast('WhatsApp pronto: scegli i destinatari e conferma l’invio.');
     return;
   }
+  const facebookWindow = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank', 'noopener');
   await copyText(text);
-  window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank', 'noopener');
-  toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
+  if (!facebookWindow) toast('Popup Facebook bloccato: abilita i popup e riprova.');
+  else toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
 }
 function buildConvocatiText() {
   const m = S.match, opponent = teamName(other(m.ourSide));
