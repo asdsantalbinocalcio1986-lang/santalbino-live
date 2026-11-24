@@ -64,7 +64,7 @@ begin
 end $$;
 set role authenticated;
 
--- A new draft supersedes the approved edition but preserves its audit metadata.
+-- A new draft must not replace the currently approved edition until the new draft is explicitly approved.
 select * from public.save_santalbino_postmatch_revision(
   'test', 'match_01', 'Terza bozza', '{"score":"3-0"}'::jsonb, 12,
   'postmatch/test/match_01/rev3.jpg',
@@ -73,8 +73,11 @@ select * from public.save_santalbino_postmatch_revision(
 
 do $$
 begin
-  if (select status from public.santalbino_postmatch_editions where revision = 2) <> 'superseded' then
-    raise exception 'Previous approved revision was not superseded';
+  if (select status from public.santalbino_postmatch_editions where revision = 2) <> 'approved' then
+    raise exception 'Saving a draft prematurely superseded the current approved revision';
+  end if;
+  if (select status from public.santalbino_postmatch_editions where revision = 3) <> 'draft' then
+    raise exception 'The new revision is not awaiting approval as a draft';
   end if;
   if (select approved_by from public.santalbino_postmatch_editions where revision = 2)
      <> '11111111-1111-4111-8111-111111111111'::uuid then
@@ -96,7 +99,26 @@ begin
   if (select status from public.santalbino_postmatch_editions where revision = 3) <> 'draft' then
     raise exception 'Stale approval changed the current draft';
   end if;
-end $$;
+end $;
+
+-- Approving the new revision atomically supersedes the previously approved one.
+select * from public.approve_santalbino_postmatch_revision(
+  (select id from public.santalbino_postmatch_editions where revision = 3), 3
+);
+
+do $
+begin
+  if (select status from public.santalbino_postmatch_editions where revision = 2) <> 'superseded' then
+    raise exception 'Previous approved revision was not superseded on replacement approval';
+  end if;
+  if (select approved_by from public.santalbino_postmatch_editions where revision = 2)
+     <> '11111111-1111-4111-8111-111111111111'::uuid then
+    raise exception 'Superseding erased previous approval audit metadata';
+  end if;
+  if (select status from public.santalbino_postmatch_editions where revision = 3) <> 'approved' then
+    raise exception 'New revision was not approved';
+  end if;
+end $;
 
 reset role;
 set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
