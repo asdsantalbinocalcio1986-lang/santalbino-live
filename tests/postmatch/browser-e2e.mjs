@@ -158,8 +158,12 @@ async function main() {
 
     // Historical revisions can be reopened independently, scoped to this seeded match.
     await revisionOne.click();
+    // History loading is asynchronous because each revision needs a signed Storage URL.
+    // Wait for the editor to finish replacing its content before asserting the caption.
+    await page.waitForFunction(expected => document.querySelector('#matchResultPost')?.value === expected, captionOne, { timeout: 30000 });
     assert.equal(await page.locator('#matchResultPost').inputValue(), captionOne, 'Revision 1 history did not restore its original caption.');
     await revisionTwo.click();
+    await page.waitForFunction(expected => document.querySelector('#matchResultPost')?.value === expected, captionTwo, { timeout: 30000 });
     assert.equal(await page.locator('#matchResultPost').inputValue(), captionTwo, 'Revision 2 history did not restore its original caption.');
 
     await page.locator('[data-a="approvePostmatchRevision"]').click();
