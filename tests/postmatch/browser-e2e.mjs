@@ -39,7 +39,7 @@ function psql(sql, file = false) {
 
 async function main() {
   // The test-mode table is applied only to this disposable local Supabase instance.
-  psql('supabase/migrations/20261120133534_isolated_test_match_mode.sql', true);
+  psql('/tmp/santalbino-hosted-migrations/20261120133534_isolated_test_match_mode.sql', true);
 
   const user = await apiRequest('/auth/v1/admin/users', {
     method: 'POST',
