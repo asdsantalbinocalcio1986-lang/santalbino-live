@@ -296,14 +296,22 @@ create policy "SANTA Live admins can upload post-match graphics"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin());
 
+-- Graphic bytes are immutable once uploaded. Revisions use unique object paths;
+-- do not permit replacing an image after its SHA-256 has been recorded.
 drop policy if exists "SANTA Live admins can update post-match graphics" on storage.objects;
-create policy "SANTA Live admins can update post-match graphics"
-  on storage.objects for update to authenticated
-  using (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin())
-  with check (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin());
 
+-- Failed saves may clean up an orphan upload, but a referenced graphic can
+-- never be deleted (including after editorial approval).
 drop policy if exists "SANTA Live admins can delete post-match graphics" on storage.objects;
-create policy "SANTA Live admins can delete post-match graphics"
+create policy "SANTA Live admins can delete unreferenced post-match graphics"
   on storage.objects for delete to authenticated
-  using (bucket_id = 'santalbino-postmatch' and public.is_santalbino_admin());
+  using (
+    bucket_id = 'santalbino-postmatch'
+    and public.is_santalbino_admin()
+    and not exists (
+      select 1
+        from public.santalbino_postmatch_editions e
+       where e.graphic_path = storage.objects.name
+    )
+  );
 
