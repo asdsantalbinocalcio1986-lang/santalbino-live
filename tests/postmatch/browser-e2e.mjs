@@ -148,8 +148,11 @@ async function main() {
     await page.locator('#matchResultPost').fill(captionTwo);
     await page.locator('[data-a="savePostmatchRevision"]').click();
     await page.getByText('Bozza post-partita salvata', { exact: false }).waitFor({ timeout: 30000 });
-    const revisionOne = page.locator('[data-postmatch-revision]').filter({ hasText: "ASD Sant'Albino Terme · TEST" }).filter({ hasText: 'Rev. 1' });
-    const revisionTwo = page.locator('[data-postmatch-revision]').filter({ hasText: "ASD Sant'Albino Terme · TEST" }).filter({ hasText: 'Rev. 2' });
+    // Scope history selection to the unique seeded opponent: the local fixture may
+    // already contain unrelated revisions with the same home-team label.
+    const revisionHistory = page.locator('[data-postmatch-revision]').filter({ hasText: 'SQUADRA AVVERSARIA · TEST' });
+    const revisionOne = revisionHistory.filter({ hasText: 'Rev. 1' });
+    const revisionTwo = revisionHistory.filter({ hasText: 'Rev. 2' });
     await revisionOne.waitFor({ timeout: 30000 });
     await revisionTwo.waitFor({ timeout: 30000 });
 
