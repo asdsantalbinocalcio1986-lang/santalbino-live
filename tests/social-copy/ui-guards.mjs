@@ -10,6 +10,8 @@ assert.match(source, /data-convocati-preview[^>]*aria-label="Testo del post conv
 assert.doesNotMatch(source, /data-matchday-preview[^>]*readonly/, 'MATCH DAY text must not be read-only.');
 assert.doesNotMatch(source, /data-convocati-preview[^>]*readonly/, 'Convocati text must not be read-only.');
 assert.match(source, /S\.socialDrafts\s*=\s*Object\.assign\(\{\s*matchDay:\s*'',\s*convocati:\s*''\s*\}/, 'Social drafts must be initialized in app state.');
+assert.match(source, /case 'regenerateMatchDayText':[\\s\\S]{0,240}buildMatchDayText\\(\)/, 'MATCH DAY draft must be refreshable from current match data.');
+assert.match(source, /case 'regenerateConvocatiText':[\\s\\S]{0,240}buildConvocatiText\\(\)/, 'Convocati draft must be refreshable from current match data.');
 assert.match(source, /case 'copyMatchDayText':[\s\S]{0,500}copyText\(text\)/, 'MATCH DAY action must save and copy the exact edited text.');
 assert.match(source, /case 'copyconvocati':[\s\S]{0,500}copyText\(text\)/, 'Convocati action must save and copy the exact edited text.');
 assert.ok(source.includes('<h2>Testo MATCH DAY</h2>'), 'The MATCH DAY editor must be clearly labelled.');
