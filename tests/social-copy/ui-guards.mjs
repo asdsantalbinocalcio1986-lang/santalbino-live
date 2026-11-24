@@ -12,6 +12,6 @@ assert.doesNotMatch(source, /data-convocati-preview[^>]*readonly/, 'Convocati te
 assert.match(source, /S\.socialDrafts[\s\S]{0,180}\{matchDay:'',convocati:''\}/, 'Social drafts must be initialized in app state.');
 assert.match(source, /case 'copyMatchDayText':[\s\S]{0,500}copyText\(text\)/, 'MATCH DAY action must save and copy the exact edited text.');
 assert.match(source, /case 'copyconvocati':[\s\S]{0,500}copyText\(text\)/, 'Convocati action must save and copy the exact edited text.');
-assert.match(source, /'Testo MATCH DAY'/, 'The MATCH DAY editor must be clearly labelled.');
+assert.match(source, /<h2>Testo MATCH DAY<\\/h2>/, 'The MATCH DAY editor must be clearly labelled.');
 
 console.log('Social copy editor guard tests passed');
