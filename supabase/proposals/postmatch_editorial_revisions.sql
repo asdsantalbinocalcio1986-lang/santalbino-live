@@ -78,10 +78,17 @@ begin
     or new.graphic_sha256 is distinct from old.graphic_sha256
     or new.created_by is distinct from old.created_by
     or new.created_at is distinct from old.created_at
-    or new.approved_by is distinct from old.approved_by
-    or new.approved_at is distinct from old.approved_at
   ) then
     raise exception 'Post-match revision content is immutable';
+  end if;
+
+  if (new.approved_by is distinct from old.approved_by
+      or new.approved_at is distinct from old.approved_at)
+     and not (
+       old.status = 'draft' and new.status = 'approved'
+       and new.approved_by is not null and new.approved_at is not null
+     ) then
+    raise exception 'Approval metadata can only be set when approving a draft';
   end if;
 
   if old.status = 'approved' and new.status <> 'superseded' then
