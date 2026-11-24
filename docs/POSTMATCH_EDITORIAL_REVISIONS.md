@@ -12,7 +12,7 @@ The post-match editor needs a durable revision that survives closing the control
 
 Each revision stores together:
 
-- `environment`: `production` or `test`; test data remains isolated even though both environments share the Supabase project.
+- `environment`: `production` or `test`; this is a logical namespace used by the UI and queries. Because the current test mode shares the production Supabase project, it is **not a security boundary**: an authenticated admin able to call the RPCs directly can specify either namespace. Hard isolation requires a separate Supabase project and separate credentials.
 - `match_id` and monotonically increasing `revision`.
 - `snapshot`: immutable JSON copy of the relevant match facts used for the caption and graphic (teams, score, scorers, cards, competition, date, venue, logo references and source state revision).
 - `caption`: exact editable social text.
@@ -42,7 +42,7 @@ The regia editor now has a first implementation on the feature branch:
 - Disables external WhatsApp sharing in test mode.
 - If the proposed table/bucket is not installed, the preview remains available and the editor reports that persistent saving is not yet configured.
 
-This is code on an unmerged feature branch. It cannot persist anything until the proposal is reviewed, converted to a migration, and installed in an isolated Supabase test project.
+This is code on an unmerged feature branch. It cannot persist anything until the proposal is reviewed, converted to a migration, and installed in a separate Supabase test project. The current `?test=1` mode shares the production Supabase project and is not suitable for installing or validating this schema.
 
 ## Proposed UI flow
 
@@ -66,6 +66,6 @@ The SQL in `supabase/proposals/postmatch_editorial_revisions.sql` is a review pr
 - Save twice: second revision supersedes the earlier unapproved draft; history remains.
 - Approve stale revision: operation fails without changing approval state.
 - Edit after approval: creates a new draft; approved content remains immutable.
-- Test mode can only load/save test revisions; production can only load/save production revisions.
+- The UI in test mode loads/saves only test revisions, and production UI loads/saves only production revisions. This client-side namespace filter is not a security boundary; validate hard isolation only in a separate Supabase project.
 - No network call to the social publisher occurs on save or editorial approval.
 - No MVP vote, candidate, or result data is read or changed by the editor.
