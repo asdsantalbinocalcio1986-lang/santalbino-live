@@ -1,0 +1,42 @@
+name: Validate post-match editorial SQL
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/proposals/postmatch_editorial_revisions.sql"
+      - "tests/postmatch/**"
+      - ".github/workflows/postmatch-sql-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-integration:
+    name: PostgreSQL integration tests (ephemeral)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare minimal Supabase-compatible test fixtures
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/setup.sql
+      - name: Apply proposed post-match schema to disposable PostgreSQL
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/postmatch_editorial_revisions.sql
+      - name: Verify revision lifecycle, authorization and immutability
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/assertions.sql
