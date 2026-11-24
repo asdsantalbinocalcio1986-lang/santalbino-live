@@ -19,7 +19,7 @@ Each revision stores together:
 - `graphic_path` and SHA-256 digest: the exact JPEG produced for this revision, in a dedicated private Storage bucket.
 - author and approval audit fields.
 
-Saving creates a new revision. Any previous unapproved draft becomes `superseded`; previous revisions remain available. Approval accepts only the current draft revision and does not regenerate any content. Approved content is immutable; a later correction is a new revision and a new explicit approval.
+Saving creates a new revision. Any previous unapproved draft becomes `superseded`; previous revisions remain available. Approval accepts only the current draft revision and does not regenerate any content. Approved content and its referenced JPEG are immutable: Storage does not permit replacing a graphic, and deletion is allowed only for orphan uploads that are not referenced by any revision; a later correction is a new revision and a new explicit approval.
 
 ## Security and separation
 
