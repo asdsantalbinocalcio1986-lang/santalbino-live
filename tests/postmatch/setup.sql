@@ -30,17 +30,25 @@ create table public.santalbino_admins (
   user_id uuid primary key references auth.users(id)
 );
 
+alter table public.santalbino_admins enable row level security;
+grant select on public.santalbino_admins to authenticated;
+drop policy if exists "Admin can read own admin record" on public.santalbino_admins;
+create policy "Admin can read own admin record"
+  on public.santalbino_admins for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+-- Match production: this helper is SECURITY INVOKER, not a definer function.
 create or replace function public.is_santalbino_admin()
 returns boolean
 language sql
 stable
-security definer
-set search_path = ''
-as $$
+set search_path = public, pg_temp
+as $
   select exists (
-    select 1 from public.santalbino_admins a where a.user_id = auth.uid()
+    select 1 from public.santalbino_admins
+    where user_id = (select auth.uid())
   )
-$$;
+$;
 grant execute on function public.is_santalbino_admin() to authenticated;
 
 create table storage.buckets (
