@@ -97,6 +97,12 @@ jobs:
           sudo apt-get install -y postgresql-client
       - name: Verify Auth, RLS, Storage and post-match revision lifecycle
         run: node tests/postmatch/supabase-local.mjs
+      - name: Install Playwright browser test runner
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Install Chromium for isolated browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Verify post-match editor in the control-room browser
+        run: node tests/postmatch/browser-e2e.mjs
       - name: Stop disposable local Supabase services
         if: always()
         run: supabase stop --no-backup
