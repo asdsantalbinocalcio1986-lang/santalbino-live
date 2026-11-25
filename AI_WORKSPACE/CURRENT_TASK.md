@@ -89,3 +89,26 @@ Completed read-only review of public SQL functions, ACLs, RLS, grants, cron and 
 
 ## SQL/RLS/sync and MVP lifecycle review — 2026-11-25
 Read-only audit completed. Save RPCs preserve optimistic concurrency (40001); test uses separate state table/RPC/localStorage keys but same Supabase project and media bucket; cron updates live and test page state. State JSON lacks schema version/whitelist/size cap. MVP vote RPC enforces fulltime, 12-hour expiry, roster membership and one vote per client-supplied UUID, which is not robust person identity. `resetMatch()` preserves positional logos and old hashtag. New docs: SQL_RLS_AND_SYNC_AUDIT, MVP_VOTING_AND_MATCH_LIFECYCLE_AUDIT, IMPLEMENTATION_BLUEPRINT. No live mutation.
+
+
+## Narrow corrective implementation authorization — 2026-11-25
+
+The project owner explicitly authorized corrective work on the already-open social/editorial PRs, limited to defects found in the independent review. This is a narrow exception to the prior audit-only gate, not authorization for the broader v3.1 implementation.
+
+### Changes applied on existing Draft PR branches
+- PR #107 (`feat/social-copy-editor`): clear previous match-day/convocati drafts on reset; prevent duplicate hashtag in the share composition; correct Facebook popup detection and opener handling for both social-copy and event sharing; correct WhatsApp event fallback opener handling; add source guard tests.
+- PR #106 (`feat/postmatch-editorial-drafts`): replace full-state snapshot fallback with reduced snapshot capture and shape validation; handle match-result graphic download errors locally; inspect Storage SDK cleanup errors and report a possible orphan object path; add guard tests.
+
+### Current commit heads
+- PR #106: `bc75b97690b867e279df5d68bef55b5890221b25`
+- PR #107: `588aaefcaac7b8bc79b081ea0726195dc08ffa7d`
+
+### Verification and remaining limits
+- Earlier CI #594 for PR #107 passed validation and social UI guards before the latest popup changes; latest head has no completed CI run visible yet.
+- PR #106's earlier CI reached successful SQL and UI guard steps but was cancelled before full completion during successive commit updates; latest head has no completed full CI run visible.
+- No final manual browser test or independent Gemini review has been completed.
+- Client-computed SHA-256 is stored after SQL format validation only; server-side object-byte verification is not implemented.
+- Publisher hardening remains untouched: atomic claim/lease, ambiguous Meta outcomes and reconciliation, per-platform idempotency, and safe retries remain blockers before automatic editorial publishing.
+- Both PRs remain Draft/unmerged. No main, production, DB, Storage configuration, cron, secret, Meta account, deployment or real publication changes were made.
+
+Independent review handoff: `AI_WORKSPACE/GEMINI_REVIEW_SOCIAL_FIXES_2026-11-25.md`.
