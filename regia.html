@@ -4459,7 +4459,7 @@ window.addEventListener('popstate', () => {
     const sh = $('#sheet');
     if (sh?.open) sh.close();
   } else {
-    const openDialogs = $('dialog[open]');
+    const openDialogs = document.querySelectorAll('dialog[open]');
     const topDialog = openDialogs[openDialogs.length - 1];
     if (topDialog) topDialog.close();
     else {
