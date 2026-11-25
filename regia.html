@@ -4672,6 +4672,7 @@ function editorialQueueHtml() {
     const canCancel = ['draft', 'approved', 'scheduled', 'failed', 'partial'].includes(post.status)
       && !deliveries.some(item => ['processing', 'unknown'].includes(item.status));
     const scheduled = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }) : '';
+    const expires = post.expires_at ? new Date(post.expires_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }) : '';
     return '<article class="card" data-editorial-post="' + esc(post.id) + '">' +
       '<div class="row2" style="align-items:center;justify-content:space-between"><b>' +
       esc(({match_day:'MATCH DAY',convocati:'CONVOCATI',formation:'FORMAZIONE',post_match:'POST PARTITA',club_notice:'AVVISO SOCIETÀ',custom:'CONTENUTO LIBERO'})[post.content_type] || post.content_type) +
@@ -4679,6 +4680,7 @@ function editorialQueueHtml() {
       (post.status === 'published' ? 'pubblicato' : 'bozza') + '">' + esc(editorialStatusLabel(post.status)) + '</span></div>' +
       (post.match_id ? '<div class="small muted">Partita: ' + esc(post.match_id) + '</div>' : '') +
       (scheduled ? '<div class="small">Programmazione: ' + esc(scheduled) + ' · Europe/Rome</div>' : '') +
+      (expires ? '<div class="small muted">Scadenza automatica: ' + esc(expires) + ' · Europe/Rome</div>' : '<div class="small muted">Nessuna scadenza automatica</div>') +
       (post.preview_url ? '<img src="' + esc(post.preview_url) + '" alt="Anteprima grafica da approvare" loading="lazy" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px;margin:10px 0">' : '<p class="small" role="alert">Anteprima non disponibile: aggiorna la coda prima di approvare.</p>') +
       '<p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(post.caption) + '</p>' +
       '<div class="small muted">Canali: ' + esc([post.platforms?.facebook ? 'Facebook' : '', post.platforms?.instagram ? 'Instagram' : ''].filter(Boolean).join(' · ')) +
