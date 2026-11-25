@@ -4589,7 +4589,7 @@ function editorialStatusLabel(status) {
     draft: 'Bozza', approved: 'Approvato · in coda', scheduled: 'Programmato',
     publishing: 'Pubblicazione in corso', published: 'Pubblicato',
     partial: 'Pubblicazione parziale', failed: 'Tentativi esauriti · annullabile',
-    unknown: 'Esito incerto · verifica necessaria', cancelled: 'Annullato',
+    unknown: 'Esito incerto · verifica necessaria', expired: 'Scaduto · finestra di pubblicazione terminata', cancelled: 'Annullato',
     superseded: 'Revisione superata', pending: 'In attesa', processing: 'In elaborazione',
     failed_retryable: 'Riprova differita', published_delivery: 'Consegnato'
   })[status] || status || '—';
@@ -4601,7 +4601,7 @@ async function loadEditorialQueue() {
   try {
     const [posts, deliveries] = await Promise.all([
       db.from('santalbino_editorial_posts')
-        .select('id,logical_key,match_id,content_type,revision,status,caption,asset_path,platforms,scheduled_at,timezone,created_at,approved_at,published_at,last_error_safe')
+        .select('id,logical_key,match_id,content_type,revision,status,caption,asset_path,platforms,scheduled_at,expires_at,timezone,created_at,approved_at,published_at,last_error_safe')
         .order('created_at', { ascending: false }).limit(40),
       db.from('santalbino_editorial_deliveries')
         .select('post_id,platform,status,attempt_count,external_post_id,last_error_safe,published_at,updated_at')
@@ -4751,7 +4751,8 @@ async function saveEditorialDraft() {
       },
       rosters: { home: String(S.rosters?.home || ''), away: String(S.rosters?.away || '') },
       convocati: String(S.convocati || ''),
-      events: (Array.isArray(S.events) ? S.events : []).map(event => ({ ...event }))
+      events: (Array.isArray(S.events) ? S.events : []).map(event => ({ ...event })),
+      clock: { phase: String(S.clock?.phase || 'pre'), finishedAt: Number(S.clock?.finishedAt || 0) }
     };
     if (new TextEncoder().encode(JSON.stringify(snapshot)).length > 65536) throw new Error('Lo snapshot supera il limite consentito di 64 KB.');
     const { data, error } = await db.rpc('save_santalbino_editorial_draft', {
