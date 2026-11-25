@@ -668,7 +668,7 @@ returns text
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_post public.santalbino_editorial_posts%rowtype;
   v_delivery public.santalbino_editorial_deliveries%rowtype;
@@ -735,8 +735,7 @@ begin
 
   return v_new_status;
 end;
-$;
-
+$$;
 revoke all on function public.resolve_santalbino_editorial_delivery(uuid,text,text,text,text) from public, anon;
 grant execute on function public.resolve_santalbino_editorial_delivery(uuid,text,text,text,text) to authenticated;
 
