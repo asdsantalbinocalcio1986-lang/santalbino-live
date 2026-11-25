@@ -109,3 +109,15 @@ These facts must be rechecked against the exact branch/commit before implementat
 - Creato `AI_WORKSPACE/SOCIAL_QUEUE_SCHEMA_DESIGN_DRAFT.md`: proposta separazione coda editoriale / delivery per piattaforma, snapshot immutabile, claim atomico, lease, stati unknown e kill switch. Non è migration pronta né approvata.
 - PR #108 resta open/Draft/non merged al controllo; i due nuovi documenti sono nel branch `ai-workspace/bootstrap` e quindi nel perimetro della PR.
 - Nessuna modifica a codice applicativo, schema/dati/storage/cron, segreti, account social, merge o deploy.
+
+
+## Publisher live contract audit — 2026-11-25
+
+- Verificata la sorgente Edge Function distribuita: identica byte-per-byte al file su main; nessuna invocazione e nessun contatto Meta.
+- Confermati JWT + verifica admin lato server e gate `META_PUBLISH_ENABLED`.
+- Nuovi finding bloccanti per l'estensione: PUB-01 claim non atomico (SELECT/UPDATE con finestra processing 120s), PUB-02 timeout/errore Meta sempre classificato failed anche se l'esito esterno può essere incerto, PUB-03 UNIQUE event_id evita righe duplicate ma non garantisce exactly-once esterno.
+- Retry per piattaforma esiste parzialmente; resta il rischio di duplicati in caso di risposta Meta persa. Aggiungere claim RPC/lease e stato unknown/reconciliation_required prima di ampliare.
+- L'azione `status` della Edge Function contatta Graph API: non è stata invocata durante audit.
+- Policy live: social log con SELECT per admin autenticati; bucket `santalbino-media` pubblico, max 8 MiB, upload/update/delete admin-only. Migrazione cron conferma che il job pubblica soltanto il contenuto della pagina live.
+- Creato `AI_WORKSPACE/PUBLISHER_LIVE_CONTRACT_AUDIT_2026-11-25.md`.
+- Nessuna modifica a codice, schema, dati, storage, cron, segreti, account Meta, merge o deploy.
