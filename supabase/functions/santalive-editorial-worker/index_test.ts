@@ -171,3 +171,55 @@ Deno.test("asset failures before any Meta request are safely retryable", async (
     throw new Error("Pre-publication asset failure was not safely retried");
   }
 });
+
+
+Deno.test("expired Instagram containers are replaced and persisted before publish", async () => {
+  const states = ["EXPIRED", "FINISHED"];
+  const recorded: string[] = [];
+  const endpoints: string[] = [];
+  const completed: string[] = [];
+  await processEditorialClaim({
+    post: {
+      id: "post-expired-container", caption: "Expired test", asset_path: "social-editorial/test/post.jpg",
+      asset_sha256: "f".repeat(64), platforms: { instagram: true }, claim_token: "claim-expired",
+    },
+    deliveries: [{ platform: "instagram", external_container_id: "expired-container" }],
+  }, {
+    loadAsset: async () => ({ publicUrl: "https://storage.example/social-editorial/test/post.jpg" }),
+    graphPost: async (path: string) => {
+      endpoints.push(path);
+      if (path.endsWith("/media")) return { id: "replacement-container" };
+      if (path.endsWith("/media_publish")) return { id: "published-media" };
+      throw new Error("Unexpected endpoint");
+    },
+    graphGet: async () => ({ status_code: states.shift() }),
+    recordContainer: async (_id: string, _token: string, containerId: string) => { recorded.push(containerId); return true; },
+    complete: async (_id: string, _platform: string, _token: string, status: string) => { completed.push(status); },
+    pageId: "page-test", pageToken: "token-test", instagramId: "ig-test", delay: async () => {},
+  } as never);
+  if (!recorded.includes("replacement-container") || !endpoints.includes("ig-test/media_publish") || completed[0] !== "published") {
+    throw new Error("Expired Instagram container was not safely replaced and published");
+  }
+});
+
+Deno.test("an already-published Instagram container becomes unknown, never a retry", async () => {
+  const endpoints: string[] = [];
+  const completed: string[] = [];
+  await processEditorialClaim({
+    post: {
+      id: "post-published-container", caption: "Published test", asset_path: "social-editorial/test/post.jpg",
+      asset_sha256: "a".repeat(64), platforms: { instagram: true }, claim_token: "claim-published",
+    },
+    deliveries: [{ platform: "instagram", external_container_id: "already-published" }],
+  }, {
+    loadAsset: async () => ({ publicUrl: "https://storage.example/social-editorial/test/post.jpg" }),
+    graphPost: async (path: string) => { endpoints.push(path); return { id: "unexpected" }; },
+    graphGet: async () => ({ status_code: "PUBLISHED" }),
+    recordContainer: async () => true,
+    complete: async (_id: string, _platform: string, _token: string, status: string) => { completed.push(status); },
+    pageId: "page-test", pageToken: "token-test", instagramId: "ig-test", delay: async () => {},
+  } as never);
+  if (endpoints.some(path => path.endsWith("/media_publish")) || completed[0] !== "unknown") {
+    throw new Error("Already-published Instagram container was retried instead of reconciled");
+  }
+});
