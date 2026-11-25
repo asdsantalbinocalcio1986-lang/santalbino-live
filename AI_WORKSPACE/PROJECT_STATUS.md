@@ -71,3 +71,13 @@ These facts must be rechecked against the exact branch/commit before implementat
 - PR #106 and #107 remain separate open Drafts and both modify `regia.html`; no merge/integration has been performed. PR #108 remains Draft with six documentation-only files.
 - Detailed line references and acceptance matrix are in `POSTMATCH_PHASE1_DESIGN_DRAFT.md` section 11.
 - No production code, schema, data, storage, external communication, merge or deploy was changed.
+
+
+## Social automation audit — 2026-11-25
+
+- Read-only audit completed against current `main` and connected Supabase project. Existing Meta publisher supports Facebook/Instagram for goal, red card, halftime and full-time events; automatic trigger remains disabled by default and requires admin/configuration gates.
+- The active pg_cron job `santalbino-publish-scheduled-content` runs every minute but only moves scheduled `live_state` / `live_test_state` content to the live published slot. It does not publish to Meta.
+- The live social publication log table exists and was empty at audit time; Edge Function `santalive-social-publish` is ACTIVE v2 with JWT verification. Meta secret values and account readiness were not inspected or tested.
+- A dedicated editorial social queue/scheduler is not present in the current public table inventory. The current system needs publisher hardening (atomic claim, ambiguous-outcome handling, per-platform retry) before broadening automatic posting.
+- Full findings, proposed workflow, release phases and acceptance tests: `AI_WORKSPACE/SOCIAL_AUTOMATION_AUDIT_2026-11-25.md`.
+- No production code, database, storage, cron, secrets, social accounts, merges or deployments were changed.
