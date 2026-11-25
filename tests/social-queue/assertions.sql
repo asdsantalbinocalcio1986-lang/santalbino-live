@@ -103,7 +103,7 @@ begin
   end if;
 
   select * into v_approved_old from public.save_santalbino_editorial_draft(
-    'match:ci-match:approved-revision', 'custom', 'ci-match',
+    'match:ci-match:approved-revision:custom', 'custom', 'ci-match',
     'Revisione approvata precedente', 'social-editorial/test/approved-r1.jpg',
     repeat('1', 64), '{"facebook":true}'::jsonb, '{"revision":1}'::jsonb
   );
@@ -112,7 +112,7 @@ begin
     raise exception 'Expected first approved revision before replacement';
   end if;
   select * into v_approved_new from public.save_santalbino_editorial_draft(
-    'match:ci-match:approved-revision', 'custom', 'ci-match',
+    'match:ci-match:approved-revision:custom', 'custom', 'ci-match',
     'Revisione aggiornata', 'social-editorial/test/approved-r2.jpg',
     repeat('2', 64), '{"facebook":true}'::jsonb, '{"revision":2}'::jsonb
   );
@@ -130,7 +130,7 @@ begin
   select * into v_queue from public.approve_santalbino_editorial_post(v_queue.id, 1, now() - interval '1 minute');
 
   select * into v_retry from public.save_santalbino_editorial_draft(
-    'match:ci-match:retry_notice', 'club_notice', null,
+    'match:ci-match:retry_notice:club_notice', 'club_notice', null,
     'Avviso con retry controllato', 'social-editorial/test/retry-notice.jpg',
     repeat('e', 64), '{"facebook":true,"instagram":false}'::jsonb,
     '{"kind":"retry-test"}'::jsonb
@@ -138,7 +138,7 @@ begin
   select * into v_retry from public.approve_santalbino_editorial_post(v_retry.id, 1, now() + interval '1 hour');
 
   select * into v_exhausted from public.save_santalbino_editorial_draft(
-    'match:ci-match:retry-limit', 'club_notice', null,
+    'match:ci-match:retry-limit:club_notice', 'club_notice', null,
     'Avviso con limite tentativi', 'social-editorial/test/retry-limit.jpg',
     repeat('3', 64), '{"facebook":true}'::jsonb, '{"kind":"retry-limit"}'::jsonb
   );
@@ -171,6 +171,9 @@ begin
   end if;
   v_post_id := (v_claims -> 0 -> 'post' ->> 'id')::uuid;
   v_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
+  if not public.renew_santalbino_editorial_claim(v_post_id, v_token) then
+    raise exception 'Active editorial claim could not be renewed';
+  end if;
 
   if (select count(*) from public.santalbino_editorial_deliveries
        where post_id = v_post_id and status = 'processing') <> 2 then
@@ -203,7 +206,7 @@ begin
 
   update public.santalbino_editorial_posts
      set scheduled_at = now() - interval '1 minute'
-   where logical_key = 'match:ci-match:retry_notice' and status = 'scheduled';
+   where logical_key = 'match:ci-match:retry_notice:club_notice' and status = 'scheduled';
   v_claims := public.claim_santalbino_editorial_queue(5, true);
   if jsonb_array_length(v_claims) <> 1 then
     raise exception 'Expected the retryable editorial delivery to be claimed once: %', v_claims;
@@ -236,7 +239,7 @@ begin
   end if;
 
   select id into v_exhausted_id from public.santalbino_editorial_posts
-   where logical_key = 'match:ci-match:retry-limit';
+   where logical_key = 'match:ci-match:retry-limit:club_notice';
   insert into public.santalbino_editorial_deliveries
     (post_id, platform, status, attempt_count, last_attempt_at)
   values (v_exhausted_id, 'facebook', 'failed_retryable', 4, now() - interval '2 hours');
@@ -282,7 +285,7 @@ begin
   end if;
 
   select id into v_post_id from public.santalbino_editorial_posts
-   where logical_key = 'match:ci-match:retry-limit' and status = 'failed';
+   where logical_key = 'match:ci-match:retry-limit:club_notice' and status = 'failed';
   if v_post_id is null or not public.cancel_santalbino_editorial_post(v_post_id) then
     raise exception 'Terminal failed editorial post could not be cancelled';
   end if;
