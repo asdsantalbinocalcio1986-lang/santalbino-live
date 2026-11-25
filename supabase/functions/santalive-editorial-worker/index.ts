@@ -271,12 +271,8 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const rpcClient = adminClient as unknown as RpcClient;
-    const { data, error } = await rpcClient.rpc("claim_santalbino_editorial_queue", {
-      p_limit: 1,
-      p_dispatch_enabled: true,
-    });
-    if (error) throw new Error("Claim della coda editoriale non riuscito");
-    const claims = Array.isArray(data) ? data as EditorialClaim[] : [];
+    const dispatch = await dispatchEditorialQueue(rpcClient, true, 1);
+    const claims = dispatch.claims || [];
 
     for (const claim of claims) {
       const deps: WorkerDependencies = {
