@@ -271,7 +271,12 @@ async function main() {
     page.removeAllListeners('dialog');
     page.on('dialog', dialog => dialog.accept());
     await scheduledCard.locator('[data-a="editorialApprove"]').click();
-    await page.getByText('Contenuto approvato e programmato', { exact: false }).waitFor({ timeout: 30000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some(el =>
+      /Contenuto approvato e programmato|Approvazione non riuscita/.test(el.textContent || '')
+    ), null, { timeout: 30000 });
+    const scheduleToasts = await page.locator('.toast').allTextContents();
+    assert.ok(scheduleToasts.some(text => text.includes('Contenuto approvato e programmato')),
+      'Scheduled approval failed: ' + scheduleToasts.join(' | '));
     const scheduledRows = await apiRequest(`/rest/v1/santalbino_editorial_posts?select=id,status,scheduled_at&logical_key=eq.${encodeURIComponent(scheduledKey)}`, {
       token: adminAccessToken, key: anon
     });
