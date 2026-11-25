@@ -29,6 +29,8 @@ jobs:
           node-version: 22
       - name: Validate application and security migration
         run: node scripts/validate-project.mjs
+      - name: Verify regia back-navigation guard
+        run: node tests/regia-navigation/ui-guards.mjs
 
   deploy:
     name: Deploy GitHub Pages

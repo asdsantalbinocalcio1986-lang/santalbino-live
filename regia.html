@@ -4430,6 +4430,13 @@ let armedNew = false;
 
 /* ================= finestra evento ================= */
 let draft = null, textManual = false, sheetHistoryEntry = false;
+let appHistoryGuardReady = false;
+function ensureAppHistoryGuard() {
+  if (appHistoryGuardReady) return;
+  // Keep an in-app history entry so Android/browser Back cannot leave the active match.
+  history.pushState({ santaliveAppGuard: true }, '', location.href);
+  appHistoryGuardReady = true;
+}
 const MISS_KINDS = ['Occasione', 'Palo', 'Rigore sbagliato', 'Gran tiro'];
 function pushSheetHistory() {
   if (sheetHistoryEntry) return;
@@ -4444,11 +4451,24 @@ function closeSheet() {
     if (history.state?.santaliveSheet) history.back();
   }
 }
+ensureAppHistoryGuard();
 window.addEventListener('popstate', () => {
-  if (!sheetHistoryEntry) return;
-  sheetHistoryEntry = false;
-  const sh = $('#sheet');
-  if (sh?.open) sh.close();
+  // Back closes the topmost transient UI first. If nothing is open, it stays in the match.
+  if (sheetHistoryEntry) {
+    sheetHistoryEntry = false;
+    const sh = $('#sheet');
+    if (sh?.open) sh.close();
+  } else {
+    const openDialogs = document.querySelectorAll('dialog[open]');
+    const topDialog = openDialogs[openDialogs.length - 1];
+    if (topDialog) topDialog.close();
+    else {
+      const mobileMenu = $('.mobile-actions[open]');
+      if (mobileMenu) mobileMenu.removeAttribute('open');
+    }
+  }
+  ensureAppHistoryGuard();
+  history.pushState({ santaliveAppGuard: true }, '', location.href);
 });
 function openSheet(type) {
   editingEventId = null;
