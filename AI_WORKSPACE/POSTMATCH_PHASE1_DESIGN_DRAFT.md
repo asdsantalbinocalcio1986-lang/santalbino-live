@@ -1,0 +1,123 @@
+# Post-match phase 1 — design draft (not approved)
+
+**Date:** 2026-11-25  
+**Status:** Draft for technical review; not implementation authorization  
+**Repository baseline:** `main` at `8166deeb4b70397af9b021b9420f93afdab2501f`  
+**Related proposals:** PR #106 (`feat/postmatch-editorial-drafts`, head `a993d5bfcc282acfc849ab45084d570524d6725b`); PR #107 (`feat/social-copy-editor`, head `81cc441328b413aa79217fcf91079c0a28362bf1`); PR #108 (`ai-workspace/bootstrap`, head `960aecd36ada1842b8f1b50f9408aa17942e5120`).
+
+This document records design work that can be done without changing application code, database schema, live data, external services or production. It is not approval to merge either feature PR or apply SQL.
+
+## 1. Fixed product decisions
+
+- Preserve the existing automatic FULL TIME flow unchanged.
+- The new editorial post-match summary is a separate flow.
+- A human administrator must explicitly approve the exact revision before external publication.
+- The summary includes teams, final score, scorers and essential match information; include dismissals when present. Bookings and other details are optional.
+- Never include the complete formation in the standard post-match message.
+- Text remains editable before approval.
+- Initial internal notifications are only for administrators/operators, never supporters.
+- Every automation has a manual fallback.
+- Reuse the existing Meta publisher if and only if its safety and idempotency can be established; do not create a second Facebook publisher.
+- Corrections after publication create a new revision and require a new explicit approval. Never auto-correct or auto-republish.
+- Web Push is out of phase 1.
+- Scheduling is deferred until a backend scheduler independent of an operator browser is verified.
+- MVP voting, candidates, votes, tallies, proclamation and voting history are completely out of scope.
+- No real social post or supporter notification during tests.
+- No implementation or database changes before the read-only audit and explicit owner approval of the resulting specification.
+
+## 2. Verified repository facts (not live deployment claims)
+
+At the recorded `main` baseline:
+- The existing publisher is `supabase/functions/santalive-social-publish/index.ts`; it authenticates the caller, checks membership in `santalbino_admins`, checks `META_PUBLISH_ENABLED`, and accepts the existing event types goal/red/halftime/fulltime.
+- Its publication ledger is `santalbino_social_publications`, with a unique `event_id`, per-platform statuses and external IDs.
+- The publisher currently uses a read-then-write 120-second processing check. This is not an atomic claim/lease. Concurrent retries and ambiguous timeouts need a deeper idempotency review before reuse for a new editorial action.
+- The existing scheduled-content migration runs a minute-level pg_cron job for `live_state` and `live_test_state`; repository presence does not prove the job is installed/enabled in the effective production project.
+- PR #106 is an open Draft, not merged. It contains an editor, immutable content snapshots, JPEG storage, revision history and explicit editorial approval, plus a SQL proposal. Its own description states that `?test=1` shares the production Supabase project and is not a hard isolation boundary.
+- PR #107 is an open Draft, not merged. It contains editable MATCH DAY and CONVOCATI copy with manual share flows. It reports automated checks passed, but manual browser testing remains.
+- PR #106 and #107 both change `regia.html` from separate branches based on main. Do not merge them independently without rebasing/reconciling the shared file and rerunning the combined test suite.
+- PR #108 is an open Draft documentation-only collaboration workspace.
+
+These are Git repository facts. Effective Supabase schema, RLS, Edge Function deployment/version, secrets, cron job state and Meta configuration remain unverified unless separately evidenced by read-only live queries.
+
+## 3. Proposed phase-1 user journey
+
+1. FULL TIME occurs; the existing automation continues exactly as today.
+2. An administrator opens the separate MATCH RESULT editorial workflow.
+3. The application captures one immutable match snapshot and generates both the initial caption and image from that same snapshot.
+4. The administrator edits the caption and previews the exact image.
+5. Save creates a new draft revision. The saved caption, snapshot, image bytes and SHA-256 are tied together.
+6. The administrator reopens the editor and sees the saved revision exactly as saved; no silent regeneration.
+7. The administrator explicitly approves the displayed revision. Approval is editorial only and does not itself publish.
+8. A separately authorized publish action may publish only that exact approved revision, through a safe, auditable path. If publisher safety cannot be proven, phase 1 falls back to manual download/copy/share and does not invoke automated Meta publishing.
+9. The UI records per-channel outcomes and any uncertain result. It must not blindly retry an ambiguous Meta request.
+10. A correction creates a new revision; the previous approved/published content and its audit trail remain available. A new approval is required before any corrected publication.
+
+## 4. Required state model
+
+Editorial revision states:
+- `draft`: editable; not externally publishable.
+- `approved`: exact content approved; immutable.
+- `superseded`: retained for history; not publishable.
+
+Publication attempt states (separate from editorial status):
+- `not_requested`
+- `queued` (only if a reliable backend queue is approved later)
+- `processing` with a unique claim/lease and expiry
+- `published` per channel, with provider object ID and timestamp
+- `failed_retryable` only when provider outcome is known to be no post created
+- `unknown` when the request may have succeeded but confirmation was lost; requires reconciliation, never blind retry
+- `partial` when one channel succeeded and another did not
+
+Do not conflate approval with publication. Do not represent an uncertain provider outcome as a definite failure.
+
+## 5. Acceptance and safety test matrix
+
+| Area | Required test | Pass condition |
+|---|---|---|
+| Summary content | Goals, own goals if represented, scorers, dismissals, score and teams | Correct facts; no full formation; no MVP data |
+| Snapshot consistency | Change match state after opening editor | Caption/image/revision remain based on one captured state |
+| Draft persistence | Save, close, reopen, reload | Exact caption and same image bytes/hash return |
+| Revision history | Save multiple drafts and start a new match | Prior revisions remain accessible and correctly associated |
+| Approval | Approve current draft; attempt stale approval | Exact expected revision only; stale request rejected |
+| Immutability | Attempt to edit approved/superseded content | Rejected; correction creates a new revision |
+| Authorization | Anonymous, ordinary authenticated user, admin | Only admin can read/create/approve/publish as specified |
+| Storage | Guess URL, access another user's object, overwrite/delete referenced object | Private access; no overwrite/delete of referenced content |
+| Test isolation | Exercise test mode and inspect backend target | Test cannot reach production tables, storage or Meta accounts |
+| Publisher concurrency | Two simultaneous requests for same approved revision | One atomic claim; no duplicate external post |
+| Publisher timeout | Provider accepts request but response is lost | State becomes unknown; no blind duplicate retry |
+| Partial channel result | Facebook succeeds, Instagram fails (and reverse) | Per-channel outcomes retained; retry targets only safe channel |
+| Bypass protection | Call publisher without approved revision / with modified caption | Server rejects; client-side checks are not trusted |
+| FULL TIME regression | Run existing event test fixtures | Existing behavior and configuration unchanged |
+| Manual fallback | Publisher unavailable or disabled | Admin can export/copy approved text and image without accidental post |
+| Audit trail | Draft, approval, publish, retry, correction | Actor, time, revision, content hash and provider IDs recorded |
+
+All integration/E2E tests must use disposable local services or a genuinely separate test project. The deployed `?test=1` mode is not proof of isolation. No test may send to real Meta accounts.
+
+## 6. Technical review points for Claude and Gemini
+
+1. Review the PR #106 SQL proposal for RLS, SECURITY DEFINER search paths, grants, race safety, status transitions, storage policies, orphan cleanup and migration ordering.
+2. Verify whether approval should preserve the prior approved revision as `approved` rather than changing it to `superseded`; history semantics must not erase the fact that it was previously approved/published.
+3. Verify that a revision's identity and publish eligibility are enforced server-side, not only by the browser.
+4. Design an atomic idempotency/claim strategy for a *new editorial publish operation* without changing the existing FULL TIME path. Include the provider-accepted/response-lost case.
+5. Confirm whether Meta APIs offer a reliable way to reconcile an ambiguous publish before retry. If not, require operator reconciliation.
+6. Determine whether PR #106 and #107 can be combined safely and in what sequence; both modify `regia.html`.
+7. Identify the minimum live read-only queries needed to verify deployed schema, RLS, function version, cron and environment separation. Mark unavailable facts UNKNOWN; do not infer from repository migrations.
+
+## 7. Phase boundaries
+
+**Phase 1 candidate:** durable editorial draft, exact snapshot/image, revision history, explicit approval, administrator-only internal indication, manual export/share fallback, audit trail, and tests in isolated infrastructure.
+
+**Conditional / not assumed in phase 1:** automated Meta publication of the new approved summary. It is allowed only if the audit proves that server-side approval gating, atomic idempotency, per-channel outcome tracking and safe reconciliation can be implemented without altering the existing FULL TIME publisher behavior. Otherwise keep publication manual.
+
+**Later:** backend scheduling, internal notification expansion, Web Push, analytics/metrics and any MVP-related work (MVP remains separately governed and is not part of this specification).
+
+## 8. Go/no-go gates
+
+- Gate A — read-only audit completed by Claude with evidence and explicit UNKNOWNs.
+- Gate B — independent Gemini review identifies missed evidence, unsupported claims and security gaps.
+- Gate C — ChatGPT reconciles findings and produces final technical specification.
+- Gate D — project owner explicitly approves the phase-1 scope.
+- Gate E — Claude implements on one isolated branch/PR; Gemini reviews read-only; ChatGPT checks diff, tests and regressions.
+- Gate F — owner explicitly approves any merge/deploy. No automatic merge or production action.
+
+Until Gate D, this draft supports planning and test design only.
