@@ -2510,8 +2510,14 @@ async function loadSocialPublicationLog() {
     const title = ({goal:'Gol',red:'Espulsione',halftime:'Intervallo',fulltime:'Fine partita'})[item.event_type] || item.event_type;
     const fb = 'Facebook: ' + item.facebook_status + (item.facebook_error ? ' · ' + item.facebook_error : '');
     const ig = 'Instagram: ' + item.instagram_status + (item.instagram_error ? ' · ' + item.instagram_error : '');
-    const retry = item.overall_status === 'published' ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
-    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div></div>';
+    const needsReconciliation = item.overall_status === 'reconciliation_required' ||
+      ['unknown', 'processing'].includes(item.facebook_status) ||
+      ['unknown', 'processing'].includes(item.instagram_status);
+    const retry = item.overall_status === 'published' || needsReconciliation ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
+    const reconciliationNote = needsReconciliation
+      ? '<div class="small" style="margin-top:6px;color:var(--muted)">Esito da verificare: il sistema blocca nuovi invii automatici per evitare duplicati.</div>'
+      : '';
+    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div>' + reconciliationNote + '</div>';
   }).join('');
 }
 
