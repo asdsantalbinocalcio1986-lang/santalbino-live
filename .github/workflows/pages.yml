@@ -71,7 +71,7 @@ jobs:
 
   postmatch-local-supabase-tests:
     name: Post-match integration tests (isolated local Supabase)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/fix/social-publisher-hardening-2026-11-25'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
