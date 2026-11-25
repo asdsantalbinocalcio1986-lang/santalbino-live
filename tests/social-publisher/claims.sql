@@ -16,6 +16,12 @@ declare
   v_event2 text := 'publisher-platform-expansion-' || gen_random_uuid()::text;
   v_expansion jsonb;
 begin
+  if (select p.prosecdef
+        from pg_catalog.pg_proc p
+       where p.oid = 'public.claim_santalbino_social_publication(text,text,text,text,text,jsonb)'::regprocedure) then
+    raise exception 'Claim RPC must run as invoker, not security definer';
+  end if;
+
   if has_function_privilege('anon',
        'public.claim_santalbino_social_publication(text,text,text,text,text,jsonb)',
        'EXECUTE') then
