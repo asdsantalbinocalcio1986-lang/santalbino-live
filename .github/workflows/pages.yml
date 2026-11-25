@@ -31,6 +31,8 @@ jobs:
         run: node scripts/validate-project.mjs
       - name: Verify social copy editor guards
         run: node tests/social-copy/ui-guards.mjs
+      - name: Verify editorial queue admin UI guards
+        run: node tests/social-queue/ui-guards.mjs
       - name: Setup Deno for editorial worker tests
         if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
         uses: denoland/setup-deno@v2
