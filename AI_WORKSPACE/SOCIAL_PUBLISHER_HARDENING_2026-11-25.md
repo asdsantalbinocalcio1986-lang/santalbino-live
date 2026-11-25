@@ -113,3 +113,5 @@ Non trattare `unknown` come retry automatico. Prevedere riconciliazione mediante
 - Nessun deploy, migrazione hosted, lettura/modifica dei segreti, invocazione della funzione hosted o chiamata Meta è stato eseguito.
 
 **Gate prima di domenica:** eseguire i test locali/CI, revisione indipendente del SQL e del publisher, verificare l'allineamento del sorgente con la versione hosted e preparare una procedura manuale di riconciliazione. L'installazione in produzione e l'eventuale attivazione restano passaggi distinti e soggetti ad autorizzazione.
+
+- **CI trigger caveat:** la PR #110 ha come base il branch d'integrazione, mentre il workflow attuale filtra le pull request dirette a `main`. Di conseguenza GitHub Actions non avvia automaticamente la suite per questa PR. I test aggiunti sono predisposti per l'esecuzione nel Supabase locale effimero, ma vanno lanciati con un workflow/manual run o in una successiva pipeline dedicata prima di considerare il codice validato.
