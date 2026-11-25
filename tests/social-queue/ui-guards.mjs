@@ -49,4 +49,16 @@ assert.ok(queueSql.includes("lower(asset_path) ~ '[.]jpe?g$'"),
 assert.ok(!queueSql.includes("lower(asset_path) ~ '\\.jpe?g$'"),
   'The editorial SQL must not reintroduce a backslash-dot regex that psql parses as a meta-command.');
 
+
+assert.match(source, /function captureEditorialDraftForm\([\s\S]*?function restoreEditorialDraftForm\(/,
+  'Editorial form state must be captured and restored across full UI renders.');
+assert.match(source, /function renderMain\(\)[\s\S]*?captureEditorialDraftForm\(\)[\s\S]*?restoreEditorialDraftForm\(\)/,
+  'Every control-room render must preserve the unsaved editorial form.');
+assert.match(source, /editorialQueueState\.draft\?\.file/,
+  'The selected image File object must survive UI refreshes even when the browser cannot restore input.files.');
+assert.match(source, /e\.target\.matches\('#editorialLogicalKey, #editorialCaption'\)/,
+  'Text edits in the editorial form must be captured immediately.');
+assert.match(source, /t\.matches\('#editorialAsset, #editorialFacebook, #editorialInstagram'\)/,
+  'File and channel changes in the editorial form must be captured.');
+
 console.log('Editorial queue admin UI guard tests passed');
