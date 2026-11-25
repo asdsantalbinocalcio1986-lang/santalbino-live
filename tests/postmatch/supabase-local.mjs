@@ -151,8 +151,8 @@ async function main() {
   const secondRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
     method: 'POST', token: service, key: service, body: rpcParams
   });
-  assert.equal(secondRpcClaim.data?.result, 'reconciliation_required',
-    'A second service_role request must be blocked while the first claim is active.');
+  assert.equal(secondRpcClaim.data?.result, 'processing',
+    'A second service_role request must report the active claim without starting another Meta request.');
   await request(
     '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(rpcEventId),
     { method: 'DELETE', token: service, key: service, expected: [204] }
