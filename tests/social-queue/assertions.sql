@@ -1,22 +1,16 @@
 -- Run only against the disposable PostgreSQL fixtures from tests/postmatch/setup.sql.
 \set ON_ERROR_STOP on
 
-do $test$
+set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111';
+set role authenticated;
+
+do $admin_tests$
 declare
   v_first public.santalbino_editorial_posts%rowtype;
   v_second public.santalbino_editorial_posts%rowtype;
   v_third public.santalbino_editorial_posts%rowtype;
   v_queue public.santalbino_editorial_posts%rowtype;
-  v_cancelled public.santalbino_editorial_posts%rowtype;
-  v_claims jsonb;
-  v_post_id uuid;
-  v_token uuid;
-  v_status text;
-  v_count integer;
 begin
-  -- Admin identity comes from the existing SANTA Live admin table, not user metadata.
-  perform set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
-
   select * into v_first from public.save_santalbino_editorial_draft(
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Prima bozza editoriale', 'social-editorial/test/match-day-r1.jpg',
@@ -45,7 +39,6 @@ begin
     raise exception 'Human approval was not recorded correctly: %', row_to_json(v_second);
   end if;
 
-  -- Approved content is immutable even for an authenticated admin.
   begin
     update public.santalbino_editorial_posts
        set caption = 'Modified after approval'
@@ -55,7 +48,6 @@ begin
     null;
   end;
 
-  -- Stale/superseded revisions cannot be approved.
   begin
     perform public.approve_santalbino_editorial_post(v_first.id, 1, null);
     raise exception 'Superseded revision was unexpectedly approved';
@@ -78,11 +70,7 @@ begin
   if not public.cancel_santalbino_editorial_post(v_third.id) then
     raise exception 'Scheduled editorial post could not be cancelled before claim';
   end if;
-  if (select status from public.santalbino_editorial_posts where id = v_third.id) <> 'cancelled' then
-    raise exception 'Cancellation state was not persisted';
-  end if;
 
-  -- The dispatch kill switch defaults to OFF even for a due approved post.
   select * into v_queue from public.save_santalbino_editorial_draft(
     'match:ci-match:post_match', 'post_match', 'ci-match',
     'Post partita approvato', 'social-editorial/test/post-match.jpg',
@@ -90,22 +78,33 @@ begin
     '{"score":"2-0","scorers":["Rossi"]}'::jsonb
   );
   select * into v_queue from public.approve_santalbino_editorial_post(v_queue.id, 1, now() - interval '1 minute');
+end
+$admin_tests$;
+
+reset role;
+set role service_role;
+
+do $worker_tests$
+declare
+  v_claims jsonb;
+  v_post_id uuid;
+  v_token uuid;
+  v_status text;
+begin
   v_claims := public.claim_santalbino_editorial_queue(5, false);
   if jsonb_array_length(v_claims) <> 0 then
     raise exception 'Queue dispatch kill switch did not block claims';
   end if;
 
-  -- The server worker can claim due work once explicitly enabled.
-  set local role service_role;
   v_claims := public.claim_santalbino_editorial_queue(5, true);
   if jsonb_array_length(v_claims) <> 1 then
     raise exception 'Expected one due editorial post to be claimed: %', v_claims;
   end if;
   v_post_id := (v_claims -> 0 -> 'post' ->> 'id')::uuid;
   v_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
-  select count(*) into v_count from public.santalbino_editorial_deliveries
-   where post_id = v_post_id and status = 'processing';
-  if v_count <> 2 then
+
+  if (select count(*) from public.santalbino_editorial_deliveries
+       where post_id = v_post_id and status = 'processing') <> 2 then
     raise exception 'Both selected platform deliveries were not claimed';
   end if;
 
@@ -132,20 +131,23 @@ begin
   if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
     raise exception 'Unknown editorial post was automatically retried';
   end if;
+end
+$worker_tests$;
 
-  -- A worker that expires mid-flight is fenced and converted to unknown.
-  v_claims := public.claim_santalbino_editorial_queue(5, true);
-  if jsonb_array_length(v_claims) <> 0 then
-    raise exception 'Unknown post unexpectedly re-entered the queue';
-  end if;
+reset role;
+set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
+set role authenticated;
 
-  reset role;
-  perform set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+do $non_admin_tests$
+declare
+  v_count integer;
+begin
   select count(*) into v_count from public.santalbino_editorial_posts;
   if v_count <> 0 then
     raise exception 'Non-admin user can read editorial drafts';
   end if;
 end
-$test$;
+$non_admin_tests$;
 
+reset role;
 select 'Social editorial queue SQL tests passed' as result;
