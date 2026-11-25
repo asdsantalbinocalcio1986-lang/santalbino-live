@@ -91,7 +91,7 @@ type WorkerDependencies = {
     postId: string,
     platform: "facebook" | "instagram",
     token: string,
-    status: "published" | "failed_retryable" | "unknown",
+    status: "published" | "failed_retryable" | "failed" | "unknown",
     externalPostId?: string | null,
     errorSafe?: string | null,
   ) => Promise<void>;
@@ -105,7 +105,7 @@ async function completeSafely(
   deps: WorkerDependencies,
   post: EditorialPost,
   platform: "facebook" | "instagram",
-  status: "published" | "failed_retryable" | "unknown",
+  status: "published" | "failed_retryable" | "failed" | "unknown",
   externalPostId: string | null = null,
   error: unknown = null,
 ) {
