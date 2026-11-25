@@ -11,6 +11,9 @@ declare
   v_third public.santalbino_editorial_posts%rowtype;
   v_queue public.santalbino_editorial_posts%rowtype;
   v_retry public.santalbino_editorial_posts%rowtype;
+  v_approved_old public.santalbino_editorial_posts%rowtype;
+  v_approved_new public.santalbino_editorial_posts%rowtype;
+  v_exhausted public.santalbino_editorial_posts%rowtype;
 begin
   if (select public from storage.buckets where id = 'santalbino-editorial') is distinct from false then
     raise exception 'Editorial Storage bucket must be private';
@@ -51,7 +54,24 @@ begin
        set caption = 'Modified after approval'
      where id = v_second.id;
     raise exception 'Approved caption was unexpectedly mutable';
-  exception when sqlstate '55000' then
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  if has_table_privilege('authenticated', 'public.santalbino_editorial_posts', 'INSERT')
+     or has_table_privilege('authenticated', 'public.santalbino_editorial_posts', 'UPDATE') then
+    raise exception 'Authenticated role still has direct editorial write privileges';
+  end if;
+  begin
+    insert into public.santalbino_editorial_posts (
+      logical_key, content_type, revision, caption, asset_path, asset_sha256,
+      platforms, snapshot, created_by
+    ) values (
+      'direct:insert:test', 'custom', 1, 'Direct insert', 'social-editorial/test/direct.jpg',
+      repeat('f', 64), '{"facebook":true}'::jsonb, '{}'::jsonb, auth.uid()
+    );
+    raise exception 'Authenticated role unexpectedly inserted an editorial post directly';
+  exception when insufficient_privilege then
     null;
   end;
 
@@ -82,6 +102,25 @@ begin
     raise exception 'Scheduled editorial post could not be cancelled before claim';
   end if;
 
+  select * into v_approved_old from public.save_santalbino_editorial_draft(
+    'match:ci-match:approved-revision', 'custom', 'ci-match',
+    'Revisione approvata precedente', 'social-editorial/test/approved-r1.jpg',
+    repeat('1', 64), '{"facebook":true}'::jsonb, '{"revision":1}'::jsonb
+  );
+  select * into v_approved_old from public.approve_santalbino_editorial_post(v_approved_old.id, 1, null);
+  if v_approved_old.status <> 'approved' then
+    raise exception 'Expected first approved revision before replacement';
+  end if;
+  select * into v_approved_new from public.save_santalbino_editorial_draft(
+    'match:ci-match:approved-revision', 'custom', 'ci-match',
+    'Revisione aggiornata', 'social-editorial/test/approved-r2.jpg',
+    repeat('2', 64), '{"facebook":true}'::jsonb, '{"revision":2}'::jsonb
+  );
+  if (select status from public.santalbino_editorial_posts where id = v_approved_old.id) <> 'superseded'
+     or v_approved_new.revision <> 2 then
+    raise exception 'A newly saved revision did not supersede the previous unclaimed approved revision';
+  end if;
+
   select * into v_queue from public.save_santalbino_editorial_draft(
     'match:ci-match:post_match', 'post_match', 'ci-match',
     'Post partita approvato', 'social-editorial/test/post-match.jpg',
@@ -97,6 +136,13 @@ begin
     '{"kind":"retry-test"}'::jsonb
   );
   select * into v_retry from public.approve_santalbino_editorial_post(v_retry.id, 1, now() + interval '1 hour');
+
+  select * into v_exhausted from public.save_santalbino_editorial_draft(
+    'match:ci-match:retry-limit', 'club_notice', null,
+    'Avviso con limite tentativi', 'social-editorial/test/retry-limit.jpg',
+    repeat('3', 64), '{"facebook":true}'::jsonb, '{"kind":"retry-limit"}'::jsonb
+  );
+  select * into v_exhausted from public.approve_santalbino_editorial_post(v_exhausted.id, 1, null);
 end
 $admin_tests$;
 
@@ -111,6 +157,8 @@ declare
   v_status text;
   v_retry_id uuid;
   v_retry_token uuid;
+  v_exhausted_id uuid;
+  v_exhausted_token uuid;
 begin
   v_claims := public.claim_santalbino_editorial_queue(5, false);
   if jsonb_array_length(v_claims) <> 0 then
@@ -186,8 +234,63 @@ begin
   if v_status <> 'unknown' then
     raise exception 'Final retry test outcome should be held for reconciliation: %', v_status;
   end if;
+
+  select id into v_exhausted_id from public.santalbino_editorial_posts
+   where logical_key = 'match:ci-match:retry-limit';
+  insert into public.santalbino_editorial_deliveries
+    (post_id, platform, status, attempt_count, last_attempt_at)
+  values (v_exhausted_id, 'facebook', 'failed_retryable', 4, now() - interval '2 hours');
+  v_claims := public.claim_santalbino_editorial_queue(5, true);
+  if jsonb_array_length(v_claims) <> 1 then
+    raise exception 'Expected final allowed retry to be claimed';
+  end if;
+  v_exhausted_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
+  v_status := public.complete_santalbino_editorial_delivery(
+    v_exhausted_id, 'facebook', v_exhausted_token, 'failed_retryable', null, 'Final explicit rejection'
+  );
+  if v_status <> 'failed' or (select status from public.santalbino_editorial_deliveries where post_id = v_exhausted_id) <> 'failed' then
+    raise exception 'Retry limit did not convert the fifth failed attempt into a terminal failure';
+  end if;
+  if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
+    raise exception 'Terminally failed delivery was automatically retried';
+  end if;
 end
 $worker_tests$;
+
+reset role;
+set request.jwt.claim.sub = '11111111-1111-4111-8111-111111111111';
+set role authenticated;
+
+do $reconciliation_tests$
+declare
+  v_post_id uuid;
+  v_status text;
+begin
+  select id into v_post_id from public.santalbino_editorial_posts
+   where logical_key = 'match:ci-match:post_match' and status = 'unknown';
+  if v_post_id is null then raise exception 'Expected an unknown post for reconciliation'; end if;
+  v_status := public.resolve_santalbino_editorial_delivery(
+    v_post_id, 'instagram', 'published', 'mock-instagram-post-123',
+    'Verificato manualmente il post remoto su Instagram'
+  );
+  if v_status <> 'published' then
+    raise exception 'Reconciliation did not close the post as published: %', v_status;
+  end if;
+  if (select count(*) from public.santalbino_editorial_delivery_resolutions
+       where post_id = v_post_id and platform = 'instagram' and resolution = 'published') <> 1 then
+    raise exception 'Administrative reconciliation was not audited';
+  end if;
+
+  select id into v_post_id from public.santalbino_editorial_posts
+   where logical_key = 'match:ci-match:retry-limit' and status = 'failed';
+  if v_post_id is null or not public.cancel_santalbino_editorial_post(v_post_id) then
+    raise exception 'Terminal failed editorial post could not be cancelled';
+  end if;
+  if (select status from public.santalbino_editorial_posts where id = v_post_id) <> 'cancelled' then
+    raise exception 'Terminal failed editorial post did not enter cancelled state';
+  end if;
+end
+$reconciliation_tests$;
 
 reset role;
 set request.jwt.claim.sub = '22222222-2222-4222-8222-222222222222';
