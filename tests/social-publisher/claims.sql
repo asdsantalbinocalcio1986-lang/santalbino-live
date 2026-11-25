@@ -13,6 +13,8 @@ declare
   v_new_token uuid;
   v_rows integer;
   v_event text := 'publisher-claim-test-' || gen_random_uuid()::text;
+  v_event2 text := 'publisher-platform-expansion-' || gen_random_uuid()::text;
+  v_expansion jsonb;
 begin
   v_first := public.claim_santalbino_social_publication(
     v_event, 'local-test', 'goal', 'Test caption', 'https://example.test/test.jpg',
@@ -75,6 +77,35 @@ begin
   end if;
 
   delete from public.santalbino_social_publications where id = v_id;
+
+  -- A previously completed Facebook-only event may later enable Instagram.
+  v_expansion := public.claim_santalbino_social_publication(
+    v_event2, 'local-test', 'goal', 'Platform expansion test', 'https://example.test/expand.jpg',
+    '{"facebook":true,"instagram":false}'::jsonb
+  );
+  if v_expansion ->> 'result' <> 'claimed' then
+    raise exception 'Initial Facebook-only claim failed: %', v_expansion;
+  end if;
+  v_id := (v_expansion ->> 'id')::uuid;
+  v_old_token := (v_expansion ->> 'claim_token')::uuid;
+  update public.santalbino_social_publications
+     set facebook_status = 'published',
+         instagram_status = 'skipped',
+         overall_status = 'published',
+         claim_token = null,
+         lease_expires_at = null
+   where id = v_id and claim_token = v_old_token;
+
+  v_expansion := public.claim_santalbino_social_publication(
+    v_event2, 'local-test', 'goal', 'Platform expansion test', 'https://example.test/expand.jpg',
+    '{"facebook":true,"instagram":true}'::jsonb
+  );
+  if v_expansion ->> 'result' <> 'claimed'
+     or v_expansion #>> '{row,facebook_status}' <> 'published'
+     or v_expansion #>> '{row,instagram_status}' <> 'processing' then
+    raise exception 'New Instagram target was not safely claimed while preserving Facebook: %', v_expansion;
+  end if;
+  delete from public.santalbino_social_publications where id = (v_expansion ->> 'id')::uuid;
 end
 $test$;
 
