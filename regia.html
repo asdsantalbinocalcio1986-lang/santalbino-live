@@ -2510,8 +2510,18 @@ async function loadSocialPublicationLog() {
     const title = ({goal:'Gol',red:'Espulsione',halftime:'Intervallo',fulltime:'Fine partita'})[item.event_type] || item.event_type;
     const fb = 'Facebook: ' + item.facebook_status + (item.facebook_error ? ' · ' + item.facebook_error : '');
     const ig = 'Instagram: ' + item.instagram_status + (item.instagram_error ? ' · ' + item.instagram_error : '');
-    const retry = item.overall_status === 'published' ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
-    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div></div>';
+    const needsReconciliation = item.overall_status === 'reconciliation_required' ||
+      ['unknown'].includes(item.facebook_status) ||
+      ['unknown'].includes(item.instagram_status);
+    const isProcessing = item.overall_status === 'processing' ||
+      item.facebook_status === 'processing' || item.instagram_status === 'processing';
+    const retry = item.overall_status === 'published' || needsReconciliation || isProcessing ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
+    const statusNote = needsReconciliation
+      ? '<div class="small" style="margin-top:6px;color:var(--muted)">Esito da verificare: il sistema blocca nuovi invii automatici per evitare duplicati.</div>'
+      : isProcessing
+        ? '<div class="small" style="margin-top:6px;color:var(--muted)">Pubblicazione in corso: i nuovi invii restano bloccati fino al completamento.</div>'
+        : '';
+    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div>' + statusNote + '</div>';
   }).join('');
 }
 
@@ -4970,7 +4980,8 @@ document.addEventListener('click', async e => {
       if (TEST_MODE) { toast('Condivisione esterna disattivata in modalità prova.'); break; }
       if (!approved || approved.status !== 'approved') { toast('Puoi condividere solo una revisione approvata.'); break; }
       if (txt !== String(approved.caption || '').trim()) { toast('Il testo è stato modificato: salva una nuova bozza e falla approvare prima di condividerlo.'); break; }
-      const url = socialDraftMatchUrl();
+      const pollId=approved.snapshot?.match?.pollId;
+      const url=pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
       window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener');
       break;
     }
@@ -5001,7 +5012,9 @@ document.addEventListener('click', async e => {
     }
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
-      const matchUrl = socialDraftMatchUrl();
+      const matchUrl = TEST_MODE
+        ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/index.html?test=1&view=public'
+        : (S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html');
       const shareText = (TEST_MODE ? '⚠️ TEST SANTA LIVE — CONTENUTO DIMOSTRATIVO, NON UFFICIALE ⚠️\n\n' : '') + so.text + '\n\n#SANTALive\n\nSegui la partita su SANTA Live: ' + matchUrl;
       const waUrl = 'https://wa.me/?text=' + encodeURIComponent(shareText);
       const ev2 = S.events.find(x => x.id === postId);
