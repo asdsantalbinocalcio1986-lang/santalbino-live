@@ -3048,7 +3048,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
   // Le due colonne si adattano al numero totale di nominativi.
   const combined = side === 'both';
   const story = !combined && format === 'story';
-  const W = combined ? 1800 : story ? 1080 : 1600, H = combined ? 1450 : story ? 1920 : 1100;
+  const W = combined ? 1080 : story ? 1080 : 1600, H = combined ? 1920 : story ? 1920 : 1100;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const x = canvas.getContext('2d'); applyGraphicTypography(x,'formation',W,H);
@@ -3092,11 +3092,11 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
     x.fillText(name.toUpperCase(), cx, story ? 345 : 190);
   };
   if (combined) {
-    drawLogo(homeLogo, teams.home.name, 450);
-    drawLogo(awayLogo, teams.away.name, 1350);
+    drawLogo(homeLogo, teams.home.name, 285);
+    drawLogo(awayLogo, teams.away.name, 795);
     x.fillStyle = '#d5f0de'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.font = '900 68px Arial,sans-serif'; x.fillText('VS', W / 2, 86);
-    x.font = '800 25px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI · 22 TITOLARI', W / 2, 190);
+    x.font = '900 46px Arial,sans-serif'; x.fillText('VS', W / 2, 86);
+    x.font = '800 30px Arial,sans-serif'; x.fillText('FORMAZIONI UFFICIALI · 22 TITOLARI', W / 2, 230);
   } else {
     const key = selectedSides[0], team = teams[key], logo = key === 'home' ? homeLogo : awayLogo;
     drawLogo(logo, team.name, W / 2);
@@ -3105,10 +3105,10 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
   }
 
   const panelY = combined ? 270 : story ? 510 : 300;
-  const panelH = combined ? 1150 : story ? 1350 : 620;
-  const panelW = combined ? 840 : story ? 980 : 1440;
+  const panelH = combined ? 1580 : story ? 1350 : 620;
+  const panelW = combined ? 470 : story ? 980 : 1440;
   const panels = combined
-    ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 920, accent: '#f0c56b' }]
+    ? [{ key: 'home', x: 40, accent: '#b8e7c8' }, { key: 'away', x: 570, accent: '#f0c56b' }]
     : [{ key: selectedSides[0], x: story ? 50 : 80, accent: selectedSides[0] === 'home' ? '#b8e7c8' : '#f0c56b' }];
 
   for (const panel of panels) {
@@ -3139,7 +3139,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
 
     if (combined) {
       const totalRows = starters.length + bench.length;
-      const rowH = Math.min(39, Math.floor((panelH - 300) / Math.max(1, totalRows)));
+      const rowH = Math.min(45, Math.floor((panelH - 300) / Math.max(1, totalRows)));
       const rowRadius = Math.max(11, Math.min(16, Math.floor(rowH * .38)));
       const drawCombinedList = (list, top, color) => list.forEach((p, i) => {
         const yy = top + i * rowH;
