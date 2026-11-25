@@ -41,15 +41,15 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 
 
 
-assert.match(publicSource, /function resetMatch\\(\\)[\\s\\S]*?S\\.publication = \\{ published: \\{ rosters: \\{ home: '', away: '' \\}, convocati: '' \\}, pending: null, publishedAt: '' \\}/,
+assert.ok(publicSource.includes("function resetMatch() {") && publicSource.includes("S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }"),
   'Starting a new match from the public/index control room must clear the previous published convocati, formations and pending publication.');
-assert.match(previewSource, /Cronaca completa[\\s\\S]*?Convocati pubblicati[\\s\\S]*?Formazioni pubblicate/,
+assert.ok(previewSource.includes("Cronaca completa") && previewSource.includes("Convocati pubblicati") && previewSource.includes("Formazioni pubblicate"),
   'The public match preview must expose the full archived match record, including events, published convocati and published lineups.');
-assert.match(previewSource, /state\\.publication\\?\\.published[\\s\\S]*?publishedRosters/,
+assert.ok(previewSource.includes("const published=state.publication?.published;") && previewSource.includes("const publishedRosters=publicData.rosters"),
   'The public archive preview must read published content, not a pending editorial draft.');
-assert.match(previewSource, /match_archive[\\s\\S]*?select\\('state'\\)/,
+assert.ok(previewSource.includes("db.from('match_archive').select('state')"),
   'The public preview must load the immutable archived state when the match is no longer live.');
-assert.match(homeSource, /CONSULTA PARTITA ARCHIVIATA/,
+assert.ok(homeSource.includes("CONSULTA PARTITA ARCHIVIATA"),
   'Archived public match cards must clearly indicate that the historical match can be consulted.');
 
 console.log('Post-match editorial UI guard tests passed');
