@@ -38,3 +38,5 @@ assert.match(source, /refreshWarning = 'La bozza è stata salvata, ma lo storico
 assert.match(source, /function releaseMatchResultPreviewUrl\(\)/, 'The generated preview object URL must have a cleanup helper.');
 assert.match(source, /dlg\.addEventListener\('close', releaseMatchResultPreviewUrl\)/, 'Closing MATCH RESULT must release its generated preview object URL.');
 assert.match(source, /displayMatchResultEdition\(edition\) \{\s*releaseMatchResultPreviewUrl\(\)/, 'Switching to a saved revision must release the generated preview object URL.');
+
+assert.match(source, /if \(button\?\.isConnected\) \{ button\.disabled = false; button\.textContent = 'Salva nuova bozza'; \}/, 'The save control must be re-enabled after a failed or recovered save attempt.');
