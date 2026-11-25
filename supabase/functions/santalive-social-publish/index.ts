@@ -15,7 +15,7 @@ const allowedEvents = new Set(["goal", "red", "halftime", "fulltime"]);
 const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v27.0";
 const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
-function safeError(error: unknown, token?: string) {
+export function safeError(error: unknown, token?: string) {
   let message = error instanceof Error ? error.message : String(error);
   if (token) message = message.split(token).join("[token oscurato]");
   message = message.replace(/access_token=[^&\\s]+/gi, "access_token=[redacted]");
