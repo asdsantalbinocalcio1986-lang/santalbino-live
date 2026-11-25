@@ -255,7 +255,7 @@ async function main() {
     assert.deepEqual(noDeliveriesYet, [], 'Approval must not itself create or dispatch platform deliveries.');
 
     // A second draft proves Europe/Rome scheduling and cancellation before any worker activation.
-    const scheduledKey = `ci-editorial:${pollId}:scheduled`;
+    const scheduledKey = `ci-editorial:${pollId}:scheduled:club_notice`;
     const scheduledCaption = 'TEST E2E · Contenuto programmato e poi annullato.';
     await page.locator('#editorialContentType').selectOption('club_notice');
     await page.locator('#editorialLogicalKey').fill(scheduledKey);
@@ -263,6 +263,8 @@ async function main() {
     await page.locator('#editorialAsset').setInputFiles(editorialJpeg);
     await page.locator('#editorialFacebook').check();
     await page.locator('#editorialInstagram').uncheck();
+    // Remove the previous draft's toast so this assertion cannot pass on stale UI feedback.
+    await page.locator('.toast').evaluateAll(nodes => nodes.forEach(node => node.remove()));
     await page.locator('[data-a="editorialSave"]').click();
     await page.getByText('Bozza editoriale salvata', { exact: false }).waitFor({ timeout: 30000 });
     const scheduledCard = page.locator('[data-editorial-post]').filter({ hasText: scheduledCaption });
