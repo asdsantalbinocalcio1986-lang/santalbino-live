@@ -230,9 +230,23 @@ begin
   exception when check_violation then null;
   end;
 
+  insert into public.santalbino_editorial_posts (
+    logical_key, content_type, revision, status, caption, asset_path, asset_sha256,
+    platforms, snapshot, expires_at, scheduled_at, created_by, approved_by, approved_at
+  ) values (
+    'worker:expired-with-kill-switch', 'match_day', 1, 'scheduled', 'Scadenza con dispatch spento',
+    'social-editorial/test/expired-disabled.jpg', repeat('6', 64), '{"facebook":true}'::jsonb,
+    '{"match":{"date":"2000-01-01","time":"12:00"}}'::jsonb,
+    now() - interval '1 minute', now() - interval '1 day',
+    '11111111-1111-4111-8111-111111111111'::uuid,
+    '11111111-1111-4111-8111-111111111111'::uuid, now()
+  );
   v_claims := public.claim_santalbino_editorial_queue(5, false);
   if jsonb_array_length(v_claims) <> 0 then
     raise exception 'Queue dispatch kill switch did not block claims';
+  end if;
+  if (select status from public.santalbino_editorial_posts where logical_key = 'worker:expired-with-kill-switch') <> 'expired' then
+    raise exception 'Expired content was not transitioned while dispatch was disabled';
   end if;
 
   v_claims := public.claim_santalbino_editorial_queue(5, true);
