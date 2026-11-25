@@ -18,7 +18,7 @@ const graphBase = `https://graph.facebook.com/${graphVersion}`;
 export function safeError(error: unknown, token?: string) {
   let message = error instanceof Error ? error.message : String(error);
   if (token) message = message.split(token).join("[token oscurato]");
-  message = message.replace(/access_token=[^&\\s]+/gi, "access_token=[redacted]");
+  message = message.replace(/access_token=[^&\s]+/gi, "access_token=[redacted]");
   return message.slice(0, 300);
 }
 
