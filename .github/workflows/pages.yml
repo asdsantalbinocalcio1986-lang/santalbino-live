@@ -2,7 +2,7 @@ name: Validate and deploy Sant'Albino Live
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/social-publisher-hardening-2026-11-25]
   pull_request:
     branches: [main, integration/social-postmatch-2026-11-25]
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/fix/social-publisher-hardening-2026-11-25'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -117,7 +117,7 @@ jobs:
 
   deploy:
     name: Deploy GitHub Pages
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: validate
     permissions:
       contents: read
