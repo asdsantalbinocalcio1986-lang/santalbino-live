@@ -62,3 +62,16 @@ The audit is complete only when:
 2. Gemini receives this exact task plus Claude's complete audit and independently checks coverage, unsupported claims, missed risks and false positives. Gemini must state exactly what it received.
 3. ChatGPT reconciles both outputs against repository/database evidence and updates the audit/decision record.
 4. No implementation begins until the project owner explicitly approves the resulting specification and phase.
+
+
+## Supplementary audit update — 2026-11-25
+
+Completed by ChatGPT as read-only work while primary analyst/reviewer are unavailable:
+- Hashtag and club-logo audit documented in `AI_WORKSPACE/HASHTAG_AND_CLUB_LOGO_AUDIT_2026-11-25.md`.
+- Social queue schema/architecture proposal documented in `AI_WORKSPACE/SOCIAL_QUEUE_SCHEMA_DESIGN_DRAFT.md`.
+- Current Supabase inventory confirms `santalbino_social_publications` exists with RLS and 0 rows; it is a live-event delivery log, not an editorial queue. Edge Function `santalive-social-publish` ACTIVE v2, JWT verification enabled. Migration list includes `scheduled_public_content` dated 2026-11-22.
+- Main code findings: `saveMatch()` stores the typed hashtag without generating it; social/convocati/formation/graphic builders consume the stored hashtag. Logo storage is shared but keyed by home/away slot rather than club identity; renderers read the positional slots directly.
+- PR #108 remains open, Draft, not merged at the latest check.
+- No app code, database, storage, cron, secrets, social account, merge or deployment changed.
+
+Remaining audit work: inspect the deployed SQL functions/policies and the complete Edge Function contract without invoking it; verify all logo renderers and initialization/reset flows; reconcile findings with Claude and an independent reviewer when available. This supplementary work does not complete the full v3.1 audit scope.
