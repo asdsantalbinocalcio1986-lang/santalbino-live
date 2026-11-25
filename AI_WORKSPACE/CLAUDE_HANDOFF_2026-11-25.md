@@ -119,3 +119,13 @@ Leggere `AI_WORKSPACE/INDEPENDENT_REVIEW_PR106_PR107_2026-11-25.md` prima di qua
 - SC-03: possibile hashtag duplicato tra testo MATCH DAY e composizione condivisione;
 - SC-04: #107 non implementa pubblicazione automatica né programmazione.
 Richiesta: confermare o confutare ogni punto con riferimenti file/funzione/righe e proporre test; non correggere il codice senza autorizzazione. Non eseguire status/publish verso Edge Function live, non leggere segreti, non toccare produzione.
+
+
+## Supplementary audit package — 2026-11-25 (read-only review requested)
+Please review the following documents and independently verify their findings against the current main/PR code and Supabase migrations. Do not modify code, database, Storage, cron, secrets, or Meta settings during this review:
+- `AI_WORKSPACE/SQL_RLS_AND_SYNC_AUDIT_2026-11-25.md`
+- `AI_WORKSPACE/MVP_VOTING_AND_MATCH_LIFECYCLE_AUDIT_2026-11-25.md`
+- `AI_WORKSPACE/IMPLEMENTATION_BLUEPRINT_CLUB_SOCIAL_2026-11-25.md`
+- `AI_WORKSPACE/PUBLISHER_LIVE_CONTRACT_AUDIT_2026-11-25.md`
+
+Specifically challenge: test/live logical isolation in one Supabase project; cron touching both live_state and live_test_state; state JSON lacking schema version/whitelist/size bound; SECURITY INVOKER and ACL/RLS behavior; MVP voter UUID being client-generated; resetMatch preserving positional logo slots and hashtag; hashtag auto/manual lifecycle; logo club-vs-opponent side resolver; PUB-01 atomic claim, PUB-02 ambiguous Meta outcome and PUB-03 exactly-once limitations. Return findings with severity, exact file/function/SQL references, counter-evidence, and minimal safe remediation. No implementation and no production probes.
