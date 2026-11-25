@@ -96,9 +96,8 @@ begin
     return jsonb_build_object('result', 'unavailable');
   end if;
 
-  if v_row.overall_status = 'published'
-     or ((not v_facebook or v_row.facebook_status = 'published')
-         and (not v_instagram or v_row.instagram_status = 'published')) then
+  if ((not v_facebook or v_row.facebook_status = 'published')
+      and (not v_instagram or v_row.instagram_status = 'published')) then
     return jsonb_build_object('result', 'already_published', 'row', to_jsonb(v_row));
   end if;
 
