@@ -150,3 +150,16 @@ Gemini:
 - Non invocare `action: status` o `action: publish` verso la funzione live senza autorizzazione specifica: status contatta Graph API e publish crea contenuti esterni.
 - Non modificare codice, database, storage, cron, segreti, PR di feature, merge o deploy in questa fase.
 - Non pubblicare contenuti reali durante test o simulazioni.
+
+
+## 12. Integrazione con PR #106 e #107 — verifica 2026-11-25
+- PR #106 è ancora open/Draft e modifica `regia.html` e `.github/workflows/pages.yml`, oltre a documentazione, proposta SQL e test post-partita.
+- PR #107 è ancora open/Draft e modifica anch'essa `regia.html` e `.github/workflows/pages.yml`, oltre al test UI dell'editor social.
+- I workflow non sono identici come ambito: #106 aggiunge job SQL/local Supabase/browser per l'editor post-partita; #107 aggiunge un controllo UI per il social-copy editor. L'integrazione deve conservare entrambi i job in un unico workflow e non sovrascrivere nessuno dei due.
+- Entrambe le PR modificano blocchi di regia vicini ma diversi: #106 introduce persistenza/editor post-partita e sostituisce il flusso MATCH RESULT; #107 aggiunge editor testi MATCH DAY/convocati e azioni di condivisione manuale. Non è un conflitto testuale garantito, ma il merge indipendente può perdere cambiamenti o produrre regressioni se viene usata una versione intera di `regia.html` al posto di un merge a tre vie.
+- La PR #107, per come è scritta, aggiunge condivisione manuale: Facebook apre il dialogo di condivisione del link e copia il testo; WhatsApp prepara il messaggio. Non implementa pubblicazione automatica diretta su Meta e non deve essere scambiata per il publisher automatico già esistente.
+- La PR #106 usa il bucket `santalbino-postmatch` e la tabella `santalbino_postmatch_editions`. Il controllo live Supabase del 2026-11-25 non trova né il bucket né la tabella. La proposta SQL e i test PR non equivalgono a schema/storage installati in produzione. Non approvare né attivare il flusso finché migrazione, bucket, policy, isolamento test e rollback non siano verificati e autorizzati.
+- I due cambiamenti workflow possono essere riconciliati mantenendo entrambi i nuovi job, poi eseguendo la suite combinata. Nessun merge è stato effettuato.
+
+## 13. Decisione di prodotto da mantenere
+Il primo obiettivo non è “pubblicare tutto automaticamente”: è portare i contenuti social in un unico flusso coerente. Gli eventi live già autorizzati possono restare automatizzabili dopo hardening; MATCH DAY, convocati, formazioni e post-partita entrano inizialmente come bozze da approvare e programmare. L'automazione senza approvazione per questi contenuti editoriali sarà una decisione separata, non un effetto collaterale dell'attivazione globale.
