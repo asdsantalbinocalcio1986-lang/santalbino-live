@@ -113,10 +113,39 @@ begin
     return jsonb_build_object('result', 'already_published', 'row', to_jsonb(v_row));
   end if;
 
+  -- An active lease means another worker owns this publication. Report it as
+  -- processing, not as a reconciliation incident.
+  if v_row.claim_token is not null
+     and v_row.lease_expires_at is not null
+     and v_row.lease_expires_at > now() then
+    return jsonb_build_object('result', 'processing', 'row', to_jsonb(v_row));
+  end if;
+
+  -- An expired/missing lease cannot be retried safely: Meta may have accepted
+  -- the request before the worker died. Fence the stale worker and require
+  -- operator reconciliation instead of silently leaving the row locked forever.
+  if v_row.claim_token is not null then
+    update public.santalbino_social_publications
+    set facebook_status = case when facebook_status = 'processing' then 'unknown' else facebook_status end,
+        instagram_status = case when instagram_status = 'processing' then 'unknown' else instagram_status end,
+        overall_status = 'reconciliation_required',
+        facebook_error = case when facebook_status = 'processing'
+          then coalesce(facebook_error || ' · ', '') || 'Lease scaduta: verificare su Meta prima di riprovare.'
+          else facebook_error end,
+        instagram_error = case when instagram_status = 'processing'
+          then coalesce(instagram_error || ' · ', '') || 'Lease scaduta: verificare su Meta prima di riprovare.'
+          else instagram_error end,
+        claim_token = null,
+        lease_expires_at = null,
+        updated_at = now()
+    where id = v_row.id
+    returning * into v_row;
+    return jsonb_build_object('result', 'reconciliation_required', 'row', to_jsonb(v_row));
+  end if;
+
   if v_row.facebook_status in ('unknown', 'processing')
      or v_row.instagram_status in ('unknown', 'processing')
-     or v_row.overall_status = 'reconciliation_required'
-     or v_row.claim_token is not null then
+     or v_row.overall_status = 'reconciliation_required' then
     return jsonb_build_object('result', 'reconciliation_required', 'row', to_jsonb(v_row));
   end if;
 
