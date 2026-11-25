@@ -115,3 +115,9 @@ Non chiamare l'azione status durante test isolati: contatta Graph API.
 
 ## Stato del lavoro
 Questa blueprint è un documento consolidato, non codice eseguibile e non autorizzazione al rilascio. Nessun cambiamento a produzione è stato eseguito.
+
+
+## Addendum — MVP voting and match lifecycle
+- Audit: `AI_WORKSPACE/MVP_VOTING_AND_MATCH_LIFECYCLE_AUDIT_2026-11-25.md`.
+- Public MVP vote RPC is SECURITY DEFINER with pinned search_path; checks fulltime, 12-hour window, candidate in roster and one vote per (match_key, voter_hash). The voter UUID is generated/stored client-side; this is basic duplicate friction, not strong one-person identity. Do not promise anti-fraud guarantees.
+- `resetMatch()` clears match events/chronicle/rosters/convocati/date/votes/social draft, but preserves positional logos, teams, ourSide and hashtag. Future reset must preserve club-level config, clear match-specific opponent logo, and regenerate auto hashtag when new opponent is entered while retaining manual override with clear UX.
