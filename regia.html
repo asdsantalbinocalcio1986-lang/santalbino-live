@@ -1625,11 +1625,11 @@ async function shareSocialDraft(kind, platform) {
   const textWithoutHashtag = hashtag
     ? text
         .replace(new RegExp('(^|[\\s([{])' + escapedHashtag + '(?=$|[\\s)\\]}>.,!?;:])', 'giu'), '$1')
-        .replace(/[ \\t]+([,.;:!?])/g, '$1')
-        .replace(/[ \\t]{2,}/g, ' ')
-        .replace(/[ \\t]+\\n/g, '\\n')
-        .replace(/\\n[ \\t]+/g, '\\n')
-        .replace(/\\n{3,}/g, '\\n\\n')
+        .replace(/[ \t]+([,.;:!?])/g, '$1')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
         .trim()
     : text;
   const shareText = [textWithoutHashtag, hashtag, 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\n\n');
