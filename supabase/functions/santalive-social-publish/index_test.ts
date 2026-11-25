@@ -78,3 +78,33 @@ Deno.test("error sanitizer removes access tokens and limits message size", () =>
   }
   if (message.length > 300) throw new Error("Sanitized error exceeds 300 characters");
 });
+
+Deno.test("Graph POST classifies Meta server errors as unknown", async () => {
+  const fakeFetch: typeof fetch = async () => new Response(
+    JSON.stringify({ error: { message: "temporary server failure" } }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+  );
+  try {
+    await graphPost("mock/photos", { caption: "test" }, fakeFetch);
+    throw new Error("Expected server error to throw");
+  } catch (error) {
+    if (classifyMetaFailure(error) !== "unknown") {
+      throw new Error("Meta 5xx must require reconciliation");
+    }
+  }
+});
+
+Deno.test("Graph POST treats malformed responses as unknown", async () => {
+  const fakeFetch: typeof fetch = async () => new Response(
+    "not-json",
+    { status: 200, headers: { "Content-Type": "application/json" } }
+  );
+  try {
+    await graphPost("mock/photos", { caption: "test" }, fakeFetch);
+    throw new Error("Expected malformed response to throw");
+  } catch (error) {
+    if (classifyMetaFailure(error) !== "unknown") {
+      throw new Error("Malformed response must require reconciliation");
+    }
+  }
+});
