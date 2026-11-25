@@ -191,6 +191,110 @@ async function main() {
     assert.equal(rows[1].caption, captionTwo);
     assert.deepEqual(pageErrors, [], `Browser reported JavaScript errors: ${pageErrors.join('; ')}`);
 
+    // Exercise the new editorial admin area in normal mode, against this disposable local Supabase only.
+    // The feature remains hidden in test-mode UI and no Meta dispatch endpoint is called.
+    psql(`update public.live_state set state = '${jsonSql}'::jsonb, updated_at = now() where id = 1;`);
+    await page.goto(`http://127.0.0.1:${address.port}/regia.html`, { waitUntil: 'domcontentloaded' });
+    const editorialTab = page.locator('[data-rtab="editorial"]');
+    await page.waitForFunction(() =>
+      !!document.querySelector('[data-rtab="editorial"]') ||
+      !!document.querySelector('[data-a="mode"]') ||
+      !!document.querySelector('[data-a="login"]'), null, { timeout: 30000 });
+    if (!(await editorialTab.isVisible())) {
+      if (await page.locator('[data-a="login"]').count()) {
+        await page.locator('[data-a="login"]').first().click();
+        await page.locator('#authEmail').fill(email);
+        await page.locator('#authPassword').fill(password);
+        await page.locator('#authForm button[type="submit"]').click();
+      } else if (await page.locator('[data-a="mode"]').count()) {
+        await page.locator('[data-a="mode"]').first().click();
+      }
+    }
+    await editorialTab.waitFor({ state: 'visible', timeout: 30000 });
+    await editorialTab.click();
+    await page.locator('#editorialCaption').waitFor({ state: 'visible', timeout: 30000 });
+
+    const editorialPng = {
+      name: 'editorial-ci.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/vU8AAAAASUVORK5CYII=', 'base64')
+    };
+    const editorialKey = `ci-editorial:${pollId}:custom`;
+    const editorialCaption = 'TEST E2E · Bozza editoriale amministrativa.';
+    await page.locator('#editorialContentType').selectOption('custom');
+    await page.locator('#editorialLogicalKey').fill(editorialKey);
+    await page.locator('#editorialCaption').fill(editorialCaption);
+    await page.locator('#editorialAsset').setInputFiles(editorialPng);
+    await page.locator('#editorialFacebook').check();
+    await page.locator('#editorialInstagram').check();
+    await page.locator('[data-a="editorialSave"]').click();
+    await page.getByText('Bozza editoriale salvata', { exact: false }).waitFor({ timeout: 30000 });
+    const editorialCard = page.locator('[data-editorial-post]').filter({ hasText: editorialCaption });
+    await editorialCard.waitFor({ timeout: 30000 });
+    assert.match(await editorialCard.innerText(), /Bozza/, 'New editorial content must be saved as a draft.');
+    await editorialCard.locator('[data-a="editorialApprove"]').click();
+    await page.getByText('Contenuto approvato e inserito in coda', { exact: false }).waitFor({ timeout: 30000 });
+    await page.waitForFunction(key => {
+      const card = [...document.querySelectorAll('[data-editorial-post]')].find(el => el.textContent.includes('TEST E2E · Bozza editoriale amministrativa.'));
+      return card && card.textContent.includes('Approvato · in coda');
+    }, editorialKey, { timeout: 30000 });
+
+    const adminAccessToken = (await apiRequest('/auth/v1/token?grant_type=password', {
+      method: 'POST', token: anon, key: anon, body: { email, password }
+    })).access_token;
+    const editorialRows = await apiRequest(`/rest/v1/santalbino_editorial_posts?select=id,revision,status,asset_path,asset_sha256,platforms,scheduled_at&logical_key=eq.${encodeURIComponent(editorialKey)}`, {
+      token: adminAccessToken, key: anon
+    });
+    assert.equal(editorialRows.length, 1, 'Expected one editorial revision in the local database.');
+    assert.equal(editorialRows[0].status, 'approved');
+    assert.match(editorialRows[0].asset_sha256, /^[a-f0-9]{64}$/);
+    assert.deepEqual(editorialRows[0].platforms, { facebook: true, instagram: true });
+    const noDeliveriesYet = await apiRequest(`/rest/v1/santalbino_editorial_deliveries?select=id&post_id=eq.${editorialRows[0].id}`, {
+      token: adminAccessToken, key: anon
+    });
+    assert.deepEqual(noDeliveriesYet, [], 'Approval must not itself create or dispatch platform deliveries.');
+
+    // A second draft proves Europe/Rome scheduling and cancellation before any worker activation.
+    const scheduledKey = `ci-editorial:${pollId}:scheduled`;
+    const scheduledCaption = 'TEST E2E · Contenuto programmato e poi annullato.';
+    await page.locator('#editorialContentType').selectOption('club_notice');
+    await page.locator('#editorialLogicalKey').fill(scheduledKey);
+    await page.locator('#editorialCaption').fill(scheduledCaption);
+    await page.locator('#editorialAsset').setInputFiles(editorialPng);
+    await page.locator('#editorialFacebook').check();
+    await page.locator('#editorialInstagram').uncheck();
+    await page.locator('[data-a="editorialSave"]').click();
+    await page.getByText('Bozza editoriale salvata', { exact: false }).waitFor({ timeout: 30000 });
+    const scheduledCard = page.locator('[data-editorial-post]').filter({ hasText: scheduledCaption });
+    await scheduledCard.waitFor({ timeout: 30000 });
+    await scheduledCard.locator('[data-editorial-schedule]').fill('2030-01-01T12:00');
+    page.removeAllListeners('dialog');
+    page.on('dialog', dialog => dialog.accept());
+    await scheduledCard.locator('[data-a="editorialApprove"]').click();
+    await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some(el =>
+      /Contenuto approvato e programmato|Approvazione non riuscita/.test(el.textContent || '')
+    ), null, { timeout: 30000 });
+    const scheduleToasts = await page.locator('.toast').allTextContents();
+    assert.ok(scheduleToasts.some(text => text.includes('Contenuto approvato e programmato')),
+      'Scheduled approval failed: ' + scheduleToasts.join(' | '));
+    const scheduledRows = await apiRequest(`/rest/v1/santalbino_editorial_posts?select=id,status,scheduled_at&logical_key=eq.${encodeURIComponent(scheduledKey)}`, {
+      token: adminAccessToken, key: anon
+    });
+    assert.equal(scheduledRows.length, 1);
+    assert.equal(scheduledRows[0].status, 'scheduled');
+    assert.equal(new Date(scheduledRows[0].scheduled_at).toISOString(), '2030-01-01T11:00:00.000Z',
+      '12:00 Europe/Rome in winter must be stored as 11:00 UTC.');
+    const scheduledCardAfterApproval = page.locator('[data-editorial-post]').filter({ hasText: scheduledCaption });
+    await scheduledCardAfterApproval.locator('[data-a="editorialCancel"]').click();
+    await page.getByText('Contenuto annullato', { exact: true }).waitFor({ timeout: 30000 });
+    const cancelledRows = await apiRequest(`/rest/v1/santalbino_editorial_posts?select=status&logical_key=eq.${encodeURIComponent(scheduledKey)}`, {
+      token: adminAccessToken, key: anon
+    });
+    assert.equal(cancelledRows[0].status, 'cancelled');
+    assert.deepEqual(pageErrors, [], `Browser reported JavaScript errors: ${pageErrors.join('; ')}`);
+
+    console.log('PASS: admin editorial UI, private image upload, immutable draft, approval without dispatch, Europe/Rome scheduling and cancellation.');
+
     console.log('PASS: browser login, MATCH RESULT rendering, JPEG upload, draft save, close/reopen recovery, revision history, approval and reload recovery.');
     console.log('PASS: test mode blocks WhatsApp sharing; all records and images remained in disposable local Supabase.');
   } finally {
