@@ -14,6 +14,7 @@ declare
   v_approved_old public.santalbino_editorial_posts%rowtype;
   v_approved_new public.santalbino_editorial_posts%rowtype;
   v_exhausted public.santalbino_editorial_posts%rowtype;
+  v_count integer;
 begin
   if (select public from storage.buckets where id = 'santalbino-editorial') is distinct from false then
     raise exception 'Editorial Storage bucket must be private';
@@ -59,6 +60,15 @@ begin
   );
   if v_second.revision <> 2 or v_second.status <> 'draft' then
     raise exception 'Second editorial draft was not revision 2: %', row_to_json(v_second);
+  end if;
+
+  insert into storage.objects (bucket_id, name)
+  values ('santalbino-editorial', v_second.asset_path);
+  delete from storage.objects
+   where bucket_id = 'santalbino-editorial' and name = v_second.asset_path;
+  get diagnostics v_count = row_count;
+  if v_count <> 0 then
+    raise exception 'An editorial asset referenced by a revision was deleted';
   end if;
   if (select status from public.santalbino_editorial_posts where id = v_first.id) <> 'superseded' then
     raise exception 'Saving a new draft did not supersede the previous unapproved draft';
