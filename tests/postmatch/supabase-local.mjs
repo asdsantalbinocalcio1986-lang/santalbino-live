@@ -111,6 +111,32 @@ async function main() {
   const adminToken = await signIn(adminEmail);
   const nonAdminToken = await signIn(nonAdminEmail);
 
+  // The social publication log is readable only by the registered SANTA Live admin.
+  const socialRlsEventId = `publisher-rls-${randomUUID()}`;
+  await request('/rest/v1/santalbino_social_publications', {
+    method: 'POST', token: service, key: service,
+    body: {
+      event_id: socialRlsEventId, match_id: 'local-rls', event_type: 'goal',
+      caption: 'RLS integration test', image_url: 'https://example.test/rls.jpg',
+      platforms: { facebook: true, instagram: false }
+    },
+    expected: [201]
+  });
+  const adminSocialRows = await request(
+    '/rest/v1/santalbino_social_publications?select=event_id&event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { token: adminToken }
+  );
+  assert.equal(adminSocialRows.data?.length, 1, 'SANTA Live admin must read the social publication log.');
+  const nonAdminSocialRows = await request(
+    '/rest/v1/santalbino_social_publications?select=event_id&event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { token: nonAdminToken }
+  );
+  assert.equal(nonAdminSocialRows.data?.length, 0, 'Non-admin users must not read the social publication log.');
+  await request(
+    '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { method: 'DELETE', token: service, key: service, expected: [204] }
+  );
+
   // One tiny JPEG is enough to exercise the real Storage API and signed downloads.
   const jpeg = new Uint8Array(Buffer.from(
     '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9k=',
