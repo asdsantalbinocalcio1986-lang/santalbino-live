@@ -33,7 +33,8 @@ function hex(bytes: Uint8Array) {
 }
 
 export async function sha256Hex(bytes: Uint8Array) {
-  return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+  const ownedBytes = bytes.slice();
+  return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", ownedBytes.buffer as ArrayBuffer)));
 }
 
 export function detectImageMime(bytes: Uint8Array): string | null {
@@ -74,6 +75,10 @@ export function validateEditorialAssetPath(path: string) {
     !path.includes("..") &&
     /^[a-zA-Z0-9/_\-.]+$/.test(path);
 }
+
+type RpcClient = {
+  rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+};
 
 type WorkerDependencies = {
   loadAsset: (post: EditorialPost) => Promise<{ publicUrl: string }>;
@@ -212,7 +217,7 @@ function equalSecret(left: string, right: string) {
 }
 
 export async function dispatchEditorialQueue(
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: RpcClient,
   dispatchEnabled: boolean,
   limit = 10,
 ) {
@@ -255,7 +260,8 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data, error } = await adminClient.rpc("claim_santalbino_editorial_queue", {
+    const rpcClient = adminClient as unknown as RpcClient;
+    const { data, error } = await rpcClient.rpc("claim_santalbino_editorial_queue", {
       p_limit: 10,
       p_dispatch_enabled: true,
     });
