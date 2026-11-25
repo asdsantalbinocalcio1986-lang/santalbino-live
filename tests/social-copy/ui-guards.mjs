@@ -46,4 +46,4 @@ console.log('Social copy editor guard tests passed');
 
 assert.match(source, /const copyPromise = copyText\(shareText\);\s*const facebookWindow = window\.open\(/, 'Social Facebook sharing must initiate clipboard writing before popup focus changes, without awaiting first.');
 assert.match(source, /const copyPromise = copyText\(so\.text\);\s*const popup = window\.open\(/, 'Event Facebook sharing must initiate clipboard writing before popup focus changes, without awaiting first.');
-assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'\);\s*if \(whatsappWindow\) whatsappWindow\.opener = null;\s*toast\(whatsappWindow \?/, 'WhatsApp event fallback must report a blocked popup.');
+assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'\);\s*if \(whatsappWindow\) whatsappWindow\.opener = null;\s*toast\(whatsappWindow\s*\?/, 'WhatsApp event fallback must report a blocked popup.');
