@@ -125,21 +125,39 @@ begin
     raise exception 'editorial post is immutable in status %', old.status using errcode = '55000';
   end if;
 
+  if new.logical_key is distinct from old.logical_key
+     or new.match_id is distinct from old.match_id
+     or new.content_type is distinct from old.content_type
+     or new.revision is distinct from old.revision
+     or new.created_by is distinct from old.created_by
+     or new.created_at is distinct from old.created_at then
+    raise exception 'editorial identity and author fields are immutable' using errcode = '55000';
+  end if;
+
   if old.status <> 'draft' and (
-    new.logical_key is distinct from old.logical_key
-    or new.match_id is distinct from old.match_id
-    or new.content_type is distinct from old.content_type
-    or new.revision is distinct from old.revision
-    or new.caption is distinct from old.caption
+    new.caption is distinct from old.caption
     or new.asset_path is distinct from old.asset_path
     or new.asset_sha256 is distinct from old.asset_sha256
     or new.platforms is distinct from old.platforms
     or new.snapshot is distinct from old.snapshot
     or new.scheduled_at is distinct from old.scheduled_at
     or new.timezone is distinct from old.timezone
-    or new.created_by is distinct from old.created_by
+    or new.approved_by is distinct from old.approved_by
+    or new.approved_at is distinct from old.approved_at
   ) then
     raise exception 'approved editorial snapshot is immutable; create a new revision' using errcode = '55000';
+  end if;
+
+  if old.status = 'draft' and new.status in ('approved', 'scheduled') then
+    if new.approved_by is distinct from auth.uid() or new.approved_at is null then
+      raise exception 'approval must be attributed to the authenticated admin' using errcode = '42501';
+    end if;
+    if new.revision <> (
+      select max(p.revision) from public.santalbino_editorial_posts p
+       where p.logical_key = old.logical_key
+    ) then
+      raise exception 'only the latest editorial revision can be approved' using errcode = '40001';
+    end if;
   end if;
 
   if old.status = 'draft' and new.status not in ('draft', 'approved', 'scheduled', 'cancelled', 'superseded') then
