@@ -52,7 +52,7 @@ create or replace function public.claim_santalbino_social_publication(
 )
 returns jsonb
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $$
 declare
