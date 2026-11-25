@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 const source = readFileSync(new URL('../../regia.html', import.meta.url), 'utf8');
+const publicSource = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+const previewSource = readFileSync(new URL('../../preview.html', import.meta.url), 'utf8');
+const homeSource = readFileSync(new URL('../../home.html', import.meta.url), 'utf8');
 
 assert.match(source, /const canShare = !!edition && edition\.status === 'approved' && !TEST_MODE && !stale;/,
   'WhatsApp sharing must be enabled only for approved revisions whose scorer and chronology snapshot still matches the current match.');
@@ -36,6 +39,18 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 
 
 
+
+
+assert.ok(publicSource.includes("function resetMatch() {") && publicSource.includes("S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }"),
+  'Starting a new match from the public/index control room must clear the previous published convocati, formations and pending publication.');
+assert.ok(previewSource.includes("Cronaca completa") && previewSource.includes("Convocati pubblicati") && previewSource.includes("Formazioni pubblicate"),
+  'The public match preview must expose the full archived match record, including events, published convocati and published lineups.');
+assert.ok(previewSource.includes("const published=state.publication?.published;") && previewSource.includes("const publishedRosters=publicData.rosters"),
+  'The public archive preview must read published content, not a pending editorial draft.');
+assert.ok(previewSource.includes("db.from('match_archive').select('state')"),
+  'The public preview must load the immutable archived state when the match is no longer live.');
+assert.ok(homeSource.includes("CONSULTA PARTITA ARCHIVIATA"),
+  'Archived public match cards must clearly indicate that the historical match can be consulted.');
 
 console.log('Post-match editorial UI guard tests passed');
 
