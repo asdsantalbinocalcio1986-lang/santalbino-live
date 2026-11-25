@@ -4422,12 +4422,16 @@ async function openMatchResult() {
     if (!dlg.open) { releaseMatchResultPreviewUrl(); return; }
     const currentMatchId = matchResultSafeId(matchResultEditor.snapshot);
     const latest = editions.find(item => item.match_id === currentMatchId);
-    if (latest) {
+    const latestSnapshotMatches = !!latest && JSON.stringify(latest.snapshot) === JSON.stringify(matchResultEditor.snapshot);
+    if (latestSnapshotMatches) {
       releaseMatchResultPreviewUrl();
       await displayMatchResultEdition(latest);
     } else {
+      const changedSinceLastRevision = !!latest;
       dlg.innerHTML = matchResultEditorHtml(previewUrl, generatedCaption, null) +
-        '<p class="small muted">Anteprima della partita corrente. Le revisioni delle partite precedenti restano disponibili nello storico qui sotto.</p>' +
+        (changedSinceLastRevision
+          ? '<p class="small muted">La cronaca o i marcatori sono cambiati dopo l’ultima revisione. Questa è la grafica aggiornata: salva una nuova bozza per conservarla senza sovrascrivere la revisione precedente.</p>'
+          : '<p class="small muted">Anteprima della partita corrente. Le revisioni delle partite precedenti restano disponibili nello storico qui sotto.</p>') +
         (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '');
     }
   } catch (err) {
