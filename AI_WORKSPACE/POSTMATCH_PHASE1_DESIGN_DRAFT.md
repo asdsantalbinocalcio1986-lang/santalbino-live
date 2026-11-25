@@ -161,3 +161,76 @@ Read-only inspection of `regia.html` at the current main ref (SHA `e1517806a0f6d
 - **Test isolation:** the existing test-mode restrictions prevent official media upload from test mode; retain this protection and test it explicitly.
 
 These are preliminary code observations, not a complete audit of all rendering paths. Claude/Gemini must verify all usages and line-level evidence before implementation.
+
+
+## 11. Follow-up read-only audit — hashtag and club crest (2026-11-25)
+
+Baseline: `main` commit `8166deeb4b70397af9b021b9420f93afdab2501f`; `regia.html` blob SHA `e1517806a0f6d49ebfd884600ebe7b5fe0058a64`. Findings below are repository evidence unless explicitly marked live Supabase.
+
+### 11.1 Hashtag — confirmed gap
+
+Evidence in current `regia.html`:
+- Initial embedded state has a fixed `#SantAlbinoTerme` value (line 1357); runtime defaults use `#SANTALive` (line 1377). This creates two different defaults depending on state initialization.
+- Match editor exposes an editable hashtag field (line 4400); `saveMatch()` copies it directly from `#s-tag` to `S.match.hashtag` (line 4823). No deterministic team-name generator is present in this save path.
+- Existing event social text appends `S.match.hashtag` (line 1547); the convocati text builder uses it (around line 1601); formation text also appends it (around line 1633); the post-match summary footer includes it (around line 4032).
+- Some share actions append the hashtag separately (around line 4688), so duplication must be tested at the composed output level, not only in individual templates.
+- `resetMatch()` clears events, rosters, date/time and match-specific publication/chronicle fields but retains `S.match` and `S.logos` (line 4805). New-match flow therefore currently retains the previous match's hashtag unless the operator changes it.
+
+Requirement interpretation:
+- Generate the hashtag from the two team identities, not merely from whichever side is home. Canonicalize Sant'Albino to `SantAlbino`, then append the opponent's normalized name; use a deterministic rule for other pairings.
+- Normalize Unicode diacritics, whitespace, punctuation and repeated separators; define stable casing and a safe fallback for empty/duplicate names.
+- Track provenance (system-generated vs explicit manual override). A plain string cannot reliably tell whether an existing value is an override.
+- On a team-name change, regenerate only system-generated values. Preserve explicit overrides.
+- Use one composition helper that guarantees a single hashtag in each final text/graphic/share payload.
+
+### 11.2 Club crest — persistence exists, identity is positional
+
+Evidence in current `regia.html`:
+- Runtime state stores `logos: { home: '', away: '' }` (line 1378), and state hydration/merge restores those two positional properties (lines 1398 and 2149).
+- The settings UI labels and uploads one logo for each current home/away team (lines 4403–4405); upload stores the returned URL in `S.logos[side]` and commits the shared state (line 4857).
+- `uploadSharedImage()` blocks all official media uploads in test mode, requires an authenticated administrator, uploads with `upsert: false`, and returns a public URL (lines 2010–2022).
+- The media bucket is `santalbino-media` (line 1648). Live read-only Supabase query confirms it exists, is public, has an 8 MiB limit and allows JPEG/PNG/WebP. Storage object policies observed: authenticated Sant'Albino admins can INSERT/UPDATE/DELETE; public/anonymous and authenticated users can SELECT objects in this bucket.
+- Several renderers read the positional logo slots directly: event/phase graphics (e.g. lines 2554, 2807), formation graphic (3032–3033), MATCH DAY graphic (3265), convocati graphics (3341 and 3402), UI badge helper (3550), and match result graphic (4042). This is a cross-cutting change, not a single-screen swap.
+- `resetMatch()` does not clear `S.logos` (line 4805), so existing URLs persist across a normal new-match reset. This is positive evidence for persistence, but not proof of correct club identity after home/away changes.
+- Test-mode state initializes test logos separately (lines 1386–1390), and the upload guard blocks writing to the official media bucket from test mode. However, `?test=1` uses a separate state table in the same Supabase project; it is not a separate storage/backend security boundary.
+
+Confirmed conclusion:
+- The existing media storage and shared-state mechanism can retain image URLs across reloads and normal match reset.
+- The product requirement is **not fully met**: the application models logos by home/away slot, not by club identity. The operator must currently manage the two slots manually; the code does not establish that one canonical club crest follows Sant'Albino from home to away.
+- A dedicated club-profile table is not automatically required. A canonical club-logo reference in the shared club configuration may be sufficient for this single-club application, provided it is admin-protected, persistent, and not reset with match state. Claude must compare the least-complex safe option with the existing architecture before proposing schema changes.
+- Public read access to the bucket is expected for public graphics, but uploaded logos are not private. Admin-only write/delete policies and test-mode guard must remain intact.
+
+### 11.3 Required regression matrix
+
+| Scenario | Expected result |
+|---|---|
+| Sant'Albino home vs Radicofani | `#SantAlbinoRadicofani`; club crest on home side |
+| Radicofani home vs Sant'Albino away | same canonical pair hashtag; club crest on away side |
+| Opponent name contains accents/punctuation | normalized deterministic hashtag |
+| Team name edited after creation | regenerate only system-generated hashtag |
+| Admin manually overrides hashtag | override remains unchanged after save/reload |
+| Generate event, convocati, formation and post-match copy | exactly one match hashtag in each final payload |
+| Upload club crest once, reload, create home fixture | same crest retained on Sant'Albino |
+| Create away fixture after home fixture | same crest follows Sant'Albino to away slot; opponent logo remains separate |
+| Replace/remove club crest | only canonical club crest reference changes; opponent asset is untouched |
+| Normal match reset | club-level crest remains; match-specific data is reset according to defined policy |
+| Test mode upload attempt | official storage write rejected; production state/assets unchanged |
+| Backup/export/import | documented behavior; no accidental loss or positional misassignment |
+
+### 11.4 Additional review tasks for Claude/Gemini
+
+1. Confirm all references listed above and inspect every `S.logos` use, including public HTML, canvas renderers, editor previews, archive/restore and backup/import paths.
+2. Trace `resetMatch()`, `startNewMatch`, `saveMatch()`, `mergeState()`, state RPC and backup/import behavior; identify whether any path clears, overwrites or misassigns logos/hashtags.
+3. Confirm all final social-text composition paths and hashtag duplication cases, including PR #106/#107 code paths.
+4. Verify the live bucket policies and the exact admin predicate. Do not attempt upload/update/delete tests against production.
+5. Recommend a minimal data model and migration/rollback only as a proposal. No code, SQL, storage, state, PR merge or deploy changes.
+6. Add automated tests for pure normalization/generation and renderer mapping; specify isolated integration tests for persistence and test-mode separation.
+
+### 11.5 Current PR/workspace state checked
+
+- PR #106: open Draft, head `a993d5bfcc282acfc849ab45084d570524d6725b`, base `8166deeb4b70397af9b021b9420f93afdab2501f`.
+- PR #107: open Draft, head `81cc441328b413aa79217fcf91079c0a28362bf1`, same base.
+- PR #108: open Draft, head `9f1924f5c63039ab390984e5f08121a9553f4c0d`, same base. It currently contains six documentation files; no application runtime file is in its changed-file list.
+- #106 and #107 both change `regia.html`; their integration still requires a single reconciled branch and combined tests. No merge is recommended by this audit.
+
+This follow-up is read-only evidence and does not authorize implementation.
