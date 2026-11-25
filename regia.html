@@ -4831,7 +4831,7 @@ document.addEventListener('click', async e => {
     case 'cancelContentSchedule': if (confirm('Annullare la bozza o la programmazione? I contenuti già pubblicati resteranno visibili.')) cancelContentPublication(); break;
     case 'savePostmatchRevision': try { await saveMatchResultRevision(); } catch (error) { toast('Salvataggio non riuscito: ' + (error?.message || 'errore')); } break;
     case 'approvePostmatchRevision': try { await approveMatchResultRevision(); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
-    case 'saveMatchResultGraphic': { if (matchResultEditor.graphicBlob) saveBlob(matchResultEditor.graphicBlob,'match-result.jpg'); else if (matchResultEditor.graphicPath) { const url=await matchResultSignedUrl(matchResultEditor.graphicPath); const response=await fetch(url); if(!response.ok) throw new Error('Download grafica non riuscito'); saveBlob(await response.blob(),'match-result.jpg'); } break; }
+    case 'saveMatchResultGraphic': { try { if (matchResultEditor.graphicBlob) saveBlob(matchResultEditor.graphicBlob,'match-result.jpg'); else if (matchResultEditor.graphicPath) { const url=await matchResultSignedUrl(matchResultEditor.graphicPath); const response=await fetch(url); if(!response.ok) throw new Error('Download grafica non riuscito'); saveBlob(await response.blob(),'match-result.jpg'); } else throw new Error('Nessuna grafica disponibile per il download.'); } catch (error) { toast('Download grafica non riuscito: ' + (error?.message || 'errore')); } break; }
     case 'copyMatchResultPost': await copyText($('#matchResultPost')?.value || ''); break;
     case 'shareMatchResultPost': {
       const approved = matchResultEditor.active;
