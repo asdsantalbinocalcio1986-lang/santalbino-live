@@ -59,3 +59,12 @@ Then provide:
 
 ## Handoff after Claude
 Return the complete report to ChatGPT. Gemini then receives this exact handoff plus Claude's complete report and independently checks omissions, unsupported claims, false positives and security gaps. ChatGPT reconciles both reviews against the repository evidence. Implementation remains blocked until the owner explicitly approves the final specification and phase.
+
+## Additional owner requirements received 2026-11-25
+
+Include these two requirements in the audit and report; do not implement during this read-only task:
+
+1. **Automatic match hashtag:** create and store a deterministic match hashtag automatically when a match is created (example `#SantAlbinoRadicofani`). Reuse it consistently in match-day, convocati and post-match copy; prevent duplicates; assess behavior if teams change and if an admin override exists.
+2. **Persistent club crest:** the club's own logo must remain saved after one upload/selection, across reloads and future matches. Its display must follow the club's home/away assignment, not be confused with the opponent logo. Assess storage location, persistence, permissions, replacement/removal and test isolation.
+
+For both, report current implementation evidence, gaps, exact files/functions, risks, and acceptance tests. No code, database, storage or production changes.
