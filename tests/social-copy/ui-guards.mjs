@@ -52,3 +52,10 @@ assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'
 assert.match(source, /#\?' \+ escapedHashtag/, 'Deduplication must remove both prefixed and unprefixed versions of the configured hashtag before appending its normalized form.');
 
 assert.ok(source.includes("new RegExp('(^|[\\\\s([{])#?' + escapedHashtag"), 'Deduplication must match configured hashtags with or without their leading hash.');
+assert.match(source, /const needsReconciliation = item\.overall_status === 'reconciliation_required'[\s\S]{0,220}\['unknown', 'processing'\]\.includes\(item\.facebook_status\)/,
+  'Unknown or in-flight publications must be recognized as requiring reconciliation.');
+assert.match(source, /item\.overall_status === 'published' \|\| needsReconciliation \? '' : '<button/,
+  'The UI must not offer a blind retry for published or uncertain events.');
+assert.match(source, /Esito da verificare: il sistema blocca nuovi invii automatici per evitare duplicati/,
+  'The UI must explain why an uncertain publication cannot be retried.');
+
