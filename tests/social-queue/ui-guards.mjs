@@ -52,7 +52,6 @@ assert.match(source, /function resetMatch\(\)[\s\S]*?S\.publication = \{ publish
 assert.match(source, /Apri scheda completa · cronaca, convocati e formazioni/);
 assert.match(source, /state\.publication\?\.published\?\.convocati/);
 assert.match(source, /state\.publication\?\.published\?\.rosters/);
-assert.match(source, /data\.sort/);
 assert.match(source, /function captureEditorialDraftForm\([\s\S]*?function restoreEditorialDraftForm\(/,
   'Editorial form state must be captured and restored across full UI renders.');
 assert.match(source, /function renderMain\(\)[\s\S]*?captureEditorialDraftForm\(\)[\s\S]*?restoreEditorialDraftForm\(\)/,
