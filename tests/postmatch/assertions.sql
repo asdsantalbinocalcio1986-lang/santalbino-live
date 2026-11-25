@@ -21,7 +21,7 @@ begin
   begin
     perform * from public.save_santalbino_postmatch_revision(
       'test', 'match_01', 'Snapshot troppo grande',
-      to_jsonb(repeat('x', 70000)), 10,
+      jsonb_build_object('payload', repeat('x', 70000)), 10,
       'postmatch/test/match_01/rev3.jpg',
       'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
     );
