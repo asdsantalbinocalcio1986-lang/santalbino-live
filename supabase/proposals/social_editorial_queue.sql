@@ -115,10 +115,25 @@ on conflict (id) do update set
   allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
 
 drop policy if exists "SANTA Live admins can manage editorial assets" on storage.objects;
-create policy "SANTA Live admins can manage editorial assets"
-  on storage.objects for all to authenticated
-  using (bucket_id = 'santalbino-editorial' and public.is_santalbino_admin())
+drop policy if exists "SANTA Live admins can read editorial assets" on storage.objects;
+drop policy if exists "SANTA Live admins can upload editorial assets" on storage.objects;
+drop policy if exists "SANTA Live admins can delete unused editorial assets" on storage.objects;
+create policy "SANTA Live admins can read editorial assets"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'santalbino-editorial' and public.is_santalbino_admin());
+create policy "SANTA Live admins can upload editorial assets"
+  on storage.objects for insert to authenticated
   with check (bucket_id = 'santalbino-editorial' and public.is_santalbino_admin());
+create policy "SANTA Live admins can delete unused editorial assets"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'santalbino-editorial'
+    and public.is_santalbino_admin()
+    and not exists (
+      select 1 from public.santalbino_editorial_posts p
+       where p.asset_path = storage.objects.name
+    )
+  );
 
 revoke all on public.santalbino_editorial_posts from anon, authenticated;
 revoke all on public.santalbino_editorial_deliveries from anon, authenticated;
