@@ -288,11 +288,20 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
         let ready = false;
         for (let attempt = 0; attempt < 8; attempt++) {
           const state = await graphGet(instagramContainerId, { fields: "status_code", access_token: pageToken });
-          if (state.status_code === "ERROR") throw new Error("Meta non ha elaborato l'immagine Instagram");
+          if (state.status_code === "ERROR") {
+            // Il container è fallito prima della pubblicazione: un nuovo tentativo
+            // può crearne uno nuovo senza ripetere un post già pubblicato.
+            instagramContainerId = null;
+            throw new MetaRequestError("Meta non ha elaborato il container Instagram", "failed_retryable");
+          }
           if (!state.status_code || state.status_code === "FINISHED") { ready = true; break; }
           await wait(1500);
         }
-        if (!ready) throw new Error("Elaborazione immagine Instagram ancora in corso; riprova dal registro");
+        if (!ready) {
+          // Il container esiste ed è persistito: il retry riprenderà il polling
+          // sullo stesso ID, senza crearne un altro.
+          throw new MetaRequestError("Container Instagram ancora in elaborazione", "failed_retryable");
+        }
         const published = await graphPost(`${instagramId}/media_publish`, {
           creation_id: instagramContainerId,
           access_token: pageToken,
