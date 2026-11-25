@@ -170,12 +170,34 @@ async function processOneDelivery(
         fields: "status_code",
         access_token: deps.pageToken,
       });
+      if (state.status_code === "PUBLISHED") {
+        throw new MetaRequestError("Container Instagram già pubblicato: verificare il post remoto prima di procedere", "unknown");
+      }
       if (state.status_code === "ERROR") {
         throw new MetaRequestError("Container Instagram in errore: riconciliazione richiesta", "unknown");
       }
-      if (!state.status_code || state.status_code === "FINISHED") {
+      if (state.status_code === "EXPIRED") {
+        // An expired container cannot be published. Create and persist a fresh one before continuing.
+        if (!await renewBeforeMetaCall(post, deps)) return;
+        const replacement = await deps.graphPost(`${deps.instagramId}/media`, {
+          image_url: assetUrl,
+          caption: post.caption,
+          access_token: deps.pageToken,
+        });
+        const replacementId = String(replacement.id || "");
+        if (!replacementId) throw new MetaRequestError("Nuovo container Instagram senza ID: riconciliazione richiesta", "unknown");
+        if (!await deps.recordContainer(post.id, post.claim_token, replacementId)) {
+          throw new MetaRequestError("Nuovo container Instagram non registrato: riconciliazione richiesta", "unknown");
+        }
+        containerId = replacementId;
+        continue;
+      }
+      if (state.status_code === "FINISHED") {
         ready = true;
         break;
+      }
+      if (state.status_code !== "IN_PROGRESS" && state.status_code !== "PENDING") {
+        throw new MetaRequestError("Stato container Instagram non riconosciuto: riconciliazione richiesta", "unknown");
       }
       await (deps.delay || (ms => new Promise(resolve => setTimeout(resolve, ms))))(1500);
     }
