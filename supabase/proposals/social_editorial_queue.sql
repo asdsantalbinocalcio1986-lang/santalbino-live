@@ -42,7 +42,7 @@ create table if not exists public.santalbino_editorial_posts (
   constraint santalbino_editorial_posts_instagram_asset_jpeg_check
     check (not coalesce(platforms -> 'instagram' = 'true'::jsonb, false) or lower(asset_path) ~ '[.]jpe?g$'),
   check (
-    (status in ('approved', 'scheduled', 'publishing', 'published', 'partial', 'failed', 'unknown')
+    (status in ('approved', 'scheduled', 'publishing', 'published', 'partial', 'failed', 'unknown', 'expired')
       and approved_by is not null and approved_at is not null)
     or status in ('draft', 'cancelled', 'superseded')
   ),
