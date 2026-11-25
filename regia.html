@@ -4581,6 +4581,31 @@ async function loadEditorialQueue() {
     editorialQueueState.loading = false;
   }
 }
+function editorialRomeDateTimeToIso(value) {
+  const match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(String(value || ''));
+  if (!match) throw new Error('Data e ora non valide.');
+  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]));
+  let guess = target;
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  });
+  for (let i = 0; i < 4; i++) {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(guess)).map(part => [part.type, part.value]));
+    const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour), Number(parts.minute), Number(parts.second));
+    const delta = target - represented;
+    if (!delta) break;
+    guess += delta;
+  }
+  const check = Object.fromEntries(formatter.formatToParts(new Date(guess)).map(part => [part.type, part.value]));
+  if (Number(check.year) !== Number(match[1]) || Number(check.month) !== Number(match[2]) ||
+      Number(check.day) !== Number(match[3]) || Number(check.hour) !== Number(match[4]) ||
+      Number(check.minute) !== Number(match[5])) {
+    throw new Error('L’orario scelto non esiste nel fuso Europe/Rome (passaggio all’ora legale).');
+  }
+  return new Date(guess).toISOString();
+}
 function editorialQueueHtml() {
   const state = editorialQueueState;
   const items = state.items.map(post => {
@@ -4645,7 +4670,8 @@ async function saveEditorialDraft() {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Formato non ammesso: usa JPEG, PNG o WebP.');
   if (!facebook && !instagram) throw new Error('Seleziona almeno un canale social.');
   editorialQueueState.saving = true;
-  renderMain();
+  const saveButton = $('[data-a="editorialSave"]');
+  if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Salvataggio…'; }
   let uploadedPath = '';
   let saved = false;
   try {
@@ -4702,6 +4728,8 @@ async function saveEditorialDraft() {
     throw error;
   } finally {
     editorialQueueState.saving = false;
+    const button = $('[data-a="editorialSave"]');
+    if (button) { button.disabled = false; button.textContent = 'Salva come bozza'; }
   }
 }
 async function approveEditorialPost(postId, revision) {
@@ -4709,9 +4737,8 @@ async function approveEditorialPost(postId, revision) {
   const scheduleInput = [...document.querySelectorAll('[data-editorial-schedule]')].find(el => el.dataset.editorialSchedule === postId);
   let scheduledAt = null;
   if (scheduleInput?.value) {
-    const date = new Date(scheduleInput.value);
-    if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()) throw new Error('La data di programmazione deve essere futura.');
-    scheduledAt = date.toISOString();
+    scheduledAt = editorialRomeDateTimeToIso(scheduleInput.value);
+    if (new Date(scheduledAt).getTime() <= Date.now()) throw new Error('La data di programmazione deve essere futura.');
   }
   const { error } = await db.rpc('approve_santalbino_editorial_post', {
     p_post_id: postId, p_expected_revision: Number(revision), p_scheduled_at: scheduledAt
@@ -5124,7 +5151,7 @@ document.addEventListener('click', async e => {
   if (TEST_MODE && ['copyig','shareig','markdone','sharewa','sharefb'].includes(act)) { toast('Le azioni di pubblicazione e condivisione social sono disattivate nella simulazione.'); return; }
   switch (act) {
     case 'editorialRefresh': await loadEditorialQueue(); renderMain(); break;
-    case 'editorialSave': try { await saveEditorialDraft(); } catch (error) { toast('Bozza non salvata: ' + (error?.message || 'errore')); renderMain(); } break;
+    case 'editorialSave': try { await saveEditorialDraft(); } catch (error) { toast('Bozza non salvata: ' + (error?.message || 'errore')); } break;
     case 'editorialApprove': try { await approveEditorialPost(a.dataset.id, a.dataset.revision); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
     case 'editorialCancel': if (window.confirm('Annullare questo contenuto editoriale?')) { try { await cancelEditorialPost(a.dataset.id); } catch (error) { toast('Annullamento non riuscito: ' + (error?.message || 'errore')); } } break;
     case 'refreshAnalytics': if (!TEST_MODE) await loadAnalytics(); break;
