@@ -4544,6 +4544,10 @@ function editorialSafeKey(value) {
     .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9:_-]+/g, '-')
     .replace(/^-+|-+$/g, '').slice(0, 150);
 }
+function editorialDefaultLogicalKey(contentType) {
+  const matchKey = editorialSafeKey(S.match.pollId || (S.match.date + '-' + S.match.home + '-' + S.match.away) || 'club') || 'club';
+  return 'santalbino:' + matchKey + ':' + String(contentType || 'custom');
+}
 function editorialStatusLabel(status) {
   return ({
     draft: 'Bozza', approved: 'Approvato · in coda', scheduled: 'Programmato',
@@ -4561,7 +4565,7 @@ async function loadEditorialQueue() {
   try {
     const [posts, deliveries] = await Promise.all([
       db.from('santalbino_editorial_posts')
-        .select('id,logical_key,match_id,content_type,revision,status,caption,platforms,scheduled_at,timezone,created_at,approved_at,published_at,last_error_safe')
+        .select('id,logical_key,match_id,content_type,revision,status,caption,asset_path,platforms,scheduled_at,timezone,created_at,approved_at,published_at,last_error_safe')
         .order('created_at', { ascending: false }).limit(40),
       db.from('santalbino_editorial_deliveries')
         .select('post_id,platform,status,attempt_count,external_post_id,last_error_safe,published_at,updated_at')
@@ -4569,7 +4573,12 @@ async function loadEditorialQueue() {
     ]);
     if (posts.error) throw posts.error;
     if (deliveries.error) throw deliveries.error;
-    editorialQueueState.items = posts.data || [];
+    editorialQueueState.items = await Promise.all((posts.data || []).map(async post => {
+      try {
+        const { data: signed, error: signedError } = await db.storage.from('santalbino-editorial').createSignedUrl(post.asset_path, 120);
+        return { ...post, preview_url: !signedError ? signed?.signedUrl || '' : '' };
+      } catch (_) { return { ...post, preview_url: '' }; }
+    }));
     editorialQueueState.deliveries = deliveries.data || [];
     editorialQueueState.loaded = true;
   } catch (error) {
@@ -4616,10 +4625,15 @@ function editorialQueueHtml() {
       esc(editorialStatusLabel(item.status)) +
       (item.external_post_id ? ' · ID ' + esc(item.external_post_id) : '') +
       (item.last_error_safe ? '<div class="muted">' + esc(item.last_error_safe) + '</div>' : '') +
+      (item.status === 'unknown' ?
+        '<label class="f"><span>ID post remoto (necessario se già pubblicato)</span><input data-editorial-external-id="' + esc(item.post_id) + '" data-platform="' + esc(item.platform) + '" maxlength="300"></label>' +
+        '<label class="f"><span>Nota di verifica (minimo 8 caratteri)</span><input data-editorial-resolution-note="' + esc(item.post_id) + '" data-platform="' + esc(item.platform) + '" maxlength="500"></label>' +
+        '<button class="btn sm" data-a="editorialResolvePublished" data-id="' + esc(item.post_id) + '" data-platform="' + esc(item.platform) + '">Conferma pubblicato</button> ' +
+        '<button class="btn sm danger" data-a="editorialResolveRetry" data-id="' + esc(item.post_id) + '" data-platform="' + esc(item.platform) + '">Conferma non pubblicato e riprova</button>' : '') +
       '</div>'
     ).join('') : '<p class="small muted">Nessuna consegna avviata.</p>';
-    const canApprove = post.status === 'draft';
-    const canCancel = ['draft', 'approved', 'scheduled'].includes(post.status);
+    const canApprove = post.status === 'draft' && !!post.preview_url;
+    const canCancel = ['draft', 'approved', 'scheduled', 'failed', 'partial'].includes(post.status);
     const scheduled = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }) : '';
     return '<article class="card" data-editorial-post="' + esc(post.id) + '">' +
       '<div class="row2" style="align-items:center;justify-content:space-between"><b>' +
@@ -4628,6 +4642,7 @@ function editorialQueueHtml() {
       (post.status === 'published' ? 'pubblicato' : 'bozza') + '">' + esc(editorialStatusLabel(post.status)) + '</span></div>' +
       (post.match_id ? '<div class="small muted">Partita: ' + esc(post.match_id) + '</div>' : '') +
       (scheduled ? '<div class="small">Programmazione: ' + esc(scheduled) + ' · Europe/Rome</div>' : '') +
+      (post.preview_url ? '<img src="' + esc(post.preview_url) + '" alt="Anteprima grafica da approvare" loading="lazy" style="display:block;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px;margin:10px 0">' : '<p class="small" role="alert">Anteprima non disponibile: aggiorna la coda prima di approvare.</p>') +
       '<p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(post.caption) + '</p>' +
       '<div class="small muted">Canali: ' + esc([post.platforms?.facebook ? 'Facebook' : '', post.platforms?.instagram ? 'Instagram' : ''].filter(Boolean).join(' · ')) +
       ' · Creato: ' + esc(new Date(post.created_at).toLocaleString('it-IT')) + '</div>' +
@@ -4646,9 +4661,9 @@ function editorialQueueHtml() {
     '</section>' +
     '<section class="card"><h2>Nuovo contenuto / revisione</h2>' +
     '<label class="f"><span>Tipo di contenuto</span><select id="editorialContentType"><option value="match_day">MATCH DAY</option><option value="convocati">Convocati</option><option value="formation">Formazione</option><option value="post_match">Post partita</option><option value="club_notice">Avviso società</option><option value="custom">Altro contenuto</option></select></label>' +
-    '<label class="f"><span>Identificativo revisioni (mantienilo uguale per aggiornare una bozza)</span><input id="editorialLogicalKey" maxlength="180" value="' + esc('santalbino:' + editorialSafeKey(S.match.pollId || (S.match.date + '-' + S.match.home + '-' + S.match.away) || 'club') + ':match_day') + '"></label>' +
+    '<label class="f"><span>Identificativo revisioni (mantienilo uguale per aggiornare una bozza)</span><input id="editorialLogicalKey" maxlength="180" value="' + esc(editorialDefaultLogicalKey('match_day')) + '"></label>' +
     '<label class="f"><span>Testo del post</span><textarea id="editorialCaption" rows="6" maxlength="2200" placeholder="Scrivi il testo da pubblicare…"></textarea></label>' +
-    '<label class="f"><span>Grafica · JPEG, PNG o WebP · massimo 8 MB</span><input id="editorialAsset" type="file" accept="image/jpeg,image/png,image/webp"></label>' +
+    '<label class="f"><span>Grafica · JPEG per Instagram, PNG/WebP solo Facebook · massimo 8 MB</span><input id="editorialAsset" type="file" accept="image/jpeg,image/png,image/webp"></label>' +
     '<div class="row2 stack"><label class="f"><span><input id="editorialFacebook" type="checkbox" checked> Facebook</span></label><label class="f"><span><input id="editorialInstagram" type="checkbox" checked> Instagram</span></label></div>' +
     '<p class="small muted">La grafica viene caricata in un archivio privato. La firma SHA-256 è calcolata sul file selezionato e verificata nuovamente dal worker.</p>' +
     '<button class="btn primary block" data-a="editorialSave" ' + (state.saving ? 'disabled' : '') + '>' + (state.saving ? 'Salvataggio…' : 'Salva come bozza') + '</button>' +
@@ -4668,6 +4683,7 @@ async function saveEditorialDraft() {
   if (!file) throw new Error('Seleziona la grafica da associare al contenuto.');
   if (file.size < 1 || file.size > 8 * 1024 * 1024) throw new Error('La grafica deve pesare al massimo 8 MB.');
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Formato non ammesso: usa JPEG, PNG o WebP.');
+  if (instagram && file.type !== 'image/jpeg') throw new Error('Per Instagram è necessario un file JPEG. Seleziona una grafica JPEG per pubblicare su entrambi i canali.');
   if (!facebook && !instagram) throw new Error('Seleziona almeno un canale social.');
   editorialQueueState.saving = true;
   const saveButton = $('[data-a="editorialSave"]');
@@ -4752,10 +4768,26 @@ async function cancelEditorialPost(postId) {
   if (TEST_MODE || !db || !CAN_EDIT) throw new Error('Operazione disponibile solo nella regia amministrativa.');
   const { data, error } = await db.rpc('cancel_santalbino_editorial_post', { p_post_id: postId });
   if (error) throw error;
-  if (data !== true) throw new Error('Il contenuto non è più annullabile.');
+  if (data !== true) throw new Error('Il contenuto non è più annullabile o richiede prima una riconciliazione.');
   await loadEditorialQueue();
   renderMain();
   toast('Contenuto annullato');
+}
+async function resolveEditorialDelivery(postId, platform, resolution) {
+  if (TEST_MODE || !db || !CAN_EDIT) throw new Error('Operazione disponibile solo nella regia amministrativa.');
+  const findValue = selector => document.querySelector(selector)?.value?.trim() || '';
+  const externalPostId = findValue('[data-editorial-external-id="' + postId + '"][data-platform="' + platform + '"]');
+  const note = findValue('[data-editorial-resolution-note="' + postId + '"][data-platform="' + platform + '"]');
+  if (note.length < 8) throw new Error('Inserisci una nota di verifica di almeno 8 caratteri.');
+  if (resolution === 'published' && !externalPostId) throw new Error('Inserisci l’ID del post remoto prima di confermare la pubblicazione.');
+  const { data, error } = await db.rpc('resolve_santalbino_editorial_delivery', {
+    p_post_id: postId, p_platform: platform, p_resolution: resolution,
+    p_external_post_id: resolution === 'published' ? externalPostId : null, p_note: note
+  });
+  if (error) throw error;
+  await loadEditorialQueue();
+  renderMain();
+  toast(resolution === 'published' ? 'Pubblicazione riconciliata' : 'Consegna rimessa in coda dopo verifica');
 }
 
 function regiaHtml() {
@@ -5154,6 +5186,8 @@ document.addEventListener('click', async e => {
     case 'editorialSave': try { await saveEditorialDraft(); } catch (error) { toast('Bozza non salvata: ' + (error?.message || 'errore')); } break;
     case 'editorialApprove': try { await approveEditorialPost(a.dataset.id, a.dataset.revision); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
     case 'editorialCancel': if (window.confirm('Annullare questo contenuto editoriale?')) { try { await cancelEditorialPost(a.dataset.id); } catch (error) { toast('Annullamento non riuscito: ' + (error?.message || 'errore')); } } break;
+    case 'editorialResolvePublished': try { await resolveEditorialDelivery(a.dataset.id, a.dataset.platform, 'published'); } catch (error) { toast('Riconciliazione non riuscita: ' + (error?.message || 'errore')); } break;
+    case 'editorialResolveRetry': if (window.confirm('Hai verificato che il contenuto NON è stato pubblicato su questa piattaforma? Solo dopo questa verifica è sicuro riprovare.')) { try { await resolveEditorialDelivery(a.dataset.id, a.dataset.platform, 'retry'); } catch (error) { toast('Riconciliazione non riuscita: ' + (error?.message || 'errore')); } } break;
     case 'refreshAnalytics': if (!TEST_MODE) await loadAnalytics(); break;
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
@@ -5433,6 +5467,11 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target, ds = t.dataset || {};
+  if (t.id === 'editorialContentType') {
+    const key = $('#editorialLogicalKey');
+    if (key) key.value = editorialDefaultLogicalKey(t.value);
+    return;
+  }
   if (t.matches('[data-attack-direction]')) { if (S.clock.phase !== 'pre') return; S.match.attackDirectionFirst = ['left','right'].includes(t.value) ? t.value : ''; commit(true); renderMain(); return; }
   if(t.matches('[data-editor-scope]')){L.editorTemplate=t.value;saveL();renderMain();return;}
   if(t.matches('[data-event-template]')){L.editorEventTemplate=t.value;renderMain();return;}
