@@ -24,6 +24,19 @@ assert.match(source, /new Date\(scheduledAt\)\.getTime\(\) <= Date\.now\(\)/,
   'Scheduled publication must reject past timestamps.');
 assert.match(source, /La pubblicazione automatica resta disattivata/,
   'The UI must distinguish approval/queueing from actual publication.');
+assert.match(source, /expired: 'Scaduto · finestra di pubblicazione terminata'/,
+  'Expired editorial posts must be clearly labelled in the admin queue.');
+assert.match(source, /clock: \{ phase: String\(S\.clock\?\.phase \|\| 'pre'\), finishedAt: Number\(S\.clock\?\.finishedAt \|\| 0\) \}/,
+  'The immutable post-match snapshot must preserve the recorded final-whistle timestamp.');
+assert.match(queueSql, /expires_at timestamptz/,
+  'Editorial posts must persist their server-calculated expiry timestamp.');
+assert.match(queueSql, /v_local_kickoff at time zone 'Europe\/Rome'/,
+  'Pre-match expiry must be calculated from the kickoff in Europe/Rome.');
+assert.match(queueSql, /interval '72 hours'/,
+  'Post-match expiry must be 72 hours after the recorded final whistle.');
+assert.match(queueSql, /status = 'expired'/,
+  'The queue must transition eligible stale posts into the expired state.');
+
 assert.match(source, /unknown: 'Esito incerto · verifica necessaria'/,
   'Unknown outcomes must be clearly labelled as requiring reconciliation.');
 assert.match(source, /Anteprima grafica da approvare/,
