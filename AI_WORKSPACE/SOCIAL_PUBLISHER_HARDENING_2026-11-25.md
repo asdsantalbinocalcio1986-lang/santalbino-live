@@ -105,13 +105,28 @@ Non trattare `unknown` come retry automatico. Prevedere riconciliazione mediante
 - Trasporto HTTP iniettabile e test Deno con risposte simulate, senza account o pagina Facebook di prova.
 - Test SQL per claim ripetuto, retry dopo rifiuto certo, fencing del token obsoleto e blocco degli esiti incerti; agganciati al test harness Supabase locale effimero.
 
-### Limiti ancora da verificare
-- I test non sono ancora stati eseguiti in questa sessione: non è stato avviato un ambiente Deno/PostgreSQL locale.
-- La suite SQL copre la logica di claim e fencing, ma non sostituisce una prova di concorrenza multi-sessione PostgreSQL né l'intero ciclo Edge Function.
+### Verifiche eseguite — 25 novembre 2026
+
+Run GitHub Actions sul commit `2ea39f25d117236e61db572768421846bce47618`:
+- **Validate application:** successo; include validazione progetto, guard UI social e test Deno con trasporto Meta simulato.
+- **Post-match SQL integration tests (ephemeral PostgreSQL):** successo; migration social e hardening applicate, test permessi RPC/tabella, stati incerti, retry consentito, fencing del token, estensione piattaforme e claim concorrenti su due sessioni PostgreSQL.
+- **Post-match integration tests (isolated local Supabase):** successo; stack Supabase locale usa-e-getta avviato, migration applicate, test Auth/RLS/Storage, lettura admin-only del registro social, invocazione RPC via PostgREST con service_role, secondo claim bloccato e test browser Playwright completati.
+- **Deploy GitHub Pages:** skipped, come previsto per un branch di lavoro.
+
+### Limiti residui e cautele
+- I test Meta sono mock: nessuna chiamata Graph API, nessuna Pagina Facebook/account Instagram reale e nessuna pubblicazione effettiva. Non è stata verificata la risposta reale di Meta a un timeout dopo accettazione.
+- I test Deno esercitano il trasporto Graph e la classificazione degli esiti; non costituiscono un collaudo end-to-end della funzione con Meta reale.
 - La migrazione tratta i vecchi stati `failed` come `unknown`, perché la versione precedente non distingueva un rifiuto certo da un timeout ambiguo.
-- Un record rimasto `processing` dopo un crash non viene riacquisito automaticamente, anche se la lease è scaduta: è una scelta deliberatamente conservativa per non duplicare contenuti. Serve riconciliazione amministrativa.
+- Un record rimasto `processing` dopo un crash non viene riacquisito automaticamente, anche se la lease è scaduta. È intenzionale: prima occorre riconciliare l'esito remoto.
+- La RPC usa `SECURITY INVOKER`, `search_path = ''` e grants limitati a `service_role`; il ruolo di servizio dispone già dei privilegi necessari sulla tabella.
 - Nessun deploy, migrazione hosted, lettura/modifica dei segreti, invocazione della funzione hosted o chiamata Meta è stato eseguito.
 
-**Gate prima di domenica:** eseguire i test locali/CI, revisione indipendente del SQL e del publisher, verificare l'allineamento del sorgente con la versione hosted e preparare una procedura manuale di riconciliazione. L'installazione in produzione e l'eventuale attivazione restano passaggi distinti e soggetti ad autorizzazione.
+### Procedura prudenziale per un esito incerto
+1. Non premere nuovamente "Riprova invio": la UI nasconde il pulsante per gli stati incerti e il backend blocca comunque il claim.
+2. Verificare manualmente la Pagina/account Meta e cercare il contenuto per evento, testo e orario.
+3. Se il contenuto esiste, annotare l'ID remoto e riconciliare il registro senza ripubblicare.
+4. Se non è possibile stabilire l'esito con certezza, lasciare il record bloccato e chiedere verifica tecnica. La scadenza della lease, da sola, non autorizza un nuovo invio.
 
-- **CI aggiornata:** il workflow ora include anche le PR dirette a `integration/social-postmatch-2026-11-25` e lancia i test Deno mock del publisher. Il job Supabase locale applica le migration social e lancia anche il test SQL concorrente. La validazione va considerata completata solo quando una run sul commit più recente termina con successo.
+**Gate prima di domenica:** revisione indipendente del SQL e del publisher, verifica finale dell'allineamento con il sorgente hosted e autorizzazione esplicita prima di installazione/attivazione. L'attivazione Meta e il primo invio reale restano passaggi separati.
+
+
