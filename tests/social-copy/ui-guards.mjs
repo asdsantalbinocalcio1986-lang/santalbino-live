@@ -52,3 +52,5 @@ assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'
 assert.match(source, /#\?' \+ escapedHashtag/, 'Deduplication must remove both prefixed and unprefixed versions of the configured hashtag before appending its normalized form.');
 
 assert.ok(source.includes("new RegExp('(^|[\\\\s([{])#?' + escapedHashtag"), 'Deduplication must match configured hashtags with or without their leading hash.');
+
+assert.match(source, /case 'sharewa':[\s\S]{0,300}const matchUrl = socialDraftMatchUrl\(\)/, 'WhatsApp event sharing must reuse the canonical match URL helper.');
