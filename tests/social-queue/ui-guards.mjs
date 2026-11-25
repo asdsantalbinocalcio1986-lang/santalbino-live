@@ -44,7 +44,7 @@ assert.match(source, /editorialSafeKey\([\s\S]*?normalize\('NFKD'\)/,
 
 
 const queueSql = readFileSync(new URL('../../supabase/proposals/social_editorial_queue.sql', import.meta.url), 'utf8');
-const jpegChecks = [...queueSql.matchAll(/lower\\((?:asset_path|p_asset_path)\\)\\s*(?:!~|~)\\s*'([^']*)'/g)].map(match => match[1]);
+const jpegChecks = [...queueSql.matchAll(/lower\((?:asset_path|p_asset_path)\)\s*(?:!~|~)\s*'([^']*)'/g)].map(match => match[1]);
 assert.equal(jpegChecks.length, 6, 'All duplicated SQL definitions must retain their six Instagram JPEG checks.');
 assert.ok(jpegChecks.every(pattern => pattern === '[.]jpe?g
 
