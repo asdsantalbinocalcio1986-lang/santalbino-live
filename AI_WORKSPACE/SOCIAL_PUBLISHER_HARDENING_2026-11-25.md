@@ -103,7 +103,7 @@ Non trattare `unknown` come retry automatico. Prevedere riconciliazione mediante
 - Timeout sulle richieste Graph; gli errori di rete, le risposte illeggibili e i 5xx sulle POST sono classificati `unknown`; le risposte 4xx esplicite sono `failed_retryable`.
 - Persistenza dell'ID del container Instagram prima del polling; i retry riprendono il container già creato. Un container esplicitamente fallito viene scartato prima di un nuovo tentativo.
 - Trasporto HTTP iniettabile e test Deno con risposte simulate, senza account o pagina Facebook di prova.
-- Test SQL per claim ripetuto, retry dopo rifiuto certo, fencing del token obsoleto e blocco degli esiti incerti; agganciati al test harness Supabase locale effimero.
+- Test SQL per claim ripetuto, distinzione tra claim attivo e lease scaduta, conversione in `unknown`, retry dopo rifiuto certo, fencing del token obsoleto e blocco degli esiti incerti; agganciati al test harness Supabase locale effimero.
 
 ### Verifiche eseguite — 25 novembre 2026
 
@@ -117,7 +117,7 @@ Run GitHub Actions sul commit `2ea39f25d117236e61db572768421846bce47618`:
 - I test Meta sono mock: nessuna chiamata Graph API, nessuna Pagina Facebook/account Instagram reale e nessuna pubblicazione effettiva. Non è stata verificata la risposta reale di Meta a un timeout dopo accettazione.
 - I test Deno esercitano il trasporto Graph e la classificazione degli esiti; non costituiscono un collaudo end-to-end della funzione con Meta reale.
 - La migrazione tratta i vecchi stati `failed` come `unknown`, perché la versione precedente non distingueva un rifiuto certo da un timeout ambiguo.
-- Un record rimasto `processing` dopo un crash non viene riacquisito automaticamente, anche se la lease è scaduta. È intenzionale: prima occorre riconciliare l'esito remoto.
+- Un record rimasto `processing` dopo un crash viene riconosciuto alla prima richiesta successiva: se la lease è ancora valida resta `processing`; se è scaduta, gli stati in-flight diventano `unknown`, il token viene revocato e il record passa a `reconciliation_required`. Non viene eseguito alcun retry automatico.
 - La RPC usa `SECURITY INVOKER`, `search_path = ''` e grants limitati a `service_role`; il ruolo di servizio dispone già dei privilegi necessari sulla tabella.
 - Nessun deploy, migrazione hosted, lettura/modifica dei segreti, invocazione della funzione hosted o chiamata Meta è stato eseguito.
 
@@ -130,3 +130,13 @@ Run GitHub Actions sul commit `2ea39f25d117236e61db572768421846bce47618`:
 **Gate prima di domenica:** revisione indipendente del SQL e del publisher, verifica finale dell'allineamento con il sorgente hosted e autorizzazione esplicita prima di installazione/attivazione. L'attivazione Meta e il primo invio reale restano passaggi separati.
 
 
+
+### Aggiornamento hardening lease — 25 novembre 2026
+
+La revisione ha individuato un caso operativo da chiudere: il claim con lease scaduta restava bloccato con token attivo senza una transizione esplicita. La migration nel branch è stata aggiornata:
+- lease valida: il secondo chiamante riceve `processing` e non contatta Meta;
+- lease scaduta o assente con token attivo: le piattaforme ancora `processing` diventano `unknown`, il token viene revocato, il record passa a `reconciliation_required`;
+- il worker precedente è fenced dal token revocato e non può salvare un esito tardivo;
+- i test SQL e di concorrenza sono stati aggiornati per verificare entrambe le condizioni.
+
+**Validazione dei commit aggiornati:** in corso su GitHub Actions; non considerare la PR pronta finché tutti i job sul commit HEAD non risultano conclusi con successo.
