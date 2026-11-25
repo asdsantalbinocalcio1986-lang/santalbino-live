@@ -2,7 +2,7 @@ name: Validate and deploy Sant'Albino Live
 
 on:
   push:
-    branches: [main, integration/social-postmatch-2026-11-25, feat/social-editorial-final-2026-11-25]
+    branches: [main, integration/social-postmatch-2026-11-25]
   pull_request:
     branches: [main, integration/social-postmatch-2026-11-25]
   workflow_dispatch:
@@ -38,11 +38,11 @@ jobs:
           deno-version: v2.x
       - name: Test editorial worker with mocked Meta transport
         if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
-        run: deno test supabase/functions/santalive-editorial-worker/index_test.ts
+        run: deno test --allow-env=META_GRAPH_API_VERSION supabase/functions/santalive-editorial-worker/index_test.ts
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/feat/social-editorial-final-2026-11-25'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     services:
       postgres:
