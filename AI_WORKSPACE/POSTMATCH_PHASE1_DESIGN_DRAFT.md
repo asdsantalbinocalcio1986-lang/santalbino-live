@@ -149,3 +149,15 @@ These two requirements apply across match creation, match persistence and social
 
 - These requirements must be reviewed against the existing logo persistence model, match data model, hashtag/social-copy builders and PR #106/#107 shared `regia.html` changes.
 - Do not implement them in production as part of the audit. Claude and Gemini must assess current support, required changes, persistence/security implications and regression tests.
+
+
+## 10. Preliminary implementation comparison against current `main`
+
+Read-only inspection of `regia.html` at the current main ref (SHA `e1517806a0f6d49ebfd884600ebe7b5fe0058a64`) found:
+
+- **Hashtag — partial / not compliant yet:** the application state has a default hashtag and the match editor saves the manually entered value (`S.match.hashtag = g('#s-tag')`). No automatic generation from home/away team names was identified in the inspected match-save path. Social event text appends the current hashtag; the convocati builder also uses it. The new requirement therefore needs automatic generation at match creation/save, normalization, duplicate prevention and consistent reuse in the #106/#107 builders.
+- **Logo persistence — partial / identity model gap:** logo uploads use `uploadSharedImage(..., 'loghi', ...)`, store the resulting URL in `S.logos[side]`, and persist the application state through the existing shared state save flow. This means the URL can persist across sessions, but the model is keyed by the positional slots `home` and `away`, not by the club identity. The app therefore needs a canonical "our club logo" reference independent of `ourSide`, then a rendering adapter that places it on the correct home/away side for each match. Do not simply swap or overwrite opponent and club logo slots.
+- **Persistence caveat:** current state persistence is the shared application state and public media bucket, not a dedicated club-profile record. Audit whether this is acceptable for one-club deployment, how it is protected from accidental replacement, and how reset/new-match operations preserve the club asset.
+- **Test isolation:** the existing test-mode restrictions prevent official media upload from test mode; retain this protection and test it explicitly.
+
+These are preliminary code observations, not a complete audit of all rendering paths. Claude/Gemini must verify all usages and line-level evidence before implementation.
