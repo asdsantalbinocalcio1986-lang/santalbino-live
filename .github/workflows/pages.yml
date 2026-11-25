@@ -2,7 +2,7 @@ name: Validate and deploy Sant'Albino Live
 
 on:
   push:
-    branches: [main, integration/social-postmatch-2026-11-25]
+    branches: [main, integration/social-postmatch-2026-11-25, feat/social-editorial-complete-2026-11-25]
   pull_request:
     branches: [main, integration/social-postmatch-2026-11-25]
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/feat/social-editorial-complete-2026-11-25'
     runs-on: ubuntu-latest
     services:
       postgres:
