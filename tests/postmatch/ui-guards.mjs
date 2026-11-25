@@ -43,10 +43,16 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 
 assert.ok(publicSource.includes("function resetMatch() {") && publicSource.includes("S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }"),
   'Starting a new match from the public/index control room must clear the previous published convocati, formations and pending publication.');
-assert.ok(previewSource.includes("Cronaca completa") && previewSource.includes("Convocati pubblicati") && previewSource.includes("Formazioni pubblicate"),
-  'The public match preview must expose the full archived match record, including events, published convocati and published lineups.');
+assert.ok(['SCHEDULE','CRONACA','FORMAZIONI','CONVOCATI'].every(label => previewSource.includes(label)) && previewSource.includes('data-archive-panel=') && previewSource.includes('SOLA CONSULTAZIONE'),
+  'The archived match preview must use live-style sections and remain read-only.');
 assert.ok(previewSource.includes("const published=state.publication?.published;") && previewSource.includes("const publishedRosters=publicData.rosters"),
   'The public archive preview must read published content, not a pending editorial draft.');
+assert.ok(previewSource.includes("const publicData=published&&typeof published==='object'?published:{rosters:{},convocati:''};"),
+  'The archive preview must not reconstruct missing published content from mutable match data.');
+assert.ok(publicSource.includes(": { rosters: {home:'',away:''}, convocati: '' };"),
+  'The live public view must show no convocati or lineups when the current match has no published snapshot.');
+assert.ok(publicSource.includes('localStorage.removeItem(DK)'),
+  'Resetting a match must discard any stale local draft before saving the new empty match.');
 assert.ok(previewSource.includes("db.from('match_archive').select('state')"),
   'The public preview must load the immutable archived state when the match is no longer live.');
 assert.ok(homeSource.includes("CONSULTA PARTITA ARCHIVIATA"),
