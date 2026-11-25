@@ -92,3 +92,10 @@ Introdurre un riferimento canonico `clubLogo` (URL/path Storage) persistito nell
 
 ## 5. Conclusione
 Il requisito hashtag è **parzialmente supportato** (il tag viene consumato dai generatori, ma non viene generato automaticamente e presenta default incoerenti). Il logo è **già caricato e condiviso**, ma resta **associato alla posizione home/away** e non all'identità del club. Entrambi i requisiti richiedono un intervento applicativo; questo audit non lo ha eseguito.
+
+
+## Addendum — renderer coverage and reset behavior
+- Conteggio sul file main: 5 letture dirette di `S.logos.home`, 5 di `S.logos.away`, 9 accessi indicizzati `S.logos[...]`. I renderer coinvolti includono tabellone/graphic summary, grafiche matchday e formazioni, convocati legacy/premium e badge UI.
+- I renderer principali di formazione e matchday continuano a leggere separatamente gli slot home/away; il renderer convocati legge `S.logos[S.match.ourSide]`. Non è presente un helper centralizzato che risolva il logo del club in base a `ourSide`.
+- `resetMatch()` non azzera `S.logos`, quindi conserva i due URL posizionali anche quando si crea la partita successiva. Questo conserva gli asset ma può associare il logo del club al lato sbagliato quando `ourSide` cambia: rischio concreto, non solo mancanza di comodità.
+- Il JSON seed incorpora due path statici distinti `./assets/logo-home.png` e `./assets/logo-away.png`, mentre i default runtime dichiarano `logos: { home: '', away: '' }`. Da uniformare durante l'intervento, evitando che seed e default divergano.
