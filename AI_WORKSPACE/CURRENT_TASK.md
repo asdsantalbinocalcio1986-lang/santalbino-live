@@ -75,3 +75,8 @@ Completed by ChatGPT as read-only work while primary analyst/reviewer are unavai
 - No app code, database, storage, cron, secrets, social account, merge or deployment changed.
 
 Remaining audit work: inspect the deployed SQL functions/policies and the complete Edge Function contract without invoking it; verify all logo renderers and initialization/reset flows; reconcile findings with Claude and an independent reviewer when available. This supplementary work does not complete the full v3.1 audit scope.
+
+
+## Publisher contract addendum — 2026-11-25
+
+Read-only verification of the deployed Edge Function and database policies is recorded in `AI_WORKSPACE/PUBLISHER_LIVE_CONTRACT_AUDIT_2026-11-25.md`. The deployed v2 source matches main byte-for-byte. Critical additional blockers: non-atomic processing claim (PUB-01), ambiguous Meta outcomes marked failed (PUB-02), and no exactly-once guarantee despite UNIQUE event_id (PUB-03). The status action itself calls Graph API and was not invoked. Existing social log RLS, media bucket policies and 8 MiB limit were inspected. No code/schema/data/storage/cron/secrets/social accounts were changed. Full v3.1 audit remains in progress.
