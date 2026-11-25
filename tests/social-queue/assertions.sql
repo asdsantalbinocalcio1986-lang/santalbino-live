@@ -12,6 +12,12 @@ declare
   v_queue public.santalbino_editorial_posts%rowtype;
   v_retry public.santalbino_editorial_posts%rowtype;
 begin
+  if (select public from storage.buckets where id = 'santalbino-editorial') is distinct from false then
+    raise exception 'Editorial Storage bucket must be private';
+  end if;
+  insert into storage.objects (bucket_id, name)
+  values ('santalbino-editorial', 'social-editorial/test/admin-upload.jpg');
+
   select * into v_first from public.save_santalbino_editorial_draft(
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Prima bozza editoriale', 'social-editorial/test/match-day-r1.jpg',
@@ -192,6 +198,17 @@ begin
   if v_count <> 0 then
     raise exception 'Non-admin user can read editorial drafts';
   end if;
+  select count(*) into v_count from storage.objects where bucket_id = 'santalbino-editorial';
+  if v_count <> 0 then
+    raise exception 'Non-admin user can read private editorial assets';
+  end if;
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('santalbino-editorial', 'social-editorial/test/non-admin-upload.jpg');
+    raise exception 'Non-admin user unexpectedly uploaded a private editorial asset';
+  exception when insufficient_privilege then
+    null;
+  end;
 end
 $non_admin_tests$;
 
