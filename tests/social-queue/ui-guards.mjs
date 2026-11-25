@@ -48,8 +48,54 @@ assert.match(source, /editorialSafeKey\([\s\S]*?normalize\('NFKD'\)/,
 const queueSql = readFileSync(new URL('../../supabase/proposals/social_editorial_queue.sql', import.meta.url), 'utf8');
 const jpegChecks = [...queueSql.matchAll(/lower\((?:asset_path|p_asset_path)\)\s*(?:!~|~)\s*'([^']*)'/g)].map(match => match[1]);
 assert.equal(jpegChecks.length, 6, 'All duplicated SQL definitions must retain their six Instagram JPEG checks.');
-assert.ok(jpegChecks.every(pattern => pattern === '[.]jpe?g
+assert.ok(jpegChecks.every(pattern => pattern === '[.]jpe?g\([\s\S]*?function restoreEditorialDraftForm\(/,
+  'Editorial form state must be captured and restored across full UI renders.');
+assert.match(source, /function renderMain\(\)[\s\S]*?captureEditorialDraftForm\(\)[\s\S]*?restoreEditorialDraftForm\(\)/,
+  'Every control-room render must preserve the unsaved editorial form.');
+assert.match(source, /editorialQueueState\.draft\?\.file/,
+  'The selected image File object must survive UI refreshes even when the browser cannot restore input.files.');
+assert.match(source, /e\.target\.matches\('#editorialLogicalKey, #editorialCaption'\)/,
+  'Text edits in the editorial form must be captured immediately.');
+assert.match(source, /t\.matches\('#editorialAsset, #editorialFacebook, #editorialInstagram'\)/,
+  'File and channel changes in the editorial form must be captured.');
 
+console.log('Editorial queue admin UI guard tests passed');
+),
+  'Every Instagram JPEG check must use the complete psql-safe [.]jpe?g$ expression.');
+const legacyBackslashRegex = "lower(p_asset_path) !~ '" + String.fromCharCode(92) + ".jpe?g
+
+
+assert.match(source, /function captureEditorialDraftForm\([\s\S]*?function restoreEditorialDraftForm\(/,
+  'Editorial form state must be captured and restored across full UI renders.');
+assert.match(source, /function renderMain\(\)[\s\S]*?captureEditorialDraftForm\(\)[\s\S]*?restoreEditorialDraftForm\(\)/,
+  'Every control-room render must preserve the unsaved editorial form.');
+assert.match(source, /editorialQueueState\.draft\?\.file/,
+  'The selected image File object must survive UI refreshes even when the browser cannot restore input.files.');
+assert.match(source, /e\.target\.matches\('#editorialLogicalKey, #editorialCaption'\)/,
+  'Text edits in the editorial form must be captured immediately.');
+assert.match(source, /t\.matches\('#editorialAsset, #editorialFacebook, #editorialInstagram'\)/,
+  'File and channel changes in the editorial form must be captured.');
+
+console.log('Editorial queue admin UI guard tests passed');
+";
+assert.ok(!queueSql.includes(legacyBackslashRegex),
+  'The editorial SQL must not reintroduce a backslash-dot regex that psql parses as a meta-command.');
+
+
+assert.match(source, /function captureEditorialDraftForm\([\s\S]*?function restoreEditorialDraftForm\(/,
+  'Editorial form state must be captured and restored across full UI renders.');
+assert.match(source, /function renderMain\(\)[\s\S]*?captureEditorialDraftForm\(\)[\s\S]*?restoreEditorialDraftForm\(\)/,
+  'Every control-room render must preserve the unsaved editorial form.');
+assert.match(source, /editorialQueueState\.draft\?\.file/,
+  'The selected image File object must survive UI refreshes even when the browser cannot restore input.files.');
+assert.match(source, /e\.target\.matches\('#editorialLogicalKey, #editorialCaption'\)/,
+  'Text edits in the editorial form must be captured immediately.');
+assert.match(source, /t\.matches\('#editorialAsset, #editorialFacebook, #editorialInstagram'\)/,
+  'File and channel changes in the editorial form must be captured.');
+
+console.log('Editorial queue admin UI guard tests passed');
+),
+  'Every Instagram SQL regex must use the psql-safe literal-dot pattern.');
 
 assert.match(source, /function captureEditorialDraftForm\([\s\S]*?function restoreEditorialDraftForm\(/,
   'Editorial form state must be captured and restored across full UI renders.');
