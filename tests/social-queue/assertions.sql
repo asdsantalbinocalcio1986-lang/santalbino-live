@@ -142,7 +142,7 @@ begin
     'Avviso con limite tentativi', 'social-editorial/test/retry-limit.jpg',
     repeat('3', 64), '{"facebook":true}'::jsonb, '{"kind":"retry-limit"}'::jsonb
   );
-  select * into v_exhausted from public.approve_santalbino_editorial_post(v_exhausted.id, 1, null);
+  select * into v_exhausted from public.approve_santalbino_editorial_post(v_exhausted.id, 1, now() + interval '1 hour');
 end
 $admin_tests$;
 
@@ -238,6 +238,9 @@ begin
     raise exception 'Final retry test outcome should be held for reconciliation: %', v_status;
   end if;
 
+  update public.santalbino_editorial_posts
+     set scheduled_at = now() - interval '1 minute'
+   where logical_key = 'match:ci-match:retry-limit:club_notice' and status = 'scheduled';
   select id into v_exhausted_id from public.santalbino_editorial_posts
    where logical_key = 'match:ci-match:retry-limit:club_notice';
   insert into public.santalbino_editorial_deliveries
