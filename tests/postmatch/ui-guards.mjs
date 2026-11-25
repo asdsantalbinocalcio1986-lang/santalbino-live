@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 
 const source = readFileSync(new URL('../../regia.html', import.meta.url), 'utf8');
 
-assert.match(source, /const canShare = !!edition && edition\.status === 'approved' && !TEST_MODE;/,
-  'WhatsApp sharing must be enabled only for approved revisions outside test mode');
+assert.match(source, /const canShare = !!edition && edition\.status === 'approved' && !TEST_MODE && !stale;/,
+  'WhatsApp sharing must be enabled only for approved revisions whose scorer and chronology snapshot still matches the current match.');
+assert.match(source, /if \(!matchResultSnapshotMatchesCurrent\(approved\.snapshot\)\)/,
+  'The share action must independently reject an approved graphic whose scorer or chronology has changed.');
+assert.match(source, /if \(!matchResultSnapshotMatchesCurrent\(edition\.snapshot\)\)/,
+  'Approval must independently reject a stale revision after a scorer or chronology edit.');
+assert.match(source, /function matchResultSnapshotKey\(snapshot\)[\s\S]*?const \{ rev, \.\.\.content \} = snapshot/,
+  'Freshness checks must ignore unrelated state revision increments while preserving match content changes.');
 assert.match(source, /if \(!approved \|\| approved\.status !== 'approved'\)/,
   'The share action must independently reject unapproved revisions');
 assert.match(source, /txt !== String\(approved\.caption \|\| ''\)\.trim\(\)/,
