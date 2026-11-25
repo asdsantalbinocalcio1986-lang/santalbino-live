@@ -58,14 +58,26 @@ as $$
 declare
   v_row public.santalbino_social_publications%rowtype;
   v_token uuid := gen_random_uuid();
-  v_facebook boolean := coalesce((p_platforms ->> 'facebook')::boolean, false);
-  v_instagram boolean := coalesce((p_platforms ->> 'instagram')::boolean, false);
+  v_facebook boolean;
+  v_instagram boolean;
 begin
-  if p_event_id is null or length(p_event_id) = 0 or length(p_event_id) > 180
-     or p_event_type not in ('goal', 'red', 'halftime', 'fulltime')
-     or p_caption is null or length(p_caption) = 0
-     or not (v_facebook or v_instagram) then
+  -- Validate JSON types before deriving booleans: malformed service-role input
+  -- must fail with a controlled validation error, not a cast exception.
+  if p_event_id is null or length(btrim(p_event_id)) = 0 or length(p_event_id) > 180
+     or p_event_type is null or p_event_type not in ('goal', 'red', 'halftime', 'fulltime')
+     or p_caption is null or length(btrim(p_caption)) = 0 or length(p_caption) > 2200
+     or p_image_url is null or length(btrim(p_image_url)) = 0
+     or (p_match_id is not null and length(p_match_id) > 180)
+     or p_platforms is null or jsonb_typeof(p_platforms) <> 'object'
+     or (p_platforms ? 'facebook' and jsonb_typeof(p_platforms -> 'facebook') <> 'boolean')
+     or (p_platforms ? 'instagram' and jsonb_typeof(p_platforms -> 'instagram') <> 'boolean') then
     raise exception 'invalid publication claim input' using errcode = '22023';
+  end if;
+
+  v_facebook := coalesce((p_platforms -> 'facebook') = 'true'::jsonb, false);
+  v_instagram := coalesce((p_platforms -> 'instagram') = 'true'::jsonb, false);
+  if not (v_facebook or v_instagram) then
+    raise exception 'at least one publication platform is required' using errcode = '22023';
   end if;
 
   insert into public.santalbino_social_publications (
