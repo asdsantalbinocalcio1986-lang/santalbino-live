@@ -195,8 +195,23 @@ async function main() {
     // The feature remains hidden in test-mode UI and no Meta dispatch endpoint is called.
     psql(`update public.live_state set state = '${jsonSql}'::jsonb, updated_at = now() where id = 1;`);
     await page.goto(`http://127.0.0.1:${address.port}/regia.html`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Editoriale', exact: true }).waitFor({ state: 'visible', timeout: 30000 });
-    await page.getByRole('button', { name: 'Editoriale', exact: true }).click();
+    const editorialTab = page.locator('[data-rtab="editorial"]');
+    await page.waitForFunction(() =>
+      !!document.querySelector('[data-rtab="editorial"]') ||
+      !!document.querySelector('[data-a="mode"]') ||
+      !!document.querySelector('[data-a="login"]'), null, { timeout: 30000 });
+    if (!(await editorialTab.isVisible())) {
+      if (await page.locator('[data-a="login"]').count()) {
+        await page.locator('[data-a="login"]').first().click();
+        await page.locator('#authEmail').fill(email);
+        await page.locator('#authPassword').fill(password);
+        await page.locator('#authForm button[type="submit"]').click();
+      } else if (await page.locator('[data-a="mode"]').count()) {
+        await page.locator('[data-a="mode"]').first().click();
+      }
+    }
+    await editorialTab.waitFor({ state: 'visible', timeout: 30000 });
+    await editorialTab.click();
     await page.locator('#editorialCaption').waitFor({ state: 'visible', timeout: 30000 });
 
     const editorialPng = {
