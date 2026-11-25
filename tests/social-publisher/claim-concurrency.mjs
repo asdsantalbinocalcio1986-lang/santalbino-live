@@ -23,10 +23,10 @@ try {
   ]);
   const parsed = results.map(({ stdout }) => JSON.parse(stdout.trim()));
   const winners = parsed.filter((value) => value.result === 'claimed');
-  const blocked = parsed.filter((value) => value.result === 'reconciliation_required');
+  const blocked = parsed.filter((value) => value.result === 'processing');
   assert.equal(winners.length, 1, `Expected exactly one winning claim, got ${JSON.stringify(parsed)}`);
-  assert.equal(blocked.length, 1, `Expected exactly one blocked claim, got ${JSON.stringify(parsed)}`);
-  console.log('Concurrent claim test passed: one winner, one blocked request.');
+  assert.equal(blocked.length, 1, `Expected exactly one active claim to be reported as processing, got ${JSON.stringify(parsed)}`);
+  console.log('Concurrent claim test passed: one winner, one active request reported as processing.');
 } finally {
   await run('psql', [
     dbUrl, '-X', '-v', 'ON_ERROR_STOP=1', '-c',
