@@ -58,7 +58,7 @@ begin
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Seconda bozza editoriale', 'social-editorial/test/match-day-r2.jpg',
     repeat('b', 64), '{"facebook":true,"instagram":false}'::jsonb,
-    '{"score":"1-0","teams":["Sant’Albino","Test FC"]}'::jsonb
+    '{"score":"1-0","teams":["Sant’Albino","Test FC"],"match":{"date":"2099-12-31","time":"18:00"}}'::jsonb
   );
   if v_second.revision <> 2 or v_second.status <> 'draft' then
     raise exception 'Second editorial draft was not revision 2: %', row_to_json(v_second);
@@ -122,7 +122,7 @@ begin
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Terza bozza editoriale', 'social-editorial/test/match-day-r3.jpg',
     repeat('c', 64), '{"facebook":true,"instagram":false}'::jsonb,
-    '{"score":"2-0","teams":["Sant’Albino","Test FC"]}'::jsonb
+    '{"score":"2-0","teams":["Sant’Albino","Test FC"],"match":{"date":"2099-12-31","time":"18:00"}}'::jsonb
   );
   select * into v_third from public.approve_santalbino_editorial_post(
     v_third.id, 3, now() + interval '1 day'
@@ -157,7 +157,7 @@ begin
     'match:ci-match:post_match', 'post_match', 'ci-match',
     'Post partita approvato', 'social-editorial/test/post-match.jpg',
     repeat('d', 64), '{"facebook":true,"instagram":true}'::jsonb,
-    '{"score":"2-0","scorers":["Rossi"]}'::jsonb
+    jsonb_build_object('score', '2-0', 'scorers', jsonb_build_array('Rossi'), 'clock', jsonb_build_object('phase', 'ft', 'finishedAt', (extract(epoch from (now() - interval '1 hour')) * 1000)::bigint))
   );
   select * into v_queue from public.approve_santalbino_editorial_post(v_queue.id, 1, now() - interval '1 minute');
 
