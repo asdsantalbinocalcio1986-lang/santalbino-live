@@ -28,8 +28,9 @@ assert.match(source, /'sharewa','sharefb'/, 'External event sharing must be bloc
 assert.match(source, /case 'sharefb':[\s\S]{0,500}facebook\.com\/sharer\/sharer\.php/, 'Event Facebook sharing must open the share dialog.');
 assert.match(source, /S\.socialDrafts\s*=\s*\{\s*matchDay:\s*'',\s*convocati:\s*''\s*\}/, 'Starting a new match must clear previous social drafts.');
 assert.match(source, /rawHashtag = String\(S\.match\.hashtag \|\| ''\)\.trim\(\)/, 'Configured hashtags must be normalized before sharing.');
-assert.match(source, /rawHashtag \? \(rawHashtag\.startsWith\('#'\) \? rawHashtag : '#' \+ rawHashtag\)/, 'Sharing must add a missing hashtag prefix.');
-assert.match(source, /escapedHashtag = hashtag\.replace\(/, 'Sharing must escape the configured hashtag before building a safe matcher.');
+assert.ok(source.includes("const hashtagBase = (rawHashtag || '#SANTALive').replace(/^#/, '');"), 'Sharing must normalize a missing hashtag to the club default and strip a leading hash before matching.');
+assert.ok(source.includes("const hashtag = '#' + hashtagBase;"), 'Sharing must always append a hashtag with its leading hash.');
+assert.ok(source.includes("const escapedHashtag = hashtagBase.replace("), 'Sharing must escape the normalized hashtag base before building a safe matcher.');
 assert.match(source, /new RegExp\(/, 'Sharing must use a token-aware matcher so inline hashtag occurrences are removed.');
 assert.match(source, /textWithoutHashtag[\s\S]{0,500}replace\(\/\\n\{3,\}\//, 'Hashtag removal must normalize excess blank lines before appending the hashtag once.');
 assert.match(source, /window\.open\([^\n]*'_blank'\);\s*if \(facebookWindow\) facebookWindow\.opener = null/, 'Facebook popup detection must not rely on noopener return semantics and must sever opener immediately.');
