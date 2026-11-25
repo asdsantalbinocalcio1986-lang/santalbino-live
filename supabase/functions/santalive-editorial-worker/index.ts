@@ -270,14 +270,20 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
         graphPost,
         graphGet,
         loadAsset: async (post) => {
-          const bucket = Deno.env.get("SOCIAL_EDITORIAL_STORAGE_BUCKET") || "santalbino-media";
-          const { data: file, error: downloadError } = await adminClient.storage.from(bucket).download(post.asset_path);
+          const bucket = Deno.env.get("SOCIAL_EDITORIAL_STORAGE_BUCKET") || "santalbino-editorial";
+          const storage = adminClient.storage.from(bucket);
+          const { data: file, error: downloadError } = await storage.download(post.asset_path);
           if (downloadError || !file) throw new Error("Download asset editoriale non riuscito");
           const bytes = new Uint8Array(await file.arrayBuffer());
           await validateEditorialAsset(bytes, file.type || "", post.asset_sha256);
-          const { data: publicData } = adminClient.storage.from(bucket).getPublicUrl(post.asset_path);
-          if (!publicData?.publicUrl) throw new Error("URL pubblico asset editoriale non disponibile");
-          return { publicUrl: publicData.publicUrl };
+          const { data: signed, error: signedError } = await storage.createSignedUrl(post.asset_path, 600);
+          if (signedError || !signed?.signedUrl) throw new Error("URL firmato asset editoriale non disponibile");
+          const signedUrl = new URL(signed.signedUrl, supabaseUrl).toString();
+          const parsedSignedUrl = new URL(signedUrl);
+          if (parsedSignedUrl.origin !== new URL(supabaseUrl).origin || parsedSignedUrl.protocol !== "https:") {
+            throw new Error("URL firmato asset editoriale non valido");
+          }
+          return { publicUrl: signedUrl };
         },
         recordContainer: async (postId, token, containerId) => {
           const { data: recorded, error: recordError } = await adminClient.rpc(
