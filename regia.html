@@ -4219,7 +4219,19 @@ async function saveMatchResultRevision() {
     }
     toast('Bozza post-partita salvata · revisione ' + saved.revision);
   } catch (error) {
-    if (uploadedPath && !recordSaved) { try { await db.storage.from('santalbino-postmatch').remove([uploadedPath]); } catch (_) {} }
+    if (uploadedPath && !recordSaved) {
+      let cleanupError = null;
+      try {
+        const { error: removeError } = await db.storage.from('santalbino-postmatch').remove([uploadedPath]);
+        cleanupError = removeError || null;
+      } catch (removeError) {
+        cleanupError = removeError;
+      }
+      if (cleanupError) {
+        const originalMessage = error?.message || 'errore durante il salvataggio';
+        throw new Error(originalMessage + ' Inoltre il caricamento temporaneo non è stato eliminato (' + uploadedPath + '): ' + (cleanupError.message || 'errore di pulizia') + '. Segnalare il percorso a un amministratore per la rimozione.');
+      }
+    }
     throw error;
   } finally {
     matchResultEditor.busy = false;
