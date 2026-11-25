@@ -19,6 +19,9 @@ assert.doesNotMatch(source, /matchResultEditor\.snapshot \|\| JSON\.parse\(JSON\
   'Post-match revisions must not persist the entire live application state as a snapshot.');
 assert.match(source, /Snapshot partita non valido/,
   'The post-match save flow must reject malformed snapshots before uploading or persisting them.');
+assert.match(source, /case 'saveMatchResultGraphic':[\s\S]{0,650}catch \(error\) \{ toast\('Download grafica non riuscito:/,
+  'Post-match graphic download failures must be handled locally and shown to the operator.');
+
 
 
 console.log('Post-match editorial UI guard tests passed');
