@@ -1620,7 +1620,8 @@ async function shareSocialDraft(kind, platform) {
   if (TEST_MODE) { toast('Condivisione esterna disattivata nella simulazione.'); return; }
   const text = socialDraftText(kind);
   const matchUrl = socialDraftMatchUrl();
-  const hashtag = String(S.match.hashtag || '#SANTALive').trim();
+  const rawHashtag = String(S.match.hashtag || '').trim();
+  const hashtag = rawHashtag ? (rawHashtag.startsWith('#') ? rawHashtag : '#' + rawHashtag) : '#SANTALive';
   const escapedHashtag = hashtag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const textWithoutHashtag = hashtag
     ? text
@@ -1639,11 +1640,13 @@ async function shareSocialDraft(kind, platform) {
     toast(whatsappWindow ? 'WhatsApp pronto: scegli i destinatari e conferma l’invio.' : 'Popup WhatsApp bloccato: abilita i popup e riprova.');
     return;
   }
+  const copyPromise = copyText(shareText);
   const facebookWindow = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank');
   if (facebookWindow) facebookWindow.opener = null;
-  await copyText(shareText);
+  const copied = await copyPromise;
   if (!facebookWindow) toast('Popup Facebook bloccato: abilita i popup e riprova.');
-  else toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
+  else if (copied) toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
+  else toast('Facebook aperto, ma la copia automatica non è riuscita: copia il testo manualmente.');
 }
 function buildConvocatiText() {
   const m = S.match, opponent = teamName(other(m.ourSide));
@@ -4724,10 +4727,13 @@ document.addEventListener('click', async e => {
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
     case 'sharefb': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
+      const copyPromise = copyText(so.text);
       const popup = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(socialDraftMatchUrl()), '_blank');
       if (popup) popup.opener = null;
-      await copyText(so.text);
-      toast(popup ? 'Testo copiato: incollalo nella finestra di condivisione Facebook.' : 'Popup Facebook bloccato: abilita i popup e riprova.');
+      const copied = await copyPromise;
+      if (!popup) toast('Popup Facebook bloccato: abilita i popup e riprova.');
+      else if (copied) toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
+      else toast('Facebook aperto, ma la copia automatica non è riuscita: copia il testo manualmente.');
       break;
     }
     case 'sharewa': {
@@ -4749,7 +4755,9 @@ document.addEventListener('click', async e => {
               await saveBlob(postBlob, 'santalbino-evento.jpg');
               const whatsappWindow = window.open(waUrl, '_blank');
               if (whatsappWindow) whatsappWindow.opener = null;
-              toast('Il dispositivo non ha accettato immagine e testo insieme: immagine salvata, allegala su WhatsApp');
+              toast(whatsappWindow
+                ? 'Il dispositivo non ha accettato immagine e testo insieme: immagine salvata, allegala su WhatsApp'
+                : 'Popup WhatsApp bloccato: immagine salvata, abilita i popup e riprova.');
             }
           }
           break;
@@ -4758,7 +4766,8 @@ document.addEventListener('click', async e => {
       if (postBlob) await saveBlob(postBlob, 'santalbino-evento.jpg');
       const whatsappWindow = window.open(waUrl, '_blank');
       if (whatsappWindow) whatsappWindow.opener = null;
-      if (postBlob) toast('Immagine salvata: allegala al messaggio WhatsApp già pronto');
+      if (!whatsappWindow) toast('Popup WhatsApp bloccato: abilita i popup e riprova.');
+      else if (postBlob) toast('Immagine salvata: allegala al messaggio WhatsApp già pronto');
       break;
     }
     case 'copyig': {
