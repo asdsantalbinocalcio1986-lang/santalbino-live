@@ -2,9 +2,9 @@ name: Validate and deploy Sant'Albino Live
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/social-publisher-hardening-2026-11-25, feat/social-editorial-worker-final-2026-11-25]
   pull_request:
-    branches: [main, integration/social-postmatch-2026-11-25]
+    branches: [main, integration/social-postmatch-2026-11-25, fix/social-publisher-hardening-2026-11-25]
   workflow_dispatch:
 
 permissions:
@@ -31,10 +31,24 @@ jobs:
         run: node scripts/validate-project.mjs
       - name: Verify social copy editor guards
         run: node tests/social-copy/ui-guards.mjs
+      - name: Setup Deno for editorial worker tests
+        if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test editorial worker with mocked Meta transport
+        if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
+        run: deno test supabase/functions/santalive-editorial-worker/index_test.ts
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test social publisher with mocked Meta transport
+        run: deno test --allow-env supabase/functions/santalive-social-publish/index_test.ts
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/fix/social-publisher-hardening-2026-11-25'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -58,6 +72,14 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/setup.sql
       - name: Apply post-match SQL proposal
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/postmatch_editorial_revisions.sql
+      - name: Apply social publication schema and claim hardening
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261123160000_santalbino_social_publications.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125120000_santalbino_social_publisher_claims.sql
+      - name: Verify social publisher claims, permissions and uncertainty states
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/social-publisher/claims.sql
+          DB_URL="$DATABASE_URL" node tests/social-publisher/claim-concurrency.mjs
       - name: Verify revision lifecycle, authorization and immutability
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/assertions.sql
       - name: Verify editorial approval and sharing UI guards
@@ -65,7 +87,7 @@ jobs:
 
   postmatch-local-supabase-tests:
     name: Post-match integration tests (isolated local Supabase)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/fix/social-publisher-hardening-2026-11-25'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
