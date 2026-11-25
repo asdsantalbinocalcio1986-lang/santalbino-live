@@ -53,3 +53,10 @@ These facts must be rechecked against the exact branch/commit before implementat
 - No code implementation, schema migration, database write, production-data mutation, merge, deploy, real social publication, or notification is authorized by this status document.
 - Existing general permission for technical corrective work does not override the current post-match gate: complete the audit and approve the implementation specification first.
 - Tests must use a genuinely isolated test setup or a controlled demonstration. The `?test=1` parameter alone is not proof of isolation.
+
+
+## Additional fixed product requirements — 2026-11-25
+
+- On match creation, automatically generate and persist a match-specific hashtag (example `#SantAlbinoRadicofani`), reuse it in relevant social copy and avoid duplicates.
+- Persist the club's own crest/logo as a club-level asset after one upload/selection. It must survive reloads and new matches and render on the correct side according to whether the club is home or away, independently of opponent identity.
+- These are requirements for audit/specification first. They do not authorize production code, database, storage, merge or deploy changes.
