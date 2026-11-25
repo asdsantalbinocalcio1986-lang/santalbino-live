@@ -353,6 +353,8 @@ begin
   insert into public.santalbino_editorial_deliveries
     (post_id, platform, status, attempt_count, last_attempt_at)
   values (v_mixed_id, 'facebook', 'failed_retryable', 5, now() - interval '2 hours');
+  insert into public.santalbino_editorial_deliveries (post_id, platform, status)
+  values (v_mixed_id, 'instagram', 'pending');
   v_claims := public.claim_santalbino_editorial_queue(5, true);
   if jsonb_array_length(v_claims) <> 1
      or jsonb_array_length(v_claims -> 0 -> 'deliveries') <> 1
