@@ -143,8 +143,29 @@ begin
     return jsonb_build_object('result', 'reconciliation_required', 'row', to_jsonb(v_row));
   end if;
 
-  if v_row.facebook_status in ('unknown', 'processing')
-     or v_row.instagram_status in ('unknown', 'processing')
+  -- Legacy or malformed in-flight rows may have lost their fencing token.
+  -- A processing state without a live token is ambiguous and must be persisted
+  -- as unknown, not merely returned as a transient reconciliation response.
+  if v_row.facebook_status = 'processing' or v_row.instagram_status = 'processing' then
+    update public.santalbino_social_publications
+    set facebook_status = case when facebook_status = 'processing' then 'unknown' else facebook_status end,
+        instagram_status = case when instagram_status = 'processing' then 'unknown' else instagram_status end,
+        overall_status = 'reconciliation_required',
+        facebook_error = case when facebook_status = 'processing'
+          then coalesce(facebook_error || ' · ', '') || 'Claim senza token valido: verificare su Meta prima di riprovare.'
+          else facebook_error end,
+        instagram_error = case when instagram_status = 'processing'
+          then coalesce(instagram_error || ' · ', '') || 'Claim senza token valido: verificare su Meta prima di riprovare.'
+          else instagram_error end,
+        claim_token = null,
+        lease_expires_at = null,
+        updated_at = now()
+    where id = v_row.id
+    returning * into v_row;
+    return jsonb_build_object('result', 'reconciliation_required', 'row', to_jsonb(v_row));
+  end if;
+
+  if v_row.facebook_status = 'unknown' or v_row.instagram_status = 'unknown'
      or v_row.overall_status = 'reconciliation_required' then
     return jsonb_build_object('result', 'reconciliation_required', 'row', to_jsonb(v_row));
   end if;
