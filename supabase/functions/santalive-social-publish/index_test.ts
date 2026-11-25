@@ -1,4 +1,4 @@
-import { classifyMetaFailure, graphPost, MetaRequestError } from "./index.ts";
+import { classifyMetaFailure, graphPost, MetaRequestError, safeError } from "./index.ts";
 
 Deno.test("explicit Meta rejection is retryable", () => {
   const error = new MetaRequestError("Meta HTTP 400: rejected", "failed_retryable");
@@ -66,4 +66,15 @@ Deno.test("Graph POST classifies explicit 4xx rejection as retryable", async () 
       throw new Error("Explicit 4xx rejection should be retryable");
     }
   }
+});
+
+Deno.test("error sanitizer removes access tokens and limits message size", () => {
+  const message = safeError(
+    new Error("Graph failed?access_token=secret-value&other=1"),
+    "secret-value",
+  );
+  if (message.includes("secret-value") || message.includes("access_token=secret-value")) {
+    throw new Error("Sensitive access token leaked through error sanitizer");
+  }
+  if (message.length > 300) throw new Error("Sanitized error exceeds 300 characters");
 });
