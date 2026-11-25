@@ -77,8 +77,14 @@ const legacyBackslashRegex = "lower(p_asset_path) !~ '" + String.fromCharCode(92
 assert.ok(!queueSql.includes(legacyBackslashRegex),
   'The SQL must not reintroduce a backslash-dot regex that psql parses as a meta-command.');
 
-assert.match(source, /const latestSnapshotMatches = !!latest && JSON\.stringify\(latest\.snapshot\) === JSON\.stringify\(matchResultEditor\.snapshot\)/,
-  'An archived MATCH RESULT graphic must be reused only when its saved snapshot still matches the current chronology and scorers.');
+assert.match(source, /function matchResultSnapshotKey\(snapshot\)[\s\S]*?const \{ rev, \.\.\.content \} = snapshot[\s\S]*?JSON\.stringify\(content\)/,
+  'MATCH RESULT freshness must compare the match content, not the unrelated state revision number.');
+assert.match(source, /events: \(Array\.isArray\(S\.events\) \? S\.events : \[\]\)\.map\(e => \(\{[\s\S]*?player: String\(e\.player \|\| ''\)/,
+  'The immutable post-match snapshot must include scorer names so changing a goal scorer invalidates old artwork.');
+assert.match(source, /const latestSnapshotMatches = !!latest && matchResultSnapshotKey\(latest\.snapshot\) === matchResultSnapshotKey\(matchResultEditor\.snapshot\)/,
+  'An archived MATCH RESULT graphic may be reused only when its saved scorers and chronology still match.');
+assert.match(source, /DATI SUPERATI[\s\S]*?matchResultSnapshotMatchesCurrent\(approved\.snapshot\)/,
+  'A superseded post-match graphic must be labelled stale and blocked from sharing.');
 assert.match(source, /La cronaca o i marcatori sono cambiati dopo l’ultima revisione/,
   'When a scorer or chronology changes, MATCH RESULT must show the freshly generated graphic and require a new revision instead of showing stale artwork.');
 
