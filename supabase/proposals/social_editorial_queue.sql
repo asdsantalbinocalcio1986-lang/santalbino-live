@@ -1302,7 +1302,7 @@ declare
   v_new_status text;
   v_count integer;
 begin
-  if p_status not in ('published', 'failed_retryable', 'unknown')
+  if p_status not in ('published', 'failed_retryable', 'failed', 'unknown')
      or p_platform not in ('facebook', 'instagram')
      or (p_status = 'published' and (p_external_post_id is null or length(p_external_post_id) > 300)) then
     raise exception 'invalid delivery completion' using errcode = '22023';
@@ -1961,7 +1961,7 @@ declare
   v_new_status text;
   v_count integer;
 begin
-  if p_status not in ('published', 'failed_retryable', 'unknown')
+  if p_status not in ('published', 'failed_retryable', 'failed', 'unknown')
      or p_platform not in ('facebook', 'instagram')
      or (p_status = 'published' and (p_external_post_id is null or length(p_external_post_id) > 300)) then
     raise exception 'invalid delivery completion' using errcode = '22023';
@@ -2444,7 +2444,7 @@ declare
   v_new_status text;
   v_count integer;
 begin
-  if p_status not in ('published', 'failed_retryable', 'unknown')
+  if p_status not in ('published', 'failed_retryable', 'failed', 'unknown')
      or p_platform not in ('facebook', 'instagram')
      or (p_status = 'published' and (p_external_post_id is null or length(p_external_post_id) > 300)) then
     raise exception 'invalid delivery completion' using errcode = '22023';
