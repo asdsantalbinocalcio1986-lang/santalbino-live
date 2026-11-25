@@ -128,3 +128,34 @@ Next gates: (1) complete the social sharing manual smoke test in a controlled de
 ## Social hashtag edge-case correction — 2026-11-25
 
 On PR #107, the previous deduplication removed only a hashtag that occupied an entire line. It could still append a duplicate when the edited caption contained the same hashtag inline. The sharing composition now escapes the configured hashtag and removes matching hashtag tokens at whitespace/punctuation boundaries, then normalizes whitespace before appending the hashtag once. Guard assertions were updated. A small isolated JavaScript exercise covered standalone, inline, punctuation-adjacent and repeated occurrences. The latest HEAD is `bb188086faa0c0328d6f73293c160a7e508eb9e6`; CI run #606 completed successfully: application validation and social-copy guard tests passed, and Pages deployment was skipped intentionally. PR #107 remains Draft. No share dialog was opened and no external service was contacted.
+
+
+## Gemini review reconciliation and second corrective pass — 2026-11-25
+
+Gemini returned an independent static review of PR #106 and #107. Gemini explicitly stated that it did not execute code, test suites or network calls. Findings were checked against the actual branch sources before changes.
+
+### PR #106 — post-match editorial
+- Ambiguous RPC outcome: after an uploaded graphic and an RPC error/timeout, the client now queries `santalbino_postmatch_editions` by `graphic_path` before attempting Storage cleanup. If the database lookup itself fails, the uploaded object is retained and the operator is told that the save outcome is uncertain; no potentially destructive cleanup is attempted.
+- Refresh failure after a successful save/approval is now tracked separately from a persistence error, so a history refresh warning does not unnecessarily disable future saves.
+- Generated preview Object URLs are tracked and revoked on dialog close, when switching to a saved revision, and on relevant error/exit paths.
+- Save control is restored after the attempt.
+- Guard tests extended.
+- Latest HEAD: `10424965e916256a274b5f49f97c3d9cb65c69b0`.
+- **CI run #611 succeeded**: app validation, ephemeral PostgreSQL SQL integration, isolated local Supabase integration and Playwright browser E2E passed; Pages deploy skipped.
+- Remaining limitation: the ambiguous RPC/cleanup branch is guarded statically but does not yet have a dedicated behavioral fault-injection test. Persistent isolated Supabase project is still not provisioned.
+
+### PR #107 — social copy and sharing
+- Configured hashtag is normalized to a leading `#`; matching removes both prefixed and unprefixed forms, including inline occurrences, before the normalized tag is appended once.
+- Facebook clipboard write is initiated synchronously before popup opening but is not awaited until after `window.open`; this preserves the clipboard request's original focus while retaining the user activation needed for the popup. The returned copy result is checked so the UI does not claim success when fallback copying fails.
+- WhatsApp event fallback paths now show a popup-blocked message.
+- Approved post-match WhatsApp sharing was aligned to the safe popup-detection pattern (no `noopener` feature string; immediately set `opener = null`; notify if blocked).
+- Guard tests extended.
+- Latest HEAD: `2802dd6e51a091e0e4fc2d690b93ab0ccf2b83c3`.
+- **CI run #616 succeeded**: application validation and social-copy guard tests passed; Pages deploy skipped.
+- Gemini's specific claim that clipboard rejection would create an unhandled promise rejection was not accurate: the existing `copyText()` helper already catches clipboard errors and attempts an `execCommand('copy')` fallback. The ordering and truthful-result handling were improved anyway.
+- Remaining limitation: social guard tests are static source checks; manual browser smoke testing of popup, clipboard, Facebook paste and WhatsApp handoff is still pending, without sending to recipients.
+
+### Current release gate
+- PR #106 and #107 remain open Drafts and unmerged.
+- No merge, main-branch change, GitHub Pages deployment, production DB/Storage mutation, Meta action, publisher invocation or external social post occurred.
+- No user action is required at this stage. Manual social smoke testing can be done later in a controlled demo session; do not use a real recipient or press final send.
