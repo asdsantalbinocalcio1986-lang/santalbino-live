@@ -444,10 +444,6 @@ begin
   if p_limit is null or p_limit < 1 or p_limit > 20 then
     raise exception 'invalid queue claim limit' using errcode = '22023';
   end if;
-  if not p_dispatch_enabled then
-    return v_claims;
-  end if;
-
   -- Expire only posts that have not entered an ambiguous/in-flight remote operation.
   -- MATCH DAY/convocati/formation expire at kickoff; post-match expires 72h after FT.
   update public.santalbino_editorial_posts
@@ -461,6 +457,10 @@ begin
         where d.post_id = santalbino_editorial_posts.id
           and d.status in ('processing', 'unknown')
      );
+
+  if not p_dispatch_enabled then
+    return v_claims;
+  end if;
 
   -- A stale worker may have reached Meta before crashing. Expiry therefore
   -- converts in-flight deliveries to unknown; it never creates an automatic retry.
