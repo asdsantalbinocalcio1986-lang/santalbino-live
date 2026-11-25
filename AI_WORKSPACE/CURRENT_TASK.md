@@ -80,3 +80,8 @@ Remaining audit work: inspect the deployed SQL functions/policies and the comple
 ## Publisher contract addendum — 2026-11-25
 
 Read-only verification of the deployed Edge Function and database policies is recorded in `AI_WORKSPACE/PUBLISHER_LIVE_CONTRACT_AUDIT_2026-11-25.md`. The deployed v2 source matches main byte-for-byte. Critical additional blockers: non-atomic processing claim (PUB-01), ambiguous Meta outcomes marked failed (PUB-02), and no exactly-once guarantee despite UNIQUE event_id (PUB-03). The status action itself calls Graph API and was not invoked. Existing social log RLS, media bucket policies and 8 MiB limit were inspected. No code/schema/data/storage/cron/secrets/social accounts were changed. Full v3.1 audit remains in progress.
+
+
+## SQL/RLS/synchronization review — 2026-11-25
+
+Completed read-only review of public SQL functions, ACLs, RLS, grants, cron and frontend synchronization. Key verified points: save RPCs retain optimistic concurrency via expected revision and SQLSTATE 40001; functions are SECURITY INVOKER and check admin. No custom triggers on public tables. Test mode uses separate state table/RPC and localStorage keys, but shares the same Supabase project and media bucket; cron updates both live and test state rows. State JSON validation has no schema version/whitelist/size cap. Added documents: `SQL_RLS_AND_SYNC_AUDIT_2026-11-25.md` and `IMPLEMENTATION_BLUEPRINT_CLUB_SOCIAL_2026-11-25.md`. No live changes. Continue with read-only audit of MVP vote pathways and verify all remaining match lifecycle/reset/create flows; then wait for Claude/Gemini independent review before implementation.
