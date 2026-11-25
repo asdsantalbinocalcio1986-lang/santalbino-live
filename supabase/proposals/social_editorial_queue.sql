@@ -76,6 +76,26 @@ create index if not exists santalbino_editorial_deliveries_claim_idx
 alter table public.santalbino_editorial_posts enable row level security;
 alter table public.santalbino_editorial_deliveries enable row level security;
 
+-- Editorial originals remain private until the worker creates a short-lived Meta URL.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'santalbino-editorial',
+  'santalbino-editorial',
+  false,
+  8388608,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = false,
+  file_size_limit = 8388608,
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
+
+drop policy if exists "SANTA Live admins can manage editorial assets" on storage.objects;
+create policy "SANTA Live admins can manage editorial assets"
+  on storage.objects for all to authenticated
+  using (bucket_id = 'santalbino-editorial' and public.is_santalbino_admin())
+  with check (bucket_id = 'santalbino-editorial' and public.is_santalbino_admin());
+
 revoke all on public.santalbino_editorial_posts from anon, authenticated;
 revoke all on public.santalbino_editorial_deliveries from anon, authenticated;
 grant select, insert, update on public.santalbino_editorial_posts to authenticated;
