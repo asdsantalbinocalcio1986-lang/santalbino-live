@@ -81,3 +81,12 @@ These facts must be rechecked against the exact branch/commit before implementat
 - A dedicated editorial social queue/scheduler is not present in the current public table inventory. The current system needs publisher hardening (atomic claim, ambiguous-outcome handling, per-platform retry) before broadening automatic posting.
 - Full findings, proposed workflow, release phases and acceptance tests: `AI_WORKSPACE/SOCIAL_AUTOMATION_AUDIT_2026-11-25.md`.
 - No production code, database, storage, cron, secrets, social accounts, merges or deployments were changed.
+
+
+## Integrazione PR e test publisher mock — 2026-11-25
+
+- PR #106 e #107 sono entrambe open/Draft e risultano mergeable al controllo; condividono modifiche a `regia.html` e `.github/workflows/pages.yml`. Nessuna merge effettuata.
+- Le descrizioni PR riportano CI #553 per #106 (PostgreSQL effimero, Supabase locale, browser E2E) e CI #563 per #107 (validazione e UI guard). Per #107 resta indicata una prova manuale browser dimostrativa.
+- Preparato `AI_WORKSPACE/PR_INTEGRATION_AND_META_MOCK_TEST_PLAN_2026-11-25.md`: strategia branch combinato, gate di stop, test MOCK-01..MOCK-18 e incarico Claude non ancora inviato.
+- La strategia non crea branch né modifica codice: merge a tre vie controllato solo dopo mappa conflitti e approvazione. Il publisher va testato con adapter Graph mock e blocco esplicito di ogni traffico esterno.
+- Nessun codice, workflow, database, storage, cron, segreto, account social, merge o deploy è stato modificato.
