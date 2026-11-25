@@ -27,6 +27,8 @@ assert.match(source, /data-a="sharefb">Condividi su Facebook/, 'Event sharing mu
 assert.match(source, /'sharewa','sharefb'/, 'External event sharing must be blocked in test mode.');
 assert.match(source, /case 'sharefb':[\s\S]{0,500}facebook\.com\/sharer\/sharer\.php/, 'Event Facebook sharing must open the share dialog.');
 assert.match(source, /S\.socialDrafts\s*=\s*\{\s*matchDay:\s*'',\s*convocati:\s*''\s*\}/, 'Starting a new match must clear previous social drafts.');
+assert.match(source, /rawHashtag = String\(S\.match\.hashtag \|\| ''\)\.trim\(\)/, 'Configured hashtags must be normalized before sharing.');
+assert.match(source, /rawHashtag \? \(rawHashtag\.startsWith\('#'\) \? rawHashtag : '#' \+ rawHashtag\)/, 'Sharing must add a missing hashtag prefix.');
 assert.match(source, /escapedHashtag = hashtag\.replace\(/, 'Sharing must escape the configured hashtag before building a safe matcher.');
 assert.match(source, /new RegExp\(/, 'Sharing must use a token-aware matcher so inline hashtag occurrences are removed.');
 assert.match(source, /textWithoutHashtag[\s\S]{0,500}replace\(\/\\n\{3,\}\//, 'Hashtag removal must normalize excess blank lines before appending the hashtag once.');
@@ -40,3 +42,8 @@ assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'
 
 
 console.log('Social copy editor guard tests passed');
+
+
+assert.match(source, /const copyPromise = copyText\(shareText\);\s*const facebookWindow = window\.open\(/, 'Social Facebook sharing must initiate clipboard writing before popup focus changes, without awaiting first.');
+assert.match(source, /const copyPromise = copyText\(so\.text\);\s*const popup = window\.open\(/, 'Event Facebook sharing must initiate clipboard writing before popup focus changes, without awaiting first.');
+assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'\);\s*if \(whatsappWindow\) whatsappWindow\.opener = null;\s*toast\(whatsappWindow \?/, 'WhatsApp event fallback must report a blocked popup.');
