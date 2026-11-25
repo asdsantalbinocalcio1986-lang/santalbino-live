@@ -33,12 +33,12 @@ export function classifyMetaFailure(error: unknown): "unknown" | "failed_retryab
   return error instanceof MetaRequestError ? error.outcome : "unknown";
 }
 
-async function graphGet(path: string, params: Record<string, string>) {
+export async function graphGet(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
   const url = new URL(`${graphBase}/${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   let response: Response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    response = await fetcher(url, { signal: AbortSignal.timeout(15000) });
   } catch {
     throw new MetaRequestError("Lettura Meta temporaneamente non disponibile", "failed_retryable");
   }
@@ -49,10 +49,10 @@ async function graphGet(path: string, params: Record<string, string>) {
   return data;
 }
 
-async function graphPost(path: string, params: Record<string, string>) {
+export async function graphPost(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
   let response: Response;
   try {
-    response = await fetch(`${graphBase}/${path}`, {
+    response = await fetcher(`${graphBase}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(params),
