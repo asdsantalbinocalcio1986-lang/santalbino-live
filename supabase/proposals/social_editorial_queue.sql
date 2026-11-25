@@ -491,6 +491,7 @@ begin
          status = 'pending'
          or (
            status = 'failed_retryable'
+           and attempt_count < 5
            and last_attempt_at <= now()
              - (interval '1 minute' * power(2, least(attempt_count, 6)))
          )
