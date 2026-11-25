@@ -21,6 +21,7 @@ create table if not exists public.santalbino_editorial_posts (
       and (not (platforms ? 'facebook') or jsonb_typeof(platforms -> 'facebook') = 'boolean')
       and (not (platforms ? 'instagram') or jsonb_typeof(platforms -> 'instagram') = 'boolean')
       and (coalesce(platforms -> 'facebook' = 'true'::jsonb, false) or coalesce(platforms -> 'instagram' = 'true'::jsonb, false))
+      and (platforms - 'facebook' - 'instagram') = '{}'::jsonb
     ),
   snapshot jsonb not null
     check (jsonb_typeof(snapshot) = 'object' and pg_catalog.pg_column_size(snapshot) <= 65536),
@@ -55,7 +56,7 @@ create table if not exists public.santalbino_editorial_deliveries (
   post_id uuid not null references public.santalbino_editorial_posts(id) on delete restrict,
   platform text not null check (platform in ('facebook', 'instagram')),
   status text not null default 'pending'
-    check (status in ('pending', 'processing', 'published', 'failed_retryable', 'unknown')),
+    check (status in ('pending', 'processing', 'published', 'failed_retryable', 'failed', 'unknown')),
   attempt_count integer not null default 0 check (attempt_count >= 0),
   claim_token uuid,
   lease_expires_at timestamptz,
@@ -98,7 +99,7 @@ create policy "SANTA Live admins can manage editorial assets"
 
 revoke all on public.santalbino_editorial_posts from anon, authenticated;
 revoke all on public.santalbino_editorial_deliveries from anon, authenticated;
-grant select, insert, update on public.santalbino_editorial_posts to authenticated;
+grant select on public.santalbino_editorial_posts to authenticated;
 grant select on public.santalbino_editorial_deliveries to authenticated;
 grant all on public.santalbino_editorial_posts to service_role;
 grant all on public.santalbino_editorial_deliveries to service_role;
@@ -109,21 +110,8 @@ create policy "SANTA Live admins can read editorial posts"
   using (public.is_santalbino_admin());
 
 drop policy if exists "SANTA Live admins can create editorial drafts" on public.santalbino_editorial_posts;
-create policy "SANTA Live admins can create editorial drafts"
-  on public.santalbino_editorial_posts for insert to authenticated
-  with check (
-    public.is_santalbino_admin()
-    and created_by = (select auth.uid())
-    and status = 'draft'
-    and approved_by is null
-    and approved_at is null
-  );
 
 drop policy if exists "SANTA Live admins can update editorial drafts" on public.santalbino_editorial_posts;
-create policy "SANTA Live admins can update editorial drafts"
-  on public.santalbino_editorial_posts for update to authenticated
-  using (public.is_santalbino_admin() and status in ('draft', 'approved', 'scheduled'))
-  with check (public.is_santalbino_admin() and status in ('draft', 'approved', 'scheduled', 'cancelled', 'superseded'));
 
 drop policy if exists "SANTA Live admins can read editorial deliveries" on public.santalbino_editorial_deliveries;
 create policy "SANTA Live admins can read editorial deliveries"
@@ -141,7 +129,7 @@ begin
     return new;
   end if;
 
-  if old.status not in ('draft', 'approved', 'scheduled') then
+  if old.status not in ('draft', 'approved', 'scheduled', 'failed', 'partial', 'unknown') then
     raise exception 'editorial post is immutable in status %', old.status using errcode = '55000';
   end if;
 
@@ -183,16 +171,23 @@ begin
   if old.status = 'draft' and new.status not in ('draft', 'approved', 'scheduled', 'cancelled', 'superseded') then
     raise exception 'invalid draft state transition' using errcode = '55000';
   end if;
-  if old.status = 'approved' and new.status not in ('approved', 'scheduled', 'cancelled') then
+  if old.status = 'approved' and new.status not in ('approved', 'scheduled', 'cancelled', 'superseded') then
     raise exception 'invalid approved state transition' using errcode = '55000';
   end if;
-  if old.status = 'scheduled' and new.status not in ('scheduled', 'cancelled') then
+  if old.status = 'scheduled' and new.status not in ('scheduled', 'cancelled', 'superseded') then
     raise exception 'invalid scheduled state transition' using errcode = '55000';
+  end if;
+
+  if old.status in ('failed', 'partial') and new.status not in (old.status, 'cancelled') then
+    raise exception 'invalid terminal editorial state transition' using errcode = '55000';
+  end if;
+  if old.status = 'unknown' and new.status not in ('unknown', 'failed', 'partial', 'published', 'cancelled') then
+    raise exception 'invalid reconciliation state transition' using errcode = '55000';
   end if;
 
   return new;
 end;
-$$;
+$;
 
 drop trigger if exists santalbino_editorial_post_guard on public.santalbino_editorial_posts;
 create trigger santalbino_editorial_post_guard
@@ -211,9 +206,9 @@ create or replace function public.save_santalbino_editorial_draft(
 )
 returns public.santalbino_editorial_posts
 language plpgsql
-security invoker
+security definer
 set search_path = ''
-as $$
+as $
 declare
   v_revision integer;
   v_row public.santalbino_editorial_posts%rowtype;
@@ -240,7 +235,13 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_logical_key, 0));
   update public.santalbino_editorial_posts
      set status = 'superseded', updated_at = now()
-   where logical_key = p_logical_key and status = 'draft';
+   where logical_key = p_logical_key
+     and status in ('draft', 'approved', 'scheduled')
+     and not exists (
+       select 1 from public.santalbino_editorial_deliveries d
+        where d.post_id = santalbino_editorial_posts.id
+          and d.status in ('processing', 'published', 'unknown')
+     );
 
   select coalesce(max(revision), 0) + 1 into v_revision
     from public.santalbino_editorial_posts
@@ -265,9 +266,9 @@ create or replace function public.approve_santalbino_editorial_post(
 )
 returns public.santalbino_editorial_posts
 language plpgsql
-security invoker
+security definer
 set search_path = ''
-as $$
+as $
 declare
   v_row public.santalbino_editorial_posts%rowtype;
   v_latest integer;
@@ -301,9 +302,9 @@ $$;
 create or replace function public.cancel_santalbino_editorial_post(p_post_id uuid)
 returns boolean
 language plpgsql
-security invoker
+security definer
 set search_path = ''
-as $$
+as $
 declare
   v_count integer;
 begin
@@ -312,11 +313,40 @@ begin
   end if;
   update public.santalbino_editorial_posts
      set status = 'cancelled', updated_at = now()
-   where id = p_post_id and status in ('draft', 'approved', 'scheduled');
+   where id = p_post_id
+     and status in ('draft', 'approved', 'scheduled', 'failed', 'partial')
+     and not exists (
+       select 1 from public.santalbino_editorial_deliveries d
+        where d.post_id = santalbino_editorial_posts.id
+          and d.status in ('processing', 'unknown')
+     );
   get diagnostics v_count = row_count;
   return v_count = 1;
 end;
 $$;
+
+create table if not exists public.santalbino_editorial_delivery_resolutions (
+  id uuid primary key default gen_random_uuid(),
+  delivery_id uuid not null references public.santalbino_editorial_deliveries(id) on delete restrict,
+  post_id uuid not null references public.santalbino_editorial_posts(id) on delete restrict,
+  platform text not null check (platform in ('facebook', 'instagram')),
+  resolution text not null check (resolution in ('published', 'retry')),
+  external_post_id text,
+  note text not null check (char_length(btrim(note)) between 8 and 500),
+  resolved_by uuid not null references auth.users(id),
+  created_at timestamptz not null default now(),
+  check ((resolution = 'published' and external_post_id is not null and length(external_post_id) between 1 and 300)
+      or (resolution = 'retry' and external_post_id is null))
+);
+
+alter table public.santalbino_editorial_delivery_resolutions enable row level security;
+revoke all on public.santalbino_editorial_delivery_resolutions from anon, authenticated;
+grant select on public.santalbino_editorial_delivery_resolutions to authenticated;
+grant all on public.santalbino_editorial_delivery_resolutions to service_role;
+drop policy if exists "SANTA Live admins can read editorial delivery resolutions" on public.santalbino_editorial_delivery_resolutions;
+create policy "SANTA Live admins can read editorial delivery resolutions"
+  on public.santalbino_editorial_delivery_resolutions for select to authenticated
+  using (public.is_santalbino_admin());
 
 create or replace function public.claim_santalbino_editorial_queue(
   p_limit integer default 10,
@@ -375,6 +405,7 @@ begin
                 due.status = 'pending'
                 or (
                   due.status = 'failed_retryable'
+                  and due.attempt_count < 5
                   and due.last_attempt_at <= now()
                     - (interval '1 minute' * power(2, least(due.attempt_count, 6)))
                 )
@@ -487,6 +518,7 @@ declare
   v_all_published boolean;
   v_new_status text;
   v_count integer;
+  v_effective_status text;
 begin
   if p_status not in ('published', 'failed_retryable', 'unknown')
      or p_platform not in ('facebook', 'instagram')
@@ -495,7 +527,10 @@ begin
   end if;
 
   update public.santalbino_editorial_deliveries
-     set status = p_status,
+     set status = case
+           when p_status = 'failed_retryable' and attempt_count >= 5 then 'failed'
+           else p_status
+         end,
          external_post_id = case when p_status = 'published' then p_external_post_id else external_post_id end,
          last_error_safe = left(p_error_safe, 300),
          published_at = case when p_status = 'published' then now() else null end,
@@ -517,7 +552,7 @@ begin
   select
     coalesce(bool_or(status = 'processing'), false),
     coalesce(bool_or(status = 'unknown'), false),
-    coalesce(bool_or(status = 'failed_retryable'), false),
+    coalesce(bool_or(status in ('failed_retryable', 'failed')), false),
     coalesce(bool_and(status = 'published'), false)
   into v_processing, v_unknown, v_failed, v_all_published
   from public.santalbino_editorial_deliveries
@@ -551,6 +586,82 @@ revoke all on function public.approve_santalbino_editorial_post(uuid,integer,tim
 grant execute on function public.approve_santalbino_editorial_post(uuid,integer,timestamptz) to authenticated;
 revoke all on function public.cancel_santalbino_editorial_post(uuid) from public, anon;
 grant execute on function public.cancel_santalbino_editorial_post(uuid) to authenticated;
+
+create or replace function public.resolve_santalbino_editorial_delivery(
+  p_post_id uuid,
+  p_platform text,
+  p_resolution text,
+  p_external_post_id text default null,
+  p_note text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_post public.santalbino_editorial_posts%rowtype;
+  v_delivery public.santalbino_editorial_deliveries%rowtype;
+  v_new_status text;
+begin
+  if auth.uid() is null or not public.is_santalbino_admin() then
+    raise exception 'SANTA Live admin required' using errcode = '42501';
+  end if;
+  if p_platform not in ('facebook', 'instagram')
+     or p_resolution not in ('published', 'retry')
+     or p_note is null or char_length(btrim(p_note)) not between 8 and 500
+     or (p_resolution = 'published' and (p_external_post_id is null or length(p_external_post_id) not between 1 and 300))
+     or (p_resolution = 'retry' and p_external_post_id is not null) then
+    raise exception 'invalid editorial reconciliation input' using errcode = '22023';
+  end if;
+
+  select * into v_post from public.santalbino_editorial_posts
+   where id = p_post_id for update;
+  if not found or v_post.status <> 'unknown' then
+    raise exception 'editorial post is not awaiting reconciliation' using errcode = '40001';
+  end if;
+  select * into v_delivery from public.santalbino_editorial_deliveries
+   where post_id = p_post_id and platform = p_platform for update;
+  if not found or v_delivery.status <> 'unknown' then
+    raise exception 'editorial delivery is not awaiting reconciliation' using errcode = '40001';
+  end if;
+
+  insert into public.santalbino_editorial_delivery_resolutions
+    (delivery_id, post_id, platform, resolution, external_post_id, note, resolved_by)
+  values
+    (v_delivery.id, p_post_id, p_platform, p_resolution, p_external_post_id, btrim(p_note), auth.uid());
+
+  update public.santalbino_editorial_deliveries
+     set status = case when p_resolution = 'published' then 'published' else 'pending' end,
+         external_post_id = case when p_resolution = 'published' then p_external_post_id else null end,
+         external_container_id = case when p_resolution = 'retry' then null else external_container_id end,
+         attempt_count = case when p_resolution = 'retry' then 0 else attempt_count end,
+         published_at = case when p_resolution = 'published' then now() else null end,
+         last_error_safe = 'Riconciliazione amministrativa: ' || btrim(p_note),
+         claim_token = null, lease_expires_at = null, updated_at = now()
+   where id = v_delivery.id;
+
+  select case
+    when bool_or(status = 'unknown') then 'unknown'
+    when bool_and(status = 'published') then 'published'
+    when bool_or(status = 'published') then 'partial'
+    else 'failed'
+  end into v_new_status
+  from public.santalbino_editorial_deliveries where post_id = p_post_id;
+
+  update public.santalbino_editorial_posts
+     set status = v_new_status,
+         published_at = case when v_new_status = 'published' then now() else null end,
+         claim_token = null, lease_expires_at = null,
+         last_error_safe = 'Riconciliazione amministrativa registrata.', updated_at = now()
+   where id = p_post_id;
+
+  return v_new_status;
+end;
+$;
+
+revoke all on function public.resolve_santalbino_editorial_delivery(uuid,text,text,text,text) from public, anon;
+grant execute on function public.resolve_santalbino_editorial_delivery(uuid,text,text,text,text) to authenticated;
 
 revoke all on function public.claim_santalbino_editorial_queue(integer,boolean) from public, anon, authenticated;
 grant execute on function public.claim_santalbino_editorial_queue(integer,boolean) to service_role;
