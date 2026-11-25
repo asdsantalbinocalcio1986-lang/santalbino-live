@@ -13,5 +13,12 @@ assert.match(source, /editedCaption !== String\(edition\.caption \|\| ''\)\.trim
   'Approval must reject a caption that differs from the saved revision');
 assert.match(source, /if \(TEST_MODE\) \{ toast\('Condivisione esterna disattivata in modalità prova\.'\); break; \}/,
   'Test mode must not allow external sharing');
+assert.match(source, /matchResultEditor\.snapshot \|\| capturePostmatchSnapshot\(\)/,
+  'A missing editor snapshot must fall back to the reduced match snapshot, never the full application state.');
+assert.doesNotMatch(source, /matchResultEditor\.snapshot \|\| JSON\.parse\(JSON\.stringify\(S\)\)/,
+  'Post-match revisions must not persist the entire live application state as a snapshot.');
+assert.match(source, /Snapshot partita non valido/,
+  'The post-match save flow must reject malformed snapshots before uploading or persisting them.');
+
 
 console.log('Post-match editorial UI guard tests passed');
