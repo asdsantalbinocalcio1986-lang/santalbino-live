@@ -47,6 +47,8 @@ assert.match(source, /editorialDefaultLogicalKey\(t\.value\)/,
   'Changing the editorial content type must update the revision key.');
 assert.match(source, /Per Instagram è necessario un file JPEG/,
   'Instagram uploads must be restricted to JPEG images.');
+assert.match(source, /function resetMatch\(\)[\s\S]*?S\.publication = \{ published: \{ rosters: \{ home: '', away: '' \}, convocati: '' \}, pending: null, publishedAt: '' \}/,
+  'Starting a new match must clear previously published convocati/formations and cancel any pending publication.');
 assert.match(source, /function captureEditorialDraftForm\([\s\S]*?function restoreEditorialDraftForm\(/,
   'Editorial form state must be captured and restored across full UI renders.');
 assert.match(source, /function renderMain\(\)[\s\S]*?captureEditorialDraftForm\(\)[\s\S]*?restoreEditorialDraftForm\(\)/,
