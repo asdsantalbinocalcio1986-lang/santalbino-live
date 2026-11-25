@@ -55,6 +55,15 @@ begin
     null;
   end;
 
+  begin
+    update public.santalbino_editorial_posts
+       set status = 'approved', approved_by = auth.uid(), approved_at = now()
+     where id = v_first.id;
+    raise exception 'Direct update bypassed latest-revision approval guard';
+  exception when sqlstate '40001' then
+    null;
+  end;
+
   select * into v_third from public.save_santalbino_editorial_draft(
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Terza bozza editoriale', 'social-editorial/test/match-day-r3.jpg',
