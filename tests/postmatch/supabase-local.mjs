@@ -137,6 +137,27 @@ async function main() {
     { method: 'DELETE', token: service, key: service, expected: [204] }
   );
 
+  // Exercise the claim RPC through PostgREST as the same service_role used by the Edge Function.
+  const rpcEventId = `publisher-rpc-${randomUUID()}`;
+  const rpcParams = {
+    p_event_id: rpcEventId, p_match_id: 'local-rpc', p_event_type: 'goal',
+    p_caption: 'Claim RPC integration test', p_image_url: 'https://example.test/rpc.jpg',
+    p_platforms: { facebook: true, instagram: false }
+  };
+  const firstRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
+    method: 'POST', token: service, key: service, body: rpcParams
+  });
+  assert.equal(firstRpcClaim.data?.result, 'claimed', 'service_role must acquire the first claim via PostgREST.');
+  const secondRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
+    method: 'POST', token: service, key: service, body: rpcParams
+  });
+  assert.equal(secondRpcClaim.data?.result, 'reconciliation_required',
+    'A second service_role request must be blocked while the first claim is active.');
+  await request(
+    '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(rpcEventId),
+    { method: 'DELETE', token: service, key: service, expected: [204] }
+  );
+
   // One tiny JPEG is enough to exercise the real Storage API and signed downloads.
   const jpeg = new Uint8Array(Buffer.from(
     '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9k=',
