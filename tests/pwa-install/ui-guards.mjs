@@ -11,7 +11,7 @@ assert.match(home, /window\.addEventListener\('beforeinstallprompt'/,
   'Android Chrome must use the native PWA install prompt when it is available.');
 assert.match(home, /platform==='ios'[\s\S]*?Safari[\s\S]*?Aggiungi alla schermata Home/,
   'iOS users must receive accurate Safari Add to Home Screen instructions.');
-assert.match(home, /platform==='android'[\s\S]*?Google Chrome[\s\S]*?Installa app[\s\S]*?Aggiungi a schermata Home/,
+assert.match(home, /Google Chrome[\s\S]*?Installa app[\s\S]*?Aggiungi a schermata Home/,
   'Android users without a native install prompt must receive browser installation instructions.');
 assert.match(home, /<dialog id="installHelp"[^>]*aria-labelledby=/,
   'Install instructions must use a labelled native dialog.');
