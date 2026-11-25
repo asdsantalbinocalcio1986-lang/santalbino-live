@@ -104,7 +104,7 @@ Please independently verify these points and report exact corrections/omissions:
 Current PR heads at the time of this handoff:
 - #106: `a993d5bfcc282acfc849ab45084d570524d6725b`
 - #107: `81cc441328b413aa79217fcf91079c0a28362bf1`
-- #108: `9f1924f5c63039ab390984e5f08121a9553f4c0d`
+- #108: open Draft, six documentation-only files at the time of the check; verify its live head SHA in GitHub because this handoff update itself changes that SHA.
 All are open Drafts; #106/#107 both modify `regia.html`. #108 has six documentation-only changed files.
 
 Please do not treat these observations as settled without checking exact branch content. Do not write to production or modify any branch/PR. Update the report with VERIFIED/UNKNOWN distinctions and line-level evidence.
