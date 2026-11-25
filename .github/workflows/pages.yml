@@ -33,6 +33,8 @@ jobs:
         run: node tests/social-copy/ui-guards.mjs
       - name: Verify editorial queue admin UI guards
         run: node tests/social-queue/ui-guards.mjs
+      - name: Verify Android and iOS PWA install entry points
+        run: node tests/pwa-install/ui-guards.mjs
       - name: Setup Deno for editorial worker tests
         if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
         uses: denoland/setup-deno@v2
