@@ -9,8 +9,10 @@ assert.match(source, /if \(!matchResultSnapshotMatchesCurrent\(approved\.snapsho
   'The share action must independently reject an approved graphic whose scorer or chronology has changed.');
 assert.match(source, /if \(!matchResultSnapshotMatchesCurrent\(edition\.snapshot\)\)/,
   'Approval must independently reject a stale revision after a scorer or chronology edit.');
-assert.match(source, /function matchResultSnapshotKey\(snapshot\)[\s\S]*?const \{ rev, \.\.\.content \} = snapshot/,
-  'Freshness checks must ignore unrelated state revision increments while preserving match content changes.');
+assert.match(source, /function matchResultSnapshotKey\(snapshot\)[\s\S]*?const \{ rev, \.\.\.content \} = snapshot[\s\S]*?Object\.keys\(value\)\.sort\(\)[\s\S]*?JSON\.stringify\(canonical\(content\)\)/,
+  'Freshness checks must canonicalize nested object keys for PostgreSQL JSONB round-trips while ignoring unrelated state revision numbers.');
+assert.match(source, /PostgreSQL JSONB does not preserve JavaScript object-key insertion order/,
+  'Snapshot freshness comparison must account for JSONB key ordering so saved current revisions reopen as current.');
 assert.match(source, /if \(!approved \|\| approved\.status !== 'approved'\)/,
   'The share action must independently reject unapproved revisions');
 assert.match(source, /txt !== String\(approved\.caption \|\| ''\)\.trim\(\)/,
