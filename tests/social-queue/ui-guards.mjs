@@ -17,7 +17,7 @@ assert.match(source, /db\.rpc\('approve_santalbino_editorial_post'/,
   'Approval and scheduling must use the dedicated admin RPC.');
 assert.match(source, /db\.rpc\('cancel_santalbino_editorial_post'/,
   'Cancellation must use the dedicated admin RPC.');
-assert.match(source, /const match = \/\^\\(\\d\{4\}\\)-\\(\\d\{2\}\\)-\\(\\d\{2\}\\)T\\(\\d\{2\}\\):\\(\\d\{2\}\\)\$\//, 'Europe/Rome scheduling must parse the datetime-local value as numeric date/time components.');
+assert.ok(source.includes(String.raw`const match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec`), 'Europe/Rome scheduling must parse the datetime-local value as numeric date/time components.');
 assert.match(source, /new Date\(scheduledAt\)\.getTime\(\) <= Date\.now\(\)/,
   'Scheduled publication must reject past timestamps.');
 assert.match(source, /La pubblicazione automatica resta disattivata/,
