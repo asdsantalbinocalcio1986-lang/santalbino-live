@@ -10,6 +10,7 @@ declare
   v_second public.santalbino_editorial_posts%rowtype;
   v_third public.santalbino_editorial_posts%rowtype;
   v_queue public.santalbino_editorial_posts%rowtype;
+  v_retry public.santalbino_editorial_posts%rowtype;
 begin
   select * into v_first from public.save_santalbino_editorial_draft(
     'match:ci-match:match_day', 'match_day', 'ci-match',
@@ -82,6 +83,14 @@ begin
     '{"score":"2-0","scorers":["Rossi"]}'::jsonb
   );
   select * into v_queue from public.approve_santalbino_editorial_post(v_queue.id, 1, now() - interval '1 minute');
+
+  select * into v_retry from public.save_santalbino_editorial_draft(
+    'match:ci-match:retry_notice', 'club_notice', null,
+    'Avviso con retry controllato', 'social-editorial/test/retry-notice.jpg',
+    repeat('e', 64), '{"facebook":true,"instagram":false}'::jsonb,
+    '{"kind":"retry-test"}'::jsonb
+  );
+  select * into v_retry from public.approve_santalbino_editorial_post(v_retry.id, 1, now() - interval '1 minute');
 end
 $admin_tests$;
 
@@ -94,6 +103,8 @@ declare
   v_post_id uuid;
   v_token uuid;
   v_status text;
+  v_retry_id uuid;
+  v_retry_token uuid;
 begin
   v_claims := public.claim_santalbino_editorial_queue(5, false);
   if jsonb_array_length(v_claims) <> 0 then
@@ -134,6 +145,37 @@ begin
   end if;
   if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
     raise exception 'Unknown editorial post was automatically retried';
+  end if;
+
+  v_claims := public.claim_santalbino_editorial_queue(5, true);
+  if jsonb_array_length(v_claims) <> 1 then
+    raise exception 'Expected the retryable editorial delivery to be claimed once: %', v_claims;
+  end if;
+  v_retry_id := (v_claims -> 0 -> 'post' ->> 'id')::uuid;
+  v_retry_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
+  v_status := public.complete_santalbino_editorial_delivery(
+    v_retry_id, 'facebook', v_retry_token, 'failed_retryable', null, 'Mock explicit rejection'
+  );
+  if v_status <> 'failed' then
+    raise exception 'Explicit rejection should remain retryable in failed state: %', v_status;
+  end if;
+  if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
+    raise exception 'Retryable delivery ignored its exponential backoff';
+  end if;
+
+  update public.santalbino_editorial_deliveries
+     set last_attempt_at = now() - interval '2 hours'
+   where post_id = v_retry_id and platform = 'facebook';
+  v_claims := public.claim_santalbino_editorial_queue(5, true);
+  if jsonb_array_length(v_claims) <> 1 then
+    raise exception 'Retryable delivery did not become eligible after its backoff: %', v_claims;
+  end if;
+  v_retry_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
+  v_status := public.complete_santalbino_editorial_delivery(
+    v_retry_id, 'facebook', v_retry_token, 'unknown', null, 'Stop retry test'
+  );
+  if v_status <> 'unknown' then
+    raise exception 'Final retry test outcome should be held for reconciliation: %', v_status;
   end if;
 end
 $worker_tests$;
