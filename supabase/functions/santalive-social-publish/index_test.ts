@@ -1,4 +1,4 @@
-import { classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
+import { classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
 
 Deno.test("explicit Meta rejection is retryable", () => {
   const error = new MetaRequestError("Meta HTTP 400: rejected", "failed_retryable");
@@ -53,18 +53,60 @@ Deno.test("Graph POST classifies transport failure as unknown", async () => {
   }
 });
 
-Deno.test("Graph POST classifies explicit 4xx rejection as retryable", async () => {
+Deno.test("Graph POST classifies permanent 4xx rejection as non-retryable", async () => {
   const fakeFetch: typeof fetch = async () => new Response(
-    JSON.stringify({ error: { message: "invalid test payload" } }),
+    JSON.stringify({ error: { message: "invalid test payload", code: 100 } }),
     { status: 400, headers: { "Content-Type": "application/json" } }
   );
   try {
     await graphPost("mock/photos", { caption: "test" }, fakeFetch);
     throw new Error("Expected the explicit rejection to throw");
   } catch (error) {
-    if (classifyMetaFailure(error) !== "failed_retryable") {
-      throw new Error("Explicit 4xx rejection should be retryable");
+    if (classifyMetaFailure(error) !== "failed") {
+      throw new Error("Permanent Meta parameter rejection must not be retried");
     }
+  }
+});
+
+Deno.test("Graph POST classifies documented Meta rate-limit codes as retryable", async () => {
+  const fakeFetch: typeof fetch = async () => new Response(
+    JSON.stringify({ error: { message: "rate limit reached", code: 32 } }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+  );
+  try {
+    await graphPost("mock/photos", { caption: "test" }, fakeFetch);
+    throw new Error("Expected the rate-limit rejection to throw");
+  } catch (error) {
+    if (classifyMetaFailure(error) !== "failed_retryable") {
+      throw new Error("Meta rate-limit code 32 must be safely retryable");
+    }
+  }
+});
+
+Deno.test("Graph POST classifies invalid access tokens as permanent failures", async () => {
+  const fakeFetch: typeof fetch = async () => new Response(
+    JSON.stringify({ error: { message: "invalid access token", code: 190 } }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+  );
+  try {
+    await graphPost("mock/photos", { caption: "test" }, fakeFetch);
+    throw new Error("Expected the token rejection to throw");
+  } catch (error) {
+    if (classifyMetaFailure(error) !== "failed") {
+      throw new Error("Invalid access tokens must not consume automatic retry attempts");
+    }
+  }
+});
+
+Deno.test("Meta API response classifier distinguishes read-only and write 5xx outcomes", () => {
+  if (classifyMetaApiError({ code: 2 }, 503, true) !== "unknown") {
+    throw new Error("A Meta write 5xx must remain ambiguous");
+  }
+  if (classifyMetaApiError({ code: 2 }, 503, false) !== "failed_retryable") {
+    throw new Error("A Meta read 5xx must remain safely retryable");
+  }
+  if (classifyMetaApiError({ is_transient: true }, 400, true) !== "failed_retryable") {
+    throw new Error("Meta is_transient errors must be retryable");
   }
 });
 
