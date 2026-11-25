@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+// Keep every historical SQL definition covered by the JPEG parser guard.
+
 const source = readFileSync(new URL('../../regia.html', import.meta.url), 'utf8');
 
 assert.match(source, /\.\.\.\(!TEST_MODE \? \[\['editorial', 'Editoriale'\]\] : \[\]\)/,
