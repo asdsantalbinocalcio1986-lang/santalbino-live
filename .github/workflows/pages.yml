@@ -2,9 +2,9 @@ name: Validate and deploy Sant'Albino Live
 
 on:
   push:
-    branches: [main, fix/social-publisher-hardening-2026-11-25]
+    branches: [main, fix/social-publisher-hardening-2026-11-25, feat/social-editorial-worker-v2-2026-11-25]
   pull_request:
-    branches: [main, integration/social-postmatch-2026-11-25, feat/social-editorial-stack-worker-2026-11-25]
+    branches: [main, integration/social-postmatch-2026-11-25, feat/social-editorial-worker-v2-2026-11-25]
   workflow_dispatch:
 
 permissions:
