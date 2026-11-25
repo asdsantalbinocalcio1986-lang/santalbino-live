@@ -71,6 +71,25 @@ create table if not exists public.santalbino_editorial_deliveries (
   check ((status = 'published' and external_post_id is not null and published_at is not null) or status <> 'published')
 );
 
+-- Keep the proposal safe to re-apply after an earlier draft of this schema.
+alter table public.santalbino_editorial_posts
+  drop constraint if exists santalbino_editorial_posts_platforms_check;
+alter table public.santalbino_editorial_posts
+  add constraint santalbino_editorial_posts_platforms_check check (
+    jsonb_typeof(platforms) = 'object'
+    and (not (platforms ? 'facebook') or jsonb_typeof(platforms -> 'facebook') = 'boolean')
+    and (not (platforms ? 'instagram') or jsonb_typeof(platforms -> 'instagram') = 'boolean')
+    and (coalesce(platforms -> 'facebook' = 'true'::jsonb, false)
+      or coalesce(platforms -> 'instagram' = 'true'::jsonb, false))
+    and (platforms - 'facebook' - 'instagram') = '{}'::jsonb
+  );
+
+alter table public.santalbino_editorial_deliveries
+  drop constraint if exists santalbino_editorial_deliveries_status_check;
+alter table public.santalbino_editorial_deliveries
+  add constraint santalbino_editorial_deliveries_status_check
+  check (status in ('pending', 'processing', 'published', 'failed_retryable', 'failed', 'unknown'));
+
 create index if not exists santalbino_editorial_deliveries_claim_idx
   on public.santalbino_editorial_deliveries (post_id, status, lease_expires_at);
 
