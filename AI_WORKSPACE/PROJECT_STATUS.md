@@ -133,3 +133,13 @@ These facts must be rechecked against the exact branch/commit before implementat
 - Findings documented: SYNC-01 shared project/test isolation; SYNC-02 state JSON has no schema version/whitelist/size validation; SYNC-03 reset preserves positional logo slots; SYNC-04 localStorage recovery is device-specific.
 - Created `AI_WORKSPACE/SQL_RLS_AND_SYNC_AUDIT_2026-11-25.md` and consolidated `AI_WORKSPACE/IMPLEMENTATION_BLUEPRINT_CLUB_SOCIAL_2026-11-25.md`.
 - No schema, rows, policies, functions, cron, Storage, secrets, code, Meta account, merge or deploy changed.
+
+
+## SQL/RLS/sync and MVP lifecycle audit — 2026-11-25
+- Audited SQL functions, ACLs, RLS, table grants, cron, triggers and frontend sync. Save RPCs use optimistic concurrency (expected revision + conditional UPDATE + SQLSTATE 40001); preserve it. Functions are SECURITY INVOKER/admin checked. No custom public-table triggers found.
+- Test mode uses distinct state table/RPC/localStorage keys but same Supabase project and media bucket; it imports sponsor references from live. Cron runs every minute and updates both live and test state rows. This is logical isolation, not a separate environment.
+- State JSON has no schema version/whitelist/size cap. Social log writes via service_role; current cron is page scheduler, not Meta.
+- Audited MVP vote RPC: SECURITY DEFINER, fulltime/12h/roster checks, unique per client-supplied voter UUID. UUID is localStorage-generated, so anti-duplicate only, not robust identity.
+- `resetMatch()` clears match-specific data but retains positional logos, team names, ourSide and hashtag; reinforces club-level logo and auto-hashtag requirements.
+- Added `SQL_RLS_AND_SYNC_AUDIT_2026-11-25.md`, `MVP_VOTING_AND_MATCH_LIFECYCLE_AUDIT_2026-11-25.md`, and `IMPLEMENTATION_BLUEPRINT_CLUB_SOCIAL_2026-11-25.md` to this branch.
+- No schema, rows, policies, functions, cron, Storage, secrets, code, Meta account, merge or deploy changed.
