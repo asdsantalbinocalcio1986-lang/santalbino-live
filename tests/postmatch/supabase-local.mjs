@@ -104,6 +104,7 @@ async function main() {
   psql(`${migrationRoot}/20261123160000_santalbino_social_publications.sql`, true);
   psql(`${migrationRoot}/20261125120000_santalbino_social_publisher_claims.sql`, true);
   psql('tests/social-publisher/claims.sql', true);
+  psql('supabase/proposals/social_editorial_queue.sql', true);
   execFileSync('node', ['tests/social-publisher/claim-concurrency.mjs'], {
     stdio: 'inherit',
     env: process.env
