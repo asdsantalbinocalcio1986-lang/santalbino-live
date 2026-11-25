@@ -13,6 +13,7 @@ const json = (body: unknown, status = 200) =>
 
 const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const INSTAGRAM_IMAGE_TYPE = "image/jpeg";
 
 type EditorialPost = {
   id: string;
@@ -85,6 +86,7 @@ type WorkerDependencies = {
   graphPost: typeof graphPost;
   graphGet: typeof graphGet;
   recordContainer: (postId: string, token: string, containerId: string) => Promise<boolean>;
+  renewClaim?: (postId: string, token: string) => Promise<boolean>;
   complete: (
     postId: string,
     platform: "facebook" | "instagram",
@@ -117,6 +119,10 @@ async function completeSafely(
   );
 }
 
+async function renewBeforeMetaCall(post: EditorialPost, deps: WorkerDependencies) {
+  return deps.renewClaim ? await deps.renewClaim(post.id, post.claim_token) : true;
+}
+
 async function processOneDelivery(
   post: EditorialPost,
   delivery: EditorialDelivery,
@@ -125,6 +131,7 @@ async function processOneDelivery(
 ) {
   if (delivery.platform === "facebook") {
     try {
+      if (!await renewBeforeMetaCall(post, deps)) return;
       const result = await deps.graphPost(`${deps.pageId}/photos`, {
         url: assetUrl,
         caption: post.caption,
@@ -143,6 +150,7 @@ async function processOneDelivery(
   try {
     let containerId = String(delivery.external_container_id || "");
     if (!containerId) {
+      if (!await renewBeforeMetaCall(post, deps)) return;
       const container = await deps.graphPost(`${deps.instagramId}/media`, {
         image_url: assetUrl,
         caption: post.caption,
@@ -157,6 +165,7 @@ async function processOneDelivery(
 
     let ready = false;
     for (let attempt = 0; attempt < 8; attempt++) {
+      if (!await renewBeforeMetaCall(post, deps)) return;
       const state = await deps.graphGet(containerId, {
         fields: "status_code",
         access_token: deps.pageToken,
@@ -174,6 +183,7 @@ async function processOneDelivery(
       throw new MetaRequestError("Container Instagram ancora in elaborazione", "failed_retryable");
     }
 
+    if (!await renewBeforeMetaCall(post, deps)) return;
     const published = await deps.graphPost(`${deps.instagramId}/media_publish`, {
       creation_id: containerId,
       access_token: deps.pageToken,
@@ -223,7 +233,7 @@ export async function dispatchEditorialQueue(
 ) {
   if (!dispatchEnabled) return { claimed: 0, processed: 0, disabled: true };
   const { data, error } = await adminClient.rpc("claim_santalbino_editorial_queue", {
-    p_limit: Math.max(1, Math.min(20, limit)),
+    p_limit: 1,
     p_dispatch_enabled: true,
   });
   if (error) throw new Error("Claim della coda editoriale non riuscito");
@@ -262,7 +272,7 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
     });
     const rpcClient = adminClient as unknown as RpcClient;
     const { data, error } = await rpcClient.rpc("claim_santalbino_editorial_queue", {
-      p_limit: 10,
+      p_limit: 1,
       p_dispatch_enabled: true,
     });
     if (error) throw new Error("Claim della coda editoriale non riuscito");
@@ -281,7 +291,10 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
           const { data: file, error: downloadError } = await storage.download(post.asset_path);
           if (downloadError || !file) throw new Error("Download asset editoriale non riuscito");
           const bytes = new Uint8Array(await file.arrayBuffer());
-          await validateEditorialAsset(bytes, file.type || "", post.asset_sha256);
+          const validated = await validateEditorialAsset(bytes, file.type || "", post.asset_sha256);
+          if (post.platforms.instagram && validated.contentType !== INSTAGRAM_IMAGE_TYPE) {
+            throw new Error("Instagram richiede immagini JPEG: convertire la grafica prima della pubblicazione");
+          }
           const { data: signed, error: signedError } = await storage.createSignedUrl(post.asset_path, 600);
           if (signedError || !signed?.signedUrl) throw new Error("URL firmato asset editoriale non disponibile");
           const rawSignedUrl = signed.signedUrl;
@@ -299,6 +312,13 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
             throw new Error("URL firmato asset editoriale non valido");
           }
           return { publicUrl: signedUrl };
+        },
+        renewClaim: async (postId, token) => {
+          const { data: renewed, error: renewError } = await rpcClient.rpc(
+            "renew_santalbino_editorial_claim",
+            { p_post_id: postId, p_claim_token: token },
+          );
+          return !renewError && renewed === true;
         },
         recordContainer: async (postId, token, containerId) => {
           const { data: recorded, error: recordError } = await rpcClient.rpc(
