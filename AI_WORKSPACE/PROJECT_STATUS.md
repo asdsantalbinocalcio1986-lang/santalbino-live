@@ -1,6 +1,6 @@
 # SANTALive — project status and fixed guardrails
 
-Last verified context: 2026-11-24. This is a coordination snapshot, not a substitute for a fresh repository/database audit.
+Last verified context: 2026-11-25 (read-only repository and Supabase checks). This is a coordination snapshot, not a substitute for a fresh repository/database audit.
 
 ## Project architecture
 
@@ -60,3 +60,14 @@ These facts must be rechecked against the exact branch/commit before implementat
 - On match creation, automatically generate and persist a match-specific hashtag (example `#SantAlbinoRadicofani`), reuse it in relevant social copy and avoid duplicates.
 - Persist the club's own crest/logo as a club-level asset after one upload/selection. It must survive reloads and new matches and render on the correct side according to whether the club is home or away, independently of opponent identity.
 - These are requirements for audit/specification first. They do not authorize production code, database, storage, merge or deploy changes.
+
+
+## Read-only follow-up — 2026-11-25
+
+- Current `main` commit remains the PR base `8166deeb4b70397af9b021b9420f93afdab2501f`; current `regia.html` blob SHA: `e1517806a0f6d49ebfd884600ebe7b5fe0058a64`.
+- Hashtag generation from team names is not present in the inspected current-main save path; the editor saves the manual field. Several social/graphic builders already consume the stored hashtag. New-match reset currently retains the match object and hashtag.
+- Club logo URLs persist in shared state and survive normal `resetMatch()`, but are stored by home/away position rather than club identity. Multiple renderers read these positional slots directly.
+- Connected Supabase read-only checks confirm `santalbino-media` exists and is public; admin-only insert/update/delete policies use `is_santalbino_admin()`, while public read is allowed. Test-mode official media uploads are blocked in the client, but test mode is not a separate storage/backend project.
+- PR #106 and #107 remain separate open Drafts and both modify `regia.html`; no merge/integration has been performed. PR #108 remains Draft with six documentation-only files.
+- Detailed line references and acceptance matrix are in `POSTMATCH_PHASE1_DESIGN_DRAFT.md` section 11.
+- No production code, schema, data, storage, external communication, merge or deploy was changed.
