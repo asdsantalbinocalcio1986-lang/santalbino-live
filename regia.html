@@ -2511,13 +2511,17 @@ async function loadSocialPublicationLog() {
     const fb = 'Facebook: ' + item.facebook_status + (item.facebook_error ? ' · ' + item.facebook_error : '');
     const ig = 'Instagram: ' + item.instagram_status + (item.instagram_error ? ' · ' + item.instagram_error : '');
     const needsReconciliation = item.overall_status === 'reconciliation_required' ||
-      ['unknown', 'processing'].includes(item.facebook_status) ||
-      ['unknown', 'processing'].includes(item.instagram_status);
-    const retry = item.overall_status === 'published' || needsReconciliation ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
-    const reconciliationNote = needsReconciliation
+      ['unknown'].includes(item.facebook_status) ||
+      ['unknown'].includes(item.instagram_status);
+    const isProcessing = item.overall_status === 'processing' ||
+      item.facebook_status === 'processing' || item.instagram_status === 'processing';
+    const retry = item.overall_status === 'published' || needsReconciliation || isProcessing ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
+    const statusNote = needsReconciliation
       ? '<div class="small" style="margin-top:6px;color:var(--muted)">Esito da verificare: il sistema blocca nuovi invii automatici per evitare duplicati.</div>'
-      : '';
-    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div>' + reconciliationNote + '</div>';
+      : isProcessing
+        ? '<div class="small" style="margin-top:6px;color:var(--muted)">Pubblicazione in corso: i nuovi invii restano bloccati fino al completamento.</div>'
+        : '';
+    return '<div class="small" style="padding:8px 0;border-top:1px solid var(--line)"><b>' + esc(title) + '</b> · ' + esc(when) + '<br>' + esc(fb) + '<br>' + esc(ig) + '<div style="margin-top:6px">' + retry + '</div>' + statusNote + '</div>';
   }).join('');
 }
 
