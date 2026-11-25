@@ -124,3 +124,27 @@ Deno.test("dispatch kill switch prevents all queue claims", async () => {
     throw new Error("Queue kill switch did not prevent a claim");
   }
 });
+
+
+Deno.test("worker does not call Meta after losing the editorial lease", async () => {
+  let metaCalls = 0;
+  const completed: string[] = [];
+  await processEditorialClaim({
+    post: {
+      id: "post-lease", caption: "Lease test", asset_path: "social-editorial/test/post.jpg",
+      asset_sha256: "d".repeat(64), platforms: { facebook: true }, claim_token: "claim-lease",
+    },
+    deliveries: [{ platform: "facebook" }],
+  }, {
+    loadAsset: async () => ({ publicUrl: "https://storage.example/social-editorial/test/post.jpg" }),
+    renewClaim: async () => false,
+    graphPost: async () => { metaCalls++; return { id: "unexpected-post" }; },
+    graphGet: async () => ({ status_code: "FINISHED" }),
+    recordContainer: async () => true,
+    complete: async (_id: string, _platform: string, _token: string, status: string) => { completed.push(status); },
+    pageId: "page-test", pageToken: "token-test", instagramId: "ig-test",
+  } as never);
+  if (metaCalls !== 0 || completed.length !== 0) {
+    throw new Error("Worker called Meta or attempted completion after losing its claim");
+  }
+});
