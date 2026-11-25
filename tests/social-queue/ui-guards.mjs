@@ -77,4 +77,9 @@ const legacyBackslashRegex = "lower(p_asset_path) !~ '" + String.fromCharCode(92
 assert.ok(!queueSql.includes(legacyBackslashRegex),
   'The SQL must not reintroduce a backslash-dot regex that psql parses as a meta-command.');
 
+assert.match(source, /const latestSnapshotMatches = !!latest && JSON\.stringify\(latest\.snapshot\) === JSON\.stringify\(matchResultEditor\.snapshot\)/,
+  'An archived MATCH RESULT graphic must be reused only when its saved snapshot still matches the current chronology and scorers.');
+assert.match(source, /La cronaca o i marcatori sono cambiati dopo l’ultima revisione/,
+  'When a scorer or chronology changes, MATCH RESULT must show the freshly generated graphic and require a new revision instead of showing stale artwork.');
+
 console.log('Editorial queue admin UI guard tests passed');
