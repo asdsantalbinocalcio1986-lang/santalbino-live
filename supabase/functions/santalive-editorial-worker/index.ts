@@ -252,7 +252,6 @@ function equalSecret(left: string, right: string) {
 export async function dispatchEditorialQueue(
   adminClient: RpcClient,
   dispatchEnabled: boolean,
-  limit = 10,
 ) {
   if (!dispatchEnabled) return { claimed: 0, processed: 0, disabled: true, claims: [] as EditorialClaim[] };
   const { data, error } = await adminClient.rpc("claim_santalbino_editorial_queue", {
@@ -294,7 +293,7 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const rpcClient = adminClient as unknown as RpcClient;
-    const dispatch = await dispatchEditorialQueue(rpcClient, true, 1);
+    const dispatch = await dispatchEditorialQueue(rpcClient, true);
     const claims = dispatch.claims || [];
 
     for (const claim of claims) {
