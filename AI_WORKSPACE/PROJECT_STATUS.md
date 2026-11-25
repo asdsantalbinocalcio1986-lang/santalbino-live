@@ -143,3 +143,11 @@ These facts must be rechecked against the exact branch/commit before implementat
 - `resetMatch()` clears match-specific data but retains positional logos, team names, ourSide and hashtag; reinforces club-level logo and auto-hashtag requirements.
 - Added `SQL_RLS_AND_SYNC_AUDIT_2026-11-25.md`, `MVP_VOTING_AND_MATCH_LIFECYCLE_AUDIT_2026-11-25.md`, and `IMPLEMENTATION_BLUEPRINT_CLUB_SOCIAL_2026-11-25.md` to this branch.
 - No schema, rows, policies, functions, cron, Storage, secrets, code, Meta account, merge or deploy changed.
+
+
+## Piano operativo condivisione social — 2026-11-25
+
+- Creato `AI_WORKSPACE/SOCIAL_SHARING_MASTER_PLAN_2026-11-25.md` nel branch `ai-workspace/bootstrap`.
+- Il piano consolida condivisione manuale, publisher Meta, programmazione server-side, coda editoriale, integrazione PR #106/#107, difetti verificati, test mock, requisiti hashtag/logo e checklist di configurazione finale.
+- Obiettivo di uscita: quando fasi 1–4 e relativi test saranno completati, dovranno restare soltanto account/permessi Meta, segreti Supabase, selezione delle opzioni, test finale autorizzato e attivazione graduale.
+- Nessun codice applicativo, workflow, database, storage, cron, segreto, account Meta, merge, deploy o post social è stato modificato.
