@@ -188,7 +188,7 @@ begin
     'Avviso con una piattaforma esaurita', 'social-editorial/test/mixed-retry-cap.jpg',
     repeat('5', 64), '{"facebook":true,"instagram":true}'::jsonb, '{"kind":"mixed-retry-cap"}'::jsonb
   );
-  select * into v_mixed from public.approve_santalbino_editorial_post(v_mixed.id, 1, now() - interval '1 minute');
+  select * into v_mixed from public.approve_santalbino_editorial_post(v_mixed.id, 1, now() + interval '1 hour');
 end
 $admin_tests$;
 
@@ -347,6 +347,9 @@ begin
 
   select id into v_mixed_id from public.santalbino_editorial_posts
    where logical_key = 'match:ci-match:mixed-retry-cap:club_notice';
+  update public.santalbino_editorial_posts
+     set scheduled_at = now() - interval '1 minute'
+   where id = v_mixed_id and status = 'scheduled';
   insert into public.santalbino_editorial_deliveries
     (post_id, platform, status, attempt_count, last_attempt_at)
   values (v_mixed_id, 'facebook', 'failed_retryable', 5, now() - interval '2 hours');
