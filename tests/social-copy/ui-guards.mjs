@@ -30,6 +30,11 @@ assert.match(source, /S\.socialDrafts\s*=\s*\{\s*matchDay:\s*'',\s*convocati:\s*
 assert.match(source, /textWithoutHashtag[\s\S]{0,220}filter\(line => line\.trim\(\) !== hashtag\)/, 'Sharing must remove a hashtag already present in the edited text before appending it once.');
 assert.match(source, /window\.open\([^\n]*'_blank'\);\s*if \(facebookWindow\) facebookWindow\.opener = null/, 'Facebook popup detection must not rely on noopener return semantics and must sever opener immediately.');
 assert.match(source, /window\.open\([^\n]*'_blank'\);\s*if \(whatsappWindow\) whatsappWindow\.opener = null/, 'WhatsApp popup must sever opener immediately.');
+assert.match(source, /case 'sharefb':[\s\S]{0,420}window\.open\([^\n]*'_blank'\);\s*if \(popup\) popup\.opener = null/,
+  'Event Facebook sharing must detect the popup without noopener return ambiguity and sever opener immediately.');
+assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'\);\s*if \(whatsappWindow\) whatsappWindow\.opener = null/,
+  'WhatsApp event-sharing fallbacks must sever opener without relying on noopener.');
+
 
 
 console.log('Social copy editor guard tests passed');
