@@ -363,6 +363,24 @@ begin
      where status in ('approved', 'scheduled', 'partial', 'failed')
        and (scheduled_at is null or scheduled_at <= now())
        and claim_token is null
+       and (
+         not exists (
+           select 1 from public.santalbino_editorial_deliveries existing
+            where existing.post_id = santalbino_editorial_posts.id
+         )
+         or exists (
+           select 1 from public.santalbino_editorial_deliveries due
+            where due.post_id = santalbino_editorial_posts.id
+              and (
+                due.status = 'pending'
+                or (
+                  due.status = 'failed_retryable'
+                  and due.last_attempt_at <= now()
+                    - (interval '1 minute' * power(2, least(due.attempt_count, 6)))
+                )
+              )
+         )
+       )
      order by scheduled_at nulls first, created_at
      limit p_limit
      for update skip locked
@@ -390,7 +408,15 @@ begin
            attempt_count = attempt_count + 1,
            last_attempt_at = now(),
            updated_at = now()
-     where post_id = v_post.id and status in ('pending', 'failed_retryable');
+     where post_id = v_post.id
+       and (
+         status = 'pending'
+         or (
+           status = 'failed_retryable'
+           and last_attempt_at <= now()
+             - (interval '1 minute' * power(2, least(attempt_count, 6)))
+         )
+       );
 
     select coalesce(jsonb_agg(to_jsonb(d) order by d.platform), '[]'::jsonb)
       into v_deliveries
