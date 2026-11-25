@@ -130,7 +130,7 @@ async function processOneDelivery(
       if (!postId) throw new MetaRequestError("Meta non ha restituito l'ID del post Facebook", "unknown");
       await completeSafely(deps, post, "facebook", "published", postId);
     } catch (error) {
-      await completeSafely(deps, post, classifyMetaFailure(error), null as never, null, error);
+      await completeSafely(deps, post, "facebook", classifyMetaFailure(error), null, error);
     }
     return;
   }
