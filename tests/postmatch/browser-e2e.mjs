@@ -229,7 +229,16 @@ async function main() {
     assert.equal(await page.locator('#editorialLogicalKey').inputValue(), editorialKey,
       'Editorial revision key changed unexpectedly while completing the form.');
     await page.locator('[data-a="editorialSave"]').click();
-    await page.getByText('Bozza editoriale salvata', { exact: false }).waitFor({ timeout: 30000 });
+    await page.waitForFunction(() => {
+      const body = document.body?.innerText || '';
+      return body.includes('Bozza editoriale salvata') || body.includes('Bozza non salvata:');
+    }, null, { timeout: 30000 }).catch(async () => {
+      const body = await page.locator('body').innerText();
+      throw new Error('Editorial draft save produced no success or error feedback. Visible page text: ' + body.slice(-1800));
+    });
+    const editorialSaveFeedback = await page.locator('body').innerText();
+    assert.match(editorialSaveFeedback, /Bozza editoriale salvata/,
+      'Editorial draft save failed: ' + editorialSaveFeedback.slice(-1800));
     const editorialCard = page.locator('[data-editorial-post]').filter({ hasText: editorialCaption });
     await editorialCard.waitFor({ timeout: 30000 });
     assert.match(await editorialCard.innerText(), /Bozza/, 'New editorial content must be saved as a draft.');
