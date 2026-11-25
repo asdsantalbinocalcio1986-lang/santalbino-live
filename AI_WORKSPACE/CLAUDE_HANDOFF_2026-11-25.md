@@ -68,3 +68,11 @@ Include these two requirements in the audit and report; do not implement during 
 2. **Persistent club crest:** the club's own logo must remain saved after one upload/selection, across reloads and future matches. Its display must follow the club's home/away assignment, not be confused with the opponent logo. Assess storage location, persistence, permissions, replacement/removal and test isolation.
 
 For both, report current implementation evidence, gaps, exact files/functions, risks, and acceptance tests. No code, database, storage or production changes.
+
+
+## Preliminary code observations for the new requirements
+
+Current `main` (`regia.html`, SHA `e1517806a0f6d49ebfd884600ebe7b5fe0058a64`):
+- Match save reads the hashtag field into `S.match.hashtag`; automatic generation from team names was not found in that save path.
+- Social event text and the convocati builder already consume `S.match.hashtag`, so generated value should flow through these existing builders without duplicate appending.
+- Logo upload stores a shared media URL in `S.logos[home|away]` and saves app state. Persistence exists at state level, but the identity is currently positional (home/away), not a canonical club-logo property. Review all graphic renderers and new-match/reset flows before proposing a migration.
