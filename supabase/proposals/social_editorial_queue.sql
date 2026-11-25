@@ -218,6 +218,7 @@ begin
   end if;
   if p_logical_key is null or p_logical_key !~ '^[a-z0-9:_-]{3,180}$'
      or p_content_type not in ('match_day', 'convocati', 'formation', 'post_match', 'club_notice', 'custom')
+     or right(p_logical_key, char_length(p_content_type) + 1) <> (':' || p_content_type)
      or p_caption is null or char_length(btrim(p_caption)) not between 1 and 2200
      or p_asset_path is null or left(p_asset_path, 17) <> 'social-editorial/' or length(p_asset_path) not between 18 and 520 or strpos(p_asset_path, '..') > 0 or translate(p_asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') <> ''
      or p_asset_sha256 is null or p_asset_sha256 !~ '^[a-f0-9]{64}$'
@@ -471,6 +472,32 @@ begin
 end;
 $$;
 
+create or replace function public.renew_santalbino_editorial_claim(
+  p_post_id uuid,
+  p_claim_token uuid
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $
+declare
+  v_count integer;
+begin
+  update public.santalbino_editorial_posts
+     set lease_expires_at = now() + interval '5 minutes', updated_at = now()
+   where id = p_post_id and status = 'publishing' and claim_token = p_claim_token
+     and lease_expires_at > now();
+  get diagnostics v_count = row_count;
+  if v_count <> 1 then return false; end if;
+
+  update public.santalbino_editorial_deliveries
+     set lease_expires_at = now() + interval '5 minutes', updated_at = now()
+   where post_id = p_post_id and status = 'processing' and claim_token = p_claim_token;
+  return found;
+end;
+$;
+
 create or replace function public.record_santalbino_editorial_container(
   p_post_id uuid,
   p_platform text,
@@ -671,6 +698,8 @@ grant execute on function public.resolve_santalbino_editorial_delivery(uuid,text
 
 revoke all on function public.claim_santalbino_editorial_queue(integer,boolean) from public, anon, authenticated;
 grant execute on function public.claim_santalbino_editorial_queue(integer,boolean) to service_role;
+revoke all on function public.renew_santalbino_editorial_claim(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.renew_santalbino_editorial_claim(uuid,uuid) to service_role;
 revoke all on function public.record_santalbino_editorial_container(uuid,text,uuid,text) from public, anon, authenticated;
 grant execute on function public.record_santalbino_editorial_container(uuid,text,uuid,text) to service_role;
 revoke all on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) from public, anon, authenticated;
