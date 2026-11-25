@@ -2,7 +2,7 @@ name: Validate and deploy Sant'Albino Live
 
 on:
   push:
-    branches: [main]
+    branches: [main, integration/social-postmatch-2026-11-25]
   pull_request:
     branches: [main, integration/social-postmatch-2026-11-25]
   workflow_dispatch:
@@ -31,6 +31,14 @@ jobs:
         run: node scripts/validate-project.mjs
       - name: Verify social copy editor guards
         run: node tests/social-copy/ui-guards.mjs
+      - name: Setup Deno for editorial worker tests
+        if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test editorial worker with mocked Meta transport
+        if: ${{ hashFiles('supabase/functions/santalive-editorial-worker/index_test.ts') != '' }}
+        run: deno test supabase/functions/santalive-editorial-worker/index_test.ts
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
