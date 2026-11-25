@@ -14,9 +14,9 @@ Each revision stores together:
 
 - `environment`: `production` or `test`; this is a logical namespace used by the UI and queries. Because the current test mode shares the production Supabase project, it is **not a security boundary**: an authenticated admin able to call the RPCs directly can specify either namespace. Hard isolation requires a separate Supabase project and separate credentials.
 - `match_id` and monotonically increasing `revision`.
-- `snapshot`: immutable JSON copy of the relevant match facts used for the caption and graphic (teams, score, scorers, cards, competition, date, venue, logo references and source state revision).
+- `snapshot`: immutable JSON copy of the relevant match facts used for the caption and graphic (teams, score, scorers, cards, competition, date, venue, logo references and source state revision); the SQL proposal enforces an object payload no larger than 65,536 bytes.
 - `caption`: exact editable social text.
-- `graphic_path` and SHA-256 digest: the exact JPEG produced for this revision, in a dedicated private Storage bucket.
+- `graphic_path` and SHA-256 digest: the exact JPEG produced for this revision, in a dedicated private Storage bucket. **In this client-upload design the digest is calculated by the browser and only its format is validated by SQL; it is not a server-side integrity proof.**
 - author and approval audit fields.
 
 Saving creates a new revision. Any previous unapproved draft becomes `superseded`; previous revisions remain available. Approval accepts only the current draft revision and does not regenerate any content. Approved content and its referenced JPEG are immutable: Storage does not permit replacing a graphic, and deletion is allowed only for orphan uploads that are not referenced by any revision; a later correction is a new revision and a new explicit approval.
@@ -49,7 +49,7 @@ This is code on an unmerged feature branch. It cannot persist anything until the
 1. Open MATCH RESULT after full time.
 2. Capture a match snapshot once; generate the caption and JPEG from that same capture.
 3. Edit the caption; preview the JPEG.
-4. Save draft: upload JPEG to the private bucket, calculate its SHA-256, then call `save_santalbino_postmatch_revision`.
+4. Save draft: upload JPEG to the private bucket, calculate its SHA-256 in the browser, then call `save_santalbino_postmatch_revision`. The digest remains client-declared until a server-side upload/verification function is introduced.
 5. On reopen, load the latest draft/revision and display its saved caption and exact image. Do not regenerate silently.
 6. Approve the displayed revision with its expected revision number. If another revision exists, reject and reload.
 7. Any edit after approval creates a new draft revision; the approved revision is retained for audit.
