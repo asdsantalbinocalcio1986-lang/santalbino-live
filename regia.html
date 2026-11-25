@@ -4716,7 +4716,8 @@ document.addEventListener('click', async e => {
     case 'copypost': { const so = socialOf(postId); so.text = $('#postText').value; saveL(); copyText(so.text); break; }
     case 'sharefb': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
-      const popup = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(socialDraftMatchUrl()), '_blank', 'noopener');
+      const popup = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(socialDraftMatchUrl()), '_blank');
+      if (popup) popup.opener = null;
       await copyText(so.text);
       toast(popup ? 'Testo copiato: incollalo nella finestra di condivisione Facebook.' : 'Popup Facebook bloccato: abilita i popup e riprova.');
       break;
@@ -4738,7 +4739,8 @@ document.addEventListener('click', async e => {
             if (err?.name !== 'AbortError') {
               console.error('Condivisione immagine WhatsApp:', err);
               await saveBlob(postBlob, 'santalbino-evento.jpg');
-              window.open(waUrl, '_blank', 'noopener');
+              const whatsappWindow = window.open(waUrl, '_blank');
+              if (whatsappWindow) whatsappWindow.opener = null;
               toast('Il dispositivo non ha accettato immagine e testo insieme: immagine salvata, allegala su WhatsApp');
             }
           }
