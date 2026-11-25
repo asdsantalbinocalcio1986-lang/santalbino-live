@@ -22,3 +22,5 @@ This note records the state of the isolated validation branch. It does not autho
 ## Safety boundary
 
 All changes remain on feature/validation branches. No production data, hosted Supabase project, Meta account, or real publication was touched.
+
+Validation note: this branch is used only to run the isolated integration CI; the Pages deployment job must remain skipped for pull requests.
