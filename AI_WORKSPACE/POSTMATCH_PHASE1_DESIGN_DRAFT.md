@@ -230,7 +230,7 @@ Confirmed conclusion:
 
 - PR #106: open Draft, head `a993d5bfcc282acfc849ab45084d570524d6725b`, base `8166deeb4b70397af9b021b9420f93afdab2501f`.
 - PR #107: open Draft, head `81cc441328b413aa79217fcf91079c0a28362bf1`, same base.
-- PR #108: open Draft, head `9f1924f5c63039ab390984e5f08121a9553f4c0d`, same base. It currently contains six documentation files; no application runtime file is in its changed-file list.
+- PR #108: open Draft, documentation-only workspace with six changed files at the time of this check. Its head SHA changes whenever this document is updated; verify the live PR metadata rather than relying on a self-referential SHA.
 - #106 and #107 both change `regia.html`; their integration still requires a single reconciled branch and combined tests. No merge is recommended by this audit.
 
 This follow-up is read-only evidence and does not authorize implementation.
