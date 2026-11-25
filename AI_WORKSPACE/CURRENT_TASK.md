@@ -101,7 +101,7 @@ The project owner explicitly authorized corrective work on the already-open soci
 
 ### Current commit heads
 - PR #106: `bc75b97690b867e279df5d68bef55b5890221b25`
-- PR #107: `588aaefcaac7b8bc79b081ea0726195dc08ffa7d`
+- PR #107: `bb188086faa0c0328d6f73293c160a7e508eb9e6` (latest corrective HEAD; CI pending)
 
 ### Verification and remaining limits
 - **Updated verification on 2026-11-25:** PR #106 HEAD `bc75b97690b867e279df5d68bef55b5890221b25` passed CI run #599 in full: application validation, ephemeral PostgreSQL SQL integration, isolated local Supabase integration (Auth/RLS/Storage/revision lifecycle), and Playwright control-room browser E2E. Pages deployment was skipped intentionally.
@@ -123,3 +123,8 @@ GitHub Actions was rechecked against the exact current PR HEAD SHAs:
 - Both PRs remain open Drafts and unmerged. No production deploy, merge, live Supabase mutation, Meta action or external social post was performed.
 
 Next gates: (1) complete the social sharing manual smoke test in a controlled demo browser, with no final send to recipients; (2) obtain and reconcile the independent Gemini review against the exact HEADs; (3) only then decide whether any additional narrow fixes are warranted. Do not begin publisher hardening or automatic Meta publishing as part of this narrow corrective authorization.
+
+
+## Social hashtag edge-case correction — 2026-11-25
+
+On PR #107, the previous deduplication removed only a hashtag that occupied an entire line. It could still append a duplicate when the edited caption contained the same hashtag inline. The sharing composition now escapes the configured hashtag and removes matching hashtag tokens at whitespace/punctuation boundaries, then normalizes whitespace before appending the hashtag once. Guard assertions were updated. A small isolated JavaScript exercise covered standalone, inline, punctuation-adjacent and repeated occurrences. The latest HEAD is `bb188086faa0c0328d6f73293c160a7e508eb9e6`; no CI run is currently visible for this commit, so do not report it as CI-passed. PR #107 remains Draft. No share dialog was opened and no external service was contacted.
