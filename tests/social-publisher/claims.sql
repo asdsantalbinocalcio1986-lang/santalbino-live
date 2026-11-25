@@ -16,6 +16,22 @@ declare
   v_event2 text := 'publisher-platform-expansion-' || gen_random_uuid()::text;
   v_expansion jsonb;
 begin
+  if has_function_privilege('anon',
+       'public.claim_santalbino_social_publication(text,text,text,text,text,jsonb)',
+       'EXECUTE') then
+    raise exception 'anon must not execute the privileged claim RPC';
+  end if;
+  if has_function_privilege('authenticated',
+       'public.claim_santalbino_social_publication(text,text,text,text,text,jsonb)',
+       'EXECUTE') then
+    raise exception 'authenticated must not execute the privileged claim RPC';
+  end if;
+  if not has_function_privilege('service_role',
+       'public.claim_santalbino_social_publication(text,text,text,text,text,jsonb)',
+       'EXECUTE') then
+    raise exception 'service_role must execute the privileged claim RPC';
+  end if;
+
   v_first := public.claim_santalbino_social_publication(
     v_event, 'local-test', 'goal', 'Test caption', 'https://example.test/test.jpg',
     '{"facebook":true,"instagram":false}'::jsonb
