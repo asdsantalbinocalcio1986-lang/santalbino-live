@@ -68,6 +68,10 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/postmatch_editorial_revisions.sql
       - name: Verify revision lifecycle, authorization and immutability
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/postmatch/assertions.sql
+      - name: Apply social editorial queue proposal
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/social_editorial_queue.sql
+      - name: Verify editorial queue lifecycle, RLS, claims and retry backoff
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/social-queue/assertions.sql
       - name: Verify editorial approval and sharing UI guards
         run: node tests/postmatch/ui-guards.mjs
 
