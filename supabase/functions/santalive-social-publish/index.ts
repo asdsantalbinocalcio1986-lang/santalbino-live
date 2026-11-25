@@ -22,14 +22,46 @@ export function safeError(error: unknown, token?: string) {
   return message.slice(0, 300);
 }
 
+export type MetaFailureOutcome = "unknown" | "failed_retryable" | "failed";
+
 export class MetaRequestError extends Error {
-  constructor(message: string, readonly outcome: "unknown" | "failed_retryable") {
+  constructor(message: string, readonly outcome: MetaFailureOutcome) {
     super(message);
     this.name = "MetaRequestError";
   }
 }
 
-export function classifyMetaFailure(error: unknown): "unknown" | "failed_retryable" {
+const retryableMetaCodes = new Set([1, 2, 4, 17, 32, 341, 368, 613, 80001, 80002]);
+
+export function classifyMetaApiError(
+  error: unknown,
+  httpStatus: number,
+  writeOperation: boolean,
+): MetaFailureOutcome {
+  const payload = error && typeof error === "object"
+    ? error as Record<string, unknown>
+    : {};
+  const code = Number(payload.code);
+  const hasCode = Number.isFinite(code);
+
+  // A failed write with a 5xx response may have reached Meta before the error.
+  if (writeOperation && httpStatus >= 500) return "unknown";
+  if (payload.is_transient === true || httpStatus === 429 ||
+      (hasCode && retryableMetaCodes.has(code))) return "failed_retryable";
+
+  // These responses are explicit, non-transient rejections: retrying unchanged
+  // credentials, permissions, parameters or duplicate content cannot help.
+  if (hasCode && (
+    code === 3 || code === 10 || code === 100 || code === 190 ||
+    (code >= 200 && code <= 299) || code === 506
+  )) return "failed";
+
+  if (httpStatus >= 400 && httpStatus < 500) return "failed";
+  if (httpStatus >= 500) return writeOperation ? "unknown" : "failed_retryable";
+  return "unknown";
+}
+
+export function classifyMetaFailure(error: unknown): MetaFailureOutcome {
   return error instanceof MetaRequestError ? error.outcome : "unknown";
 }
 
@@ -43,8 +75,12 @@ export async function graphGet(path: string, params: Record<string, string>, fet
     throw new MetaRequestError("Lettura Meta temporaneamente non disponibile", "failed_retryable");
   }
   const data = await response.json().catch(() => null);
-  if (!response.ok || data?.error || !data) {
-    throw new MetaRequestError(`Lettura Meta HTTP ${response.status}`, "failed_retryable");
+  if (!data) throw new MetaRequestError("Risposta Meta non leggibile durante la lettura", "failed_retryable");
+  if (!response.ok || data.error) {
+    throw new MetaRequestError(
+      `Lettura Meta HTTP ${response.status}`,
+      classifyMetaApiError(data.error, response.status, false),
+    );
   }
   return data;
 }
@@ -67,10 +103,15 @@ export async function graphPost(path: string, params: Record<string, string>, fe
     throw new MetaRequestError("Risposta Meta illeggibile: esito non determinabile", "unknown");
   }
   if (!response.ok || data.error) {
-    if (response.status >= 500 || response.status === 0) {
-      throw new MetaRequestError(`Meta Graph API HTTP ${response.status}: esito non determinabile`, "unknown");
-    }
-    throw new MetaRequestError(`Meta Graph API HTTP ${response.status}: richiesta rifiutata`, "failed_retryable");
+    const outcome = classifyMetaApiError(data.error, response.status, true);
+    throw new MetaRequestError(
+      outcome === "unknown"
+        ? `Meta Graph API HTTP ${response.status}: esito non determinabile`
+        : outcome === "failed"
+          ? `Meta Graph API HTTP ${response.status}: richiesta rifiutata in modo permanente`
+          : `Meta Graph API HTTP ${response.status}: rifiuto temporaneo`,
+      outcome,
+    );
   }
   return data;
 }
