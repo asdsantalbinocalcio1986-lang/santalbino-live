@@ -126,6 +126,33 @@ async function main() {
     await page.locator('.test-banner').waitFor({ state: 'visible', timeout: 30000 });
     await page.getByRole('button', { name: 'Genera MATCH RESULT e post' }).waitFor({ state: 'visible', timeout: 30000 });
 
+    // Editing a scorer in the live chronology must invalidate the old summary snapshot
+    // and the regenerated MATCH RESULT canvas must render the corrected player name.
+    const snapshotBeforeScorerEdit = await page.evaluate(() => matchResultSnapshotKey(capturePostmatchSnapshot()));
+    const homeGoal = page.locator('.ev[data-id="browser-goal-home"]');
+    await homeGoal.locator('[data-a="editevent"]').click();
+    await page.locator('#sheet [data-d="player"]').fill('Marcatore Corretto Test');
+    await page.locator('#sheet [data-sub="go"]').click();
+    await page.waitForFunction(() =>
+      document.querySelector('.ev[data-id="browser-goal-home"]')?.innerText.includes('Marcatore Corretto Test')
+    , null, { timeout: 30000 });
+    const snapshotAfterScorerEdit = await page.evaluate(() => matchResultSnapshotKey(capturePostmatchSnapshot()));
+    assert.notEqual(snapshotAfterScorerEdit, snapshotBeforeScorerEdit,
+      'Changing the scorer in the chronology must invalidate the previous MATCH RESULT snapshot.');
+    const renderedGraphicText = await page.evaluate(async () => {
+      const captured = [];
+      const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function(text, ...args) {
+        captured.push(String(text));
+        return originalFillText.call(this, text, ...args);
+      };
+      try { await renderMatchResultGraphic(); }
+      finally { CanvasRenderingContext2D.prototype.fillText = originalFillText; }
+      return captured;
+    });
+    assert.ok(renderedGraphicText.includes('Marcatore Corretto Test'),
+      'Regenerated MATCH RESULT graphic must display the scorer corrected in the chronology.');
+
     await page.getByRole('button', { name: 'Genera MATCH RESULT e post' }).click();
     await page.locator('#matchResultPost').waitFor({ state: 'visible', timeout: 30000 });
     assert.equal(await page.locator('[data-a="savePostmatchRevision"]').isEnabled(), true, 'Save button should be enabled for the admin.');
