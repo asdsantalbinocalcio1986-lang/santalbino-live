@@ -4633,7 +4633,8 @@ function editorialQueueHtml() {
       '</div>'
     ).join('') : '<p class="small muted">Nessuna consegna avviata.</p>';
     const canApprove = post.status === 'draft' && !!post.preview_url;
-    const canCancel = ['draft', 'approved', 'scheduled', 'failed', 'partial'].includes(post.status);
+    const canCancel = ['draft', 'approved', 'scheduled', 'failed', 'partial'].includes(post.status)
+      && !deliveries.some(item => ['processing', 'unknown'].includes(item.status));
     const scheduled = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }) : '';
     return '<article class="card" data-editorial-post="' + esc(post.id) + '">' +
       '<div class="row2" style="align-items:center;justify-content:space-between"><b>' +
