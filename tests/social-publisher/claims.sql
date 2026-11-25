@@ -6,6 +6,7 @@ do $test$
 declare
   v_first jsonb;
   v_second jsonb;
+  v_expired jsonb;
   v_third jsonb;
   v_fourth jsonb;
   v_id uuid;
@@ -88,8 +89,25 @@ begin
     v_event, 'local-test', 'goal', 'Test caption', 'https://example.test/test.jpg',
     '{"facebook":true,"instagram":false}'::jsonb
   );
-  if v_second ->> 'result' <> 'reconciliation_required' then
-    raise exception 'Concurrent/repeated claim was not blocked: %', v_second;
+  if v_second ->> 'result' <> 'processing' then
+    raise exception 'An active claim was not reported as processing: %', v_second;
+  end if;
+
+  -- An abandoned worker must be fenced after its lease expires. Its in-flight
+  -- platform outcome becomes unknown and must never be retried automatically.
+  update public.santalbino_social_publications
+     set lease_expires_at = now() - interval '1 second'
+   where id = v_id and claim_token = v_old_token;
+
+  v_expired := public.claim_santalbino_social_publication(
+    v_event, 'local-test', 'goal', 'Test caption', 'https://example.test/test.jpg',
+    '{"facebook":true,"instagram":false}'::jsonb
+  );
+  if v_expired ->> 'result' <> 'reconciliation_required'
+     or v_expired #>> '{row,facebook_status}' <> 'unknown'
+     or v_expired #>> '{row,overall_status}' <> 'reconciliation_required'
+     or v_expired #>> '{row,claim_token}' is not null then
+    raise exception 'Expired claim was not safely fenced for reconciliation: %', v_expired;
   end if;
 
   -- Simulate a response explicitly rejected by Meta: only this state is retryable.
