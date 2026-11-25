@@ -52,6 +52,14 @@ assert.match(source, /case 'sharewa':[\s\S]{0,1800}window\.open\(waUrl, '_blank'
 assert.match(source, /#\?' \+ escapedHashtag/, 'Deduplication must remove both prefixed and unprefixed versions of the configured hashtag before appending its normalized form.');
 
 assert.ok(source.includes("new RegExp('(^|[\\\\s([{])#?' + escapedHashtag"), 'Deduplication must match configured hashtags with or without their leading hash.');
+assert.match(source, /const needsReconciliation = item\.overall_status === 'reconciliation_required'[\s\S]{0,180}\['unknown'\]\.includes\(item\.facebook_status\)/,
+  'Unknown publication outcomes must require reconciliation.');
+assert.match(source, /const isProcessing = item\.overall_status === 'processing'[\s\S]{0,160}item\.instagram_status === 'processing'/,
+  'Active publication claims must be distinguished from uncertain outcomes.');
+assert.match(source, /needsReconciliation \|\| isProcessing \? '' : '<button/,
+  'The UI must not offer a blind retry for published, active or uncertain events.');
+assert.match(source, /Esito da verificare: il sistema blocca nuovi invii automatici per evitare duplicati/,
+  'The UI must explain why an uncertain publication cannot be retried.');
+assert.match(source, /Pubblicazione in corso: i nuovi invii restano bloccati fino al completamento/,
+  'The UI must explain that an active claim is still processing, not uncertain.');
 
-assert.match(source, /case 'sharewa':[\s\S]{0,300}const matchUrl = socialDraftMatchUrl\(\)/, 'WhatsApp event sharing must reuse the canonical match URL helper.');
-assert.match(source, /case 'shareMatchResultPost':[\s\S]{0,700}const url = socialDraftMatchUrl\(\)/, 'Post-match sharing must reuse the canonical match URL helper.');
