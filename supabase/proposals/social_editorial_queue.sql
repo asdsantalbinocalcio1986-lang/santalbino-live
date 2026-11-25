@@ -13,7 +13,7 @@ create table if not exists public.santalbino_editorial_posts (
     check (status in ('draft', 'approved', 'scheduled', 'publishing', 'published',
                       'partial', 'failed', 'unknown', 'cancelled', 'superseded')),
   caption text not null check (char_length(btrim(caption)) between 1 and 2200),
-  asset_path text not null check (left(asset_path, 17) = 'social-editorial/' and length(asset_path) between 18 and 520 and position('..' in asset_path) = 0 and translate(asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-', '') = ''),
+  asset_path text not null check (left(asset_path, 17) = 'social-editorial/' and length(asset_path) between 18 and 520 and position('..' in asset_path) = 0 and translate(asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') = ''),
   asset_sha256 text not null check (asset_sha256 ~ '^[a-f0-9]{64}$'),
   platforms jsonb not null
     check (
