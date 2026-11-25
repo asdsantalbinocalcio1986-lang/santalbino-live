@@ -96,7 +96,7 @@ begin
     repeat('e', 64), '{"facebook":true,"instagram":false}'::jsonb,
     '{"kind":"retry-test"}'::jsonb
   );
-  select * into v_retry from public.approve_santalbino_editorial_post(v_retry.id, 1, now() - interval '1 minute');
+  select * into v_retry from public.approve_santalbino_editorial_post(v_retry.id, 1, now() + interval '1 hour');
 end
 $admin_tests$;
 
@@ -153,6 +153,9 @@ begin
     raise exception 'Unknown editorial post was automatically retried';
   end if;
 
+  update public.santalbino_editorial_posts
+     set scheduled_at = now() - interval '1 minute'
+   where logical_key = 'match:ci-match:retry_notice' and status = 'scheduled';
   v_claims := public.claim_santalbino_editorial_queue(5, true);
   if jsonb_array_length(v_claims) <> 1 then
     raise exception 'Expected the retryable editorial delivery to be claimed once: %', v_claims;
