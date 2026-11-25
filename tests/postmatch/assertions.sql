@@ -16,6 +16,21 @@ select * from public.save_santalbino_postmatch_revision(
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 );
 
+do $block$
+begin
+  begin
+    perform * from public.save_santalbino_postmatch_revision(
+      'test', 'match_01', 'Snapshot troppo grande',
+      to_jsonb(repeat('x', 70000)), 10,
+      'postmatch/test/match_01/rev3.jpg',
+      'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+    );
+    raise exception 'Oversized snapshot unexpectedly accepted';
+  exception when sqlstate '22023' then
+    null;
+  end;
+end $block$;
+
 select * from public.save_santalbino_postmatch_revision(
   'test', 'match_01', 'Seconda bozza', '{"score":"2-0"}'::jsonb, 11,
   'postmatch/test/match_01/rev2.jpg',
