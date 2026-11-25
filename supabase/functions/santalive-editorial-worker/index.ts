@@ -278,8 +278,17 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
           await validateEditorialAsset(bytes, file.type || "", post.asset_sha256);
           const { data: signed, error: signedError } = await storage.createSignedUrl(post.asset_path, 600);
           if (signedError || !signed?.signedUrl) throw new Error("URL firmato asset editoriale non disponibile");
-          const signedUrl = new URL(signed.signedUrl, supabaseUrl).toString();
-          const parsedSignedUrl = new URL(signedUrl);
+          const rawSignedUrl = signed.signedUrl;
+          const normalizedSignedUrl = rawSignedUrl.startsWith("http")
+            ? rawSignedUrl
+            : new URL(
+              rawSignedUrl.startsWith("/storage/v1/")
+                ? rawSignedUrl
+                : `/storage/v1${rawSignedUrl.startsWith("/") ? rawSignedUrl : `/${rawSignedUrl}`}`,
+              supabaseUrl,
+            ).toString();
+          const parsedSignedUrl = new URL(normalizedSignedUrl);
+          const signedUrl = parsedSignedUrl.toString();
           if (parsedSignedUrl.origin !== new URL(supabaseUrl).origin || parsedSignedUrl.protocol !== "https:") {
             throw new Error("URL firmato asset editoriale non valido");
           }
