@@ -39,7 +39,7 @@ create table if not exists public.santalbino_editorial_posts (
   last_error_safe text,
   unique (logical_key, revision),
   constraint santalbino_editorial_posts_instagram_asset_jpeg_check
-    check (not coalesce(platforms -> 'instagram' = 'true'::jsonb, false) or lower(asset_path) ~ '[.]jpe?g),
+    check (not coalesce(platforms -> 'instagram' = 'true'::jsonb, false) or lower(asset_path) ~ '[.]jpe?g$'),
   check (
     (status in ('approved', 'scheduled', 'publishing', 'published', 'partial', 'failed', 'unknown')
       and approved_by is not null and approved_at is not null)
@@ -90,7 +90,7 @@ alter table public.santalbino_editorial_posts
   drop constraint if exists santalbino_editorial_posts_instagram_asset_jpeg_check;
 alter table public.santalbino_editorial_posts
   add constraint santalbino_editorial_posts_instagram_asset_jpeg_check
-  check (not coalesce(platforms -> 'instagram' = 'true'::jsonb, false) or lower(asset_path) ~ '\.jpe?g$');
+  check (not coalesce(platforms -> 'instagram' = 'true'::jsonb, false) or lower(asset_path) ~ '[.]jpe?g$');
 
 alter table public.santalbino_editorial_deliveries
   drop constraint if exists santalbino_editorial_deliveries_status_check;
@@ -266,7 +266,7 @@ begin
      or right(p_logical_key, char_length(p_content_type) + 1) <> (':' || p_content_type)
      or p_caption is null or char_length(btrim(p_caption)) not between 1 and 2200
      or p_asset_path is null or left(p_asset_path, 17) <> 'social-editorial/' or length(p_asset_path) not between 18 and 520 or strpos(p_asset_path, '..') > 0 or translate(p_asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') <> ''
-     or (coalesce(p_platforms -> 'instagram' = 'true'::jsonb, false) and lower(p_asset_path) !~ '\.jpe?g$')
+     or (coalesce(p_platforms -> 'instagram' = 'true'::jsonb, false) and lower(p_asset_path) !~ '[.]jpe?g$')
      or p_asset_sha256 is null or p_asset_sha256 !~ '^[a-f0-9]{64}$'
      or p_platforms is null or jsonb_typeof(p_platforms) <> 'object'
      or (p_platforms ? 'facebook' and jsonb_typeof(p_platforms -> 'facebook') <> 'boolean')
