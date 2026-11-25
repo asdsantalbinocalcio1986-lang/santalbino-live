@@ -104,11 +104,22 @@ The project owner explicitly authorized corrective work on the already-open soci
 - PR #107: `588aaefcaac7b8bc79b081ea0726195dc08ffa7d`
 
 ### Verification and remaining limits
-- Earlier CI #594 for PR #107 passed validation and social UI guards before the latest popup changes; latest head has no completed CI run visible yet.
-- PR #106's earlier CI reached successful SQL and UI guard steps but was cancelled before full completion during successive commit updates; latest head has no completed full CI run visible.
-- No final manual browser test or independent Gemini review has been completed.
+- **Updated verification on 2026-11-25:** PR #106 HEAD `bc75b97690b867e279df5d68bef55b5890221b25` passed CI run #599 in full: application validation, ephemeral PostgreSQL SQL integration, isolated local Supabase integration (Auth/RLS/Storage/revision lifecycle), and Playwright control-room browser E2E. Pages deployment was skipped intentionally.
+- **Updated verification on 2026-11-25:** PR #107 HEAD `588aaefcaac7b8bc79b081ea0726195dc08ffa7d` passed CI run #602: application validation and social-copy UI guard tests. Pages deployment was skipped intentionally.
+- No manual browser smoke test of the social sharing flows or independent Gemini review has been completed.
 - Client-computed SHA-256 is stored after SQL format validation only; server-side object-byte verification is not implemented.
 - Publisher hardening remains untouched: atomic claim/lease, ambiguous Meta outcomes and reconciliation, per-platform idempotency, and safe retries remain blockers before automatic editorial publishing.
 - Both PRs remain Draft/unmerged. No main, production, DB, Storage configuration, cron, secret, Meta account, deployment or real publication changes were made.
 
 Independent review handoff: `AI_WORKSPACE/GEMINI_REVIEW_SOCIAL_FIXES_2026-11-25.md`.
+
+
+## Verification refresh — 2026-11-25
+
+GitHub Actions was rechecked against the exact current PR HEAD SHAs:
+- PR #106: CI run #599 completed successfully. All three validation/integration jobs passed, including the local Supabase + Playwright browser E2E job. The Pages deploy job was skipped because this is a pull request.
+- PR #107: CI run #602 completed successfully. Application validation and social-copy guard tests passed. The Pages deploy job was skipped because this is a pull request.
+- PR descriptions were refreshed to record the current run IDs, exact HEAD SHAs and remaining limitations.
+- Both PRs remain open Drafts and unmerged. No production deploy, merge, live Supabase mutation, Meta action or external social post was performed.
+
+Next gates: (1) complete the social sharing manual smoke test in a controlled demo browser, with no final send to recipients; (2) obtain and reconcile the independent Gemini review against the exact HEADs; (3) only then decide whether any additional narrow fixes are warranted. Do not begin publisher hardening or automatic Meta publishing as part of this narrow corrective authorization.
