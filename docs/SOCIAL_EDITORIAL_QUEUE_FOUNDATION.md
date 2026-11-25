@@ -1,4 +1,4 @@
-# SANTA Live — social editorial queue and worker
+# SANTA Live — social editorial queue, worker and activation boundary
 
 **Status:** implementation proposal on a feature branch, validated only in isolated CI. The SQL is still under `supabase/proposals/`; no hosted migration, Edge Function deployment, cron job, secret, Meta account or social publication has been changed.
 
