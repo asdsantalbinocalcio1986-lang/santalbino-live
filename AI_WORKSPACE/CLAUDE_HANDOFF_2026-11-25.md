@@ -95,7 +95,7 @@ Please independently verify these points and report exact corrections/omissions:
 - State shape: `logos: {home, away}` around `1378`; hydration/merge around `1398` and `2149`.
 - Settings UI: `4403–4405`; upload handler: `4857`; shared upload guard/function: `2010–2022`.
 - Reset: `4805` retains logo URLs.
-- Direct renderer reads include around `2554`, `2807`, `3032`, `3265`, `3341`, `3402`, `3550`, `4042`. Search every remaining use, including archive/restore/import.
+- Direct renderer reads include around `2554`, `2805`, `3032`, `3262`, `3341`, `3402`, `3550`, `4039`. Search every remaining use, including archive/restore/import.
 - `MEDIA_BUCKET = 'santalbino-media'` around `1648`.
 - Live read-only Supabase evidence: bucket exists, public=true, 8 MiB limit, JPEG/PNG/WebP; storage policies allow authenticated admins (via `is_santalbino_admin()`) to insert/update/delete and public/anon/authenticated users to read. No storage writes were made.
 - Test mode blocks `uploadSharedImage()`; however test mode uses a separate state table in the same project, not a separate storage environment.
