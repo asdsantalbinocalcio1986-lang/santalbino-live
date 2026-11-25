@@ -21,6 +21,11 @@ assert.match(source, /Snapshot partita non valido/,
   'The post-match save flow must reject malformed snapshots before uploading or persisting them.');
 assert.match(source, /case 'saveMatchResultGraphic':[\s\S]{0,650}catch \(error\) \{ toast\('Download grafica non riuscito:/,
   'Post-match graphic download failures must be handled locally and shown to the operator.');
+assert.match(source, /remove\(\[uploadedPath\]\)[\s\S]{0,550}cleanupError/,
+  'A failed Storage cleanup must be detected, including Supabase SDK returned errors.');
+assert.match(source, /caricamento temporaneo non è stato eliminato/,
+  'The operator must be told when an uploaded orphan may remain and given its storage path.');
+
 
 
 
