@@ -209,7 +209,8 @@ export async function processEditorialClaim(claim: EditorialClaim, deps: WorkerD
     if (url.protocol !== "https:") throw new Error("URL asset editoriale non sicuro");
   } catch (error) {
     for (const delivery of claim.deliveries) {
-      await completeSafely(deps, post, delivery.platform, "unknown", null, error);
+      // Asset loading and validation happen before any Meta POST, so this failure is safe to retry.
+      await completeSafely(deps, post, delivery.platform, "failed_retryable", null, error);
     }
     return;
   }
