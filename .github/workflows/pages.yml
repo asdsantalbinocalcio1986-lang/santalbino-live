@@ -36,7 +36,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Test editorial worker with mocked Meta transport
-        run: deno test --no-check supabase/functions/santalive-editorial-worker/index_test.ts
+        run: deno test supabase/functions/santalive-editorial-worker/index_test.ts
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
