@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID, randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -94,9 +94,15 @@ async function main() {
   `);
 
   psql('supabase/proposals/postmatch_editorial_revisions.sql', true);
+  // The CI job moves hosted migrations out of supabase/migrations before booting
+  // the isolated stack. Resolve the preserved copy there; use the repository path
+  // for a direct local invocation.
+  const migrationRoot = existsSync('/tmp/santalbino-hosted-migrations')
+    ? '/tmp/santalbino-hosted-migrations'
+    : 'supabase/migrations';
   // Exercise the additive social publisher schema only on this disposable local stack.
-  psql('supabase/migrations/20261123160000_santalbino_social_publications.sql', true);
-  psql('supabase/migrations/20261125120000_santalbino_social_publisher_claims.sql', true);
+  psql(`${migrationRoot}/20261123160000_santalbino_social_publications.sql`, true);
+  psql(`${migrationRoot}/20261125120000_santalbino_social_publisher_claims.sql`, true);
   psql('tests/social-publisher/claims.sql', true);
   const adminToken = await signIn(adminEmail);
   const nonAdminToken = await signIn(nonAdminEmail);
