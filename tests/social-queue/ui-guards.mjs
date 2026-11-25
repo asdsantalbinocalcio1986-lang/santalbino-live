@@ -24,6 +24,16 @@ assert.match(source, /La pubblicazione automatica resta disattivata/,
   'The UI must explicitly distinguish approval/queueing from actual publication.');
 assert.match(source, /unknown: 'Esito incerto · verifica necessaria'/,
   'Unknown outcomes must be clearly labelled as requiring reconciliation.');
+assert.match(source, /Anteprima grafica da approvare/,
+  'The admin must see the actual uploaded graphic before approving a revision.');
+assert.match(source, /editorialResolvePublished[\s\S]*?editorialResolveRetry/,
+  'Unknown delivery outcomes must offer explicit admin reconciliation actions.');
+assert.match(source, /editorialDefaultLogicalKey\(t\.value\)/,
+  'Changing the editorial content type must update the default revision key.');
+assert.match(source, /Per Instagram è necessario un file JPEG/,
+  'Instagram uploads must be restricted to JPEG images.');
+assert.match(source, /resolve_santalbino_editorial_delivery/,
+  'Editorial unknown outcomes must be reconciled through the audited admin RPC.');
 assert.doesNotMatch(source, /db\.rpc\('claim_santalbino_editorial_queue'/,
   'The browser must never claim editorial deliveries or dispatch the worker.');
 assert.doesNotMatch(source, /SOCIAL_EDITORIAL_DISPATCH_ENABLED\s*=\s*true/,
