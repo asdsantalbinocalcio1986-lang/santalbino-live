@@ -16,6 +16,8 @@ declare
   v_event text := 'publisher-claim-test-' || gen_random_uuid()::text;
   v_event2 text := 'publisher-platform-expansion-' || gen_random_uuid()::text;
   v_expansion jsonb;
+  v_missing jsonb;
+  v_event3 text := 'publisher-missing-claim-test-' || gen_random_uuid()::text;
 begin
   -- The RPC must reject NULL event types and non-boolean platform values
   -- with the documented validation SQLSTATE.
@@ -152,6 +154,30 @@ begin
     raise exception 'Unknown remote outcome was incorrectly retried: %', v_fourth;
   end if;
 
+  delete from public.santalbino_social_publications where id = v_id;
+
+  -- A processing row without a fencing token must be durably moved to unknown.
+  v_missing := public.claim_santalbino_social_publication(
+    v_event3, 'local-test', 'goal', 'Missing claim token test', 'https://example.test/missing.jpg',
+    '{"facebook":true,"instagram":false}'::jsonb
+  );
+  if v_missing ->> 'result' <> 'claimed' then
+    raise exception 'Initial claim for missing-token fixture failed: %', v_missing;
+  end if;
+  v_id := (v_missing ->> 'id')::uuid;
+  update public.santalbino_social_publications
+     set claim_token = null, lease_expires_at = null
+   where id = v_id;
+  v_missing := public.claim_santalbino_social_publication(
+    v_event3, 'local-test', 'goal', 'Missing claim token test', 'https://example.test/missing.jpg',
+    '{"facebook":true,"instagram":false}'::jsonb
+  );
+  if v_missing ->> 'result' <> 'reconciliation_required'
+     or v_missing #>> '{row,facebook_status}' <> 'unknown'
+     or v_missing #>> '{row,overall_status}' <> 'reconciliation_required'
+     or v_missing #>> '{row,claim_token}' is not null then
+    raise exception 'Processing row without a fencing token was not durably reconciled: %', v_missing;
+  end if;
   delete from public.santalbino_social_publications where id = v_id;
 
   -- A previously completed Facebook-only event may later enable Instagram.
