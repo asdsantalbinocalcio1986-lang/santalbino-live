@@ -77,8 +77,10 @@ const legacyBackslashRegex = "lower(p_asset_path) !~ '" + String.fromCharCode(92
 assert.ok(!queueSql.includes(legacyBackslashRegex),
   'The SQL must not reintroduce a backslash-dot regex that psql parses as a meta-command.');
 
-assert.match(source, /function matchResultSnapshotKey\(snapshot\)[\s\S]*?const \{ rev, \.\.\.content \} = snapshot[\s\S]*?JSON\.stringify\(content\)/,
-  'MATCH RESULT freshness must compare the match content, not the unrelated state revision number.');
+assert.match(source, /function matchResultSnapshotKey\(snapshot\)[\s\S]*?const \{ rev, \.\.\.content \} = snapshot[\s\S]*?Object\.keys\(value\)\.sort\(\)[\s\S]*?JSON\.stringify\(canonical\(content\)\)/,
+  'MATCH RESULT freshness must canonicalize nested object keys for PostgreSQL JSONB round-trips while ignoring unrelated state revision numbers.');
+assert.match(source, /PostgreSQL JSONB does not preserve JavaScript object-key insertion order/,
+  'Snapshot freshness comparison must account for JSONB key ordering so saved current revisions reopen as current.');
 assert.match(source, /events: \(Array\.isArray\(S\.events\) \? S\.events : \[\]\)\.map\(e => \(\{[\s\S]*?player: String\(e\.player \|\| ''\)/,
   'The immutable post-match snapshot must include scorer names so changing a goal scorer invalidates old artwork.');
 assert.match(source, /const latestSnapshotMatches = !!latest && matchResultSnapshotKey\(latest\.snapshot\) === matchResultSnapshotKey\(matchResultEditor\.snapshot\)/,
