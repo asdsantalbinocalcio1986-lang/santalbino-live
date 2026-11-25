@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID, randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -94,14 +94,103 @@ async function main() {
   `);
 
   psql('supabase/proposals/postmatch_editorial_revisions.sql', true);
+  // The CI job moves hosted migrations out of supabase/migrations before booting
+  // the isolated stack. Resolve the preserved copy there; use the repository path
+  // for a direct local invocation.
+  const migrationRoot = existsSync('/tmp/santalbino-hosted-migrations')
+    ? '/tmp/santalbino-hosted-migrations'
+    : 'supabase/migrations';
+  // Exercise the additive social publisher schema only on this disposable local stack.
+  psql(`${migrationRoot}/20261123160000_santalbino_social_publications.sql`, true);
+  psql(`${migrationRoot}/20261125120000_santalbino_social_publisher_claims.sql`, true);
+  psql('tests/social-publisher/claims.sql', true);
+  psql('supabase/proposals/social_editorial_queue.sql', true);
+  execFileSync('node', ['tests/social-publisher/claim-concurrency.mjs'], {
+    stdio: 'inherit',
+    env: process.env
+  });
   const adminToken = await signIn(adminEmail);
   const nonAdminToken = await signIn(nonAdminEmail);
+
+  // The social publication log is readable only by the registered SANTA Live admin.
+  const socialRlsEventId = `publisher-rls-${randomUUID()}`;
+  await request('/rest/v1/santalbino_social_publications', {
+    method: 'POST', token: service, key: service,
+    body: {
+      event_id: socialRlsEventId, match_id: 'local-rls', event_type: 'goal',
+      caption: 'RLS integration test', image_url: 'https://example.test/rls.jpg',
+      platforms: { facebook: true, instagram: false }
+    },
+    expected: [201]
+  });
+  const adminSocialRows = await request(
+    '/rest/v1/santalbino_social_publications?select=event_id&event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { token: adminToken }
+  );
+  assert.equal(adminSocialRows.data?.length, 1, 'SANTA Live admin must read the social publication log.');
+  const nonAdminSocialRows = await request(
+    '/rest/v1/santalbino_social_publications?select=event_id&event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { token: nonAdminToken }
+  );
+  assert.equal(nonAdminSocialRows.data?.length, 0, 'Non-admin users must not read the social publication log.');
+  await request(
+    '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { method: 'DELETE', token: service, key: service, expected: [204] }
+  );
+
+  // Exercise the claim RPC through PostgREST as the same service_role used by the Edge Function.
+  const rpcEventId = `publisher-rpc-${randomUUID()}`;
+  const rpcParams = {
+    p_event_id: rpcEventId, p_match_id: 'local-rpc', p_event_type: 'goal',
+    p_caption: 'Claim RPC integration test', p_image_url: 'https://example.test/rpc.jpg',
+    p_platforms: { facebook: true, instagram: false }
+  };
+  const firstRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
+    method: 'POST', token: service, key: service, body: rpcParams
+  });
+  assert.equal(firstRpcClaim.data?.result, 'claimed', 'service_role must acquire the first claim via PostgREST.');
+  const secondRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
+    method: 'POST', token: service, key: service, body: rpcParams
+  });
+  assert.equal(secondRpcClaim.data?.result, 'processing',
+    'A second service_role request must report the active claim without starting another Meta request.');
+  await request(
+    '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(rpcEventId),
+    { method: 'DELETE', token: service, key: service, expected: [204] }
+  );
 
   // One tiny JPEG is enough to exercise the real Storage API and signed downloads.
   const jpeg = new Uint8Array(Buffer.from(
     '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9k=',
     'base64'
   ));
+
+  // Editorial originals stay private until the worker signs a short-lived Meta URL.
+  const editorialPath = `social-editorial/test/${matchId}/${randomUUID()}.jpg`;
+  const editorialObjectPath = editorialPath.split('/').map(encodeURIComponent).join('/');
+  const editorialUpload = await request('/storage/v1/object/santalbino-editorial/' + editorialObjectPath, {
+    method: 'POST', token: adminToken, body: jpeg,
+    headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'false' }
+  });
+  assert.equal(editorialUpload.response.status, 200, 'Admin could not upload a private editorial asset');
+
+  const editorialSigned = await request('/storage/v1/object/sign/santalbino-editorial/' + editorialObjectPath, {
+    method: 'POST', token: adminToken, body: { expiresIn: 600 }
+  });
+  const editorialSignedUrl = editorialSigned.data?.signedURL || editorialSigned.data?.signedUrl;
+  assert.ok(editorialSignedUrl, 'Private editorial asset did not produce a signed URL');
+  const editorialSignedFetch = await fetch(editorialSignedUrl.startsWith('http') ? editorialSignedUrl : api + '/storage/v1' + editorialSignedUrl);
+  assert.equal(editorialSignedFetch.status, 200, 'Signed editorial asset URL could not be fetched');
+
+  const nonAdminEditorial = await fetch(api + '/storage/v1/object/authenticated/santalbino-editorial/' + editorialObjectPath, {
+    headers: { apikey: anon, Authorization: `Bearer ${nonAdminToken}` }
+  });
+  assert.notEqual(nonAdminEditorial.status, 200, 'Non-admin user could read a private editorial original');
+
+  const publicEditorial = await fetch(api + '/storage/v1/object/public/santalbino-editorial/' + editorialObjectPath, {
+    headers: { apikey: anon }
+  });
+  assert.notEqual(publicEditorial.status, 200, 'Private editorial original was exposed through a public URL');
 
   const pathFor = (revision) => `postmatch/test/${matchId}/${revision}-${randomUUID()}.jpg`;
   const firstPath = pathFor('r1');
@@ -208,7 +297,7 @@ async function main() {
   });
   assert.equal(finalDownload.status, 200, 'Approved graphic was not preserved');
 
-  console.log('PASS: local Supabase Auth, admin RLS, Storage upload/signed URL/immutability, revision history, save and approval RPCs.');
+  console.log('PASS: local Supabase Auth, admin RLS, private editorial Storage and signed URLs, post-match Storage, revision history, save and approval RPCs.');
   console.log(`PASS: isolated local match ${matchId}; no hosted Supabase project was contacted.`);
 }
 
