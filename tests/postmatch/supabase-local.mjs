@@ -164,6 +164,33 @@ async function main() {
     'base64'
   ));
 
+  // Editorial originals stay private until the worker signs a short-lived Meta URL.
+  const editorialPath = `social-editorial/test/${matchId}/${randomUUID()}.jpg`;
+  const editorialObjectPath = editorialPath.split('/').map(encodeURIComponent).join('/');
+  const editorialUpload = await request('/storage/v1/object/santalbino-editorial/' + editorialObjectPath, {
+    method: 'POST', token: adminToken, body: jpeg,
+    headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'false' }
+  });
+  assert.equal(editorialUpload.response.status, 200, 'Admin could not upload a private editorial asset');
+
+  const editorialSigned = await request('/storage/v1/object/sign/santalbino-editorial/' + editorialObjectPath, {
+    method: 'POST', token: adminToken, body: { expiresIn: 600 }
+  });
+  const editorialSignedUrl = editorialSigned.data?.signedURL || editorialSigned.data?.signedUrl;
+  assert.ok(editorialSignedUrl, 'Private editorial asset did not produce a signed URL');
+  const editorialSignedFetch = await fetch(editorialSignedUrl.startsWith('http') ? editorialSignedUrl : api + '/storage/v1' + editorialSignedUrl);
+  assert.equal(editorialSignedFetch.status, 200, 'Signed editorial asset URL could not be fetched');
+
+  const nonAdminEditorial = await fetch(api + '/storage/v1/object/authenticated/santalbino-editorial/' + editorialObjectPath, {
+    headers: { apikey: anon, Authorization: `Bearer ${nonAdminToken}` }
+  });
+  assert.notEqual(nonAdminEditorial.status, 200, 'Non-admin user could read a private editorial original');
+
+  const publicEditorial = await fetch(api + '/storage/v1/object/public/santalbino-editorial/' + editorialObjectPath, {
+    headers: { apikey: anon }
+  });
+  assert.notEqual(publicEditorial.status, 200, 'Private editorial original was exposed through a public URL');
+
   const pathFor = (revision) => `postmatch/test/${matchId}/${revision}-${randomUUID()}.jpg`;
   const firstPath = pathFor('r1');
   await upload(firstPath, adminToken, jpeg);
@@ -269,7 +296,7 @@ async function main() {
   });
   assert.equal(finalDownload.status, 200, 'Approved graphic was not preserved');
 
-  console.log('PASS: local Supabase Auth, admin RLS, Storage upload/signed URL/immutability, revision history, save and approval RPCs.');
+  console.log('PASS: local Supabase Auth, admin RLS, private editorial Storage and signed URLs, post-match Storage, revision history, save and approval RPCs.');
   console.log(`PASS: isolated local match ${matchId}; no hosted Supabase project was contacted.`);
 }
 
