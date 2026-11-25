@@ -625,6 +625,12 @@ begin
   if not found or v_delivery.status <> 'unknown' then
     raise exception 'editorial delivery is not awaiting reconciliation' using errcode = '40001';
   end if;
+  if exists (
+    select 1 from public.santalbino_editorial_deliveries d
+     where d.post_id = p_post_id and d.id <> v_delivery.id and d.status = 'processing'
+  ) then
+    raise exception 'another platform delivery is still processing' using errcode = '55000';
+  end if;
 
   insert into public.santalbino_editorial_delivery_resolutions
     (delivery_id, post_id, platform, resolution, external_post_id, note, resolved_by)
