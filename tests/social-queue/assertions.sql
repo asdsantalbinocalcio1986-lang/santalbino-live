@@ -28,7 +28,7 @@ begin
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Prima bozza editoriale', 'social-editorial/test/match-day-r1.jpg',
     repeat('a', 64), '{"facebook":true,"instagram":true}'::jsonb,
-    '{"score":"0-0","teams":["Sant’Albino","Test FC"]}'::jsonb
+    '{"score":"0-0","teams":["Sant’Albino","Test FC"],"match":{"date":"2099-12-31","time":"18:00"}}'::jsonb
   );
   if v_first.revision <> 1 or v_first.status <> 'draft' then
     raise exception 'First editorial draft was not created as revision 1: %', row_to_json(v_first);
@@ -60,8 +60,9 @@ begin
     repeat('b', 64), '{"facebook":true,"instagram":false}'::jsonb,
     '{"score":"1-0","teams":["Sant’Albino","Test FC"],"match":{"date":"2099-12-31","time":"18:00"}}'::jsonb
   );
-  if v_second.revision <> 2 or v_second.status <> 'draft' then
-    raise exception 'Second editorial draft was not revision 2: %', row_to_json(v_second);
+  if v_second.revision <> 2 or v_second.status <> 'draft'
+     or v_second.expires_at is distinct from (timestamp '2099-12-31 18:00' at time zone 'Europe/Rome') then
+    raise exception 'Second editorial draft revision or Europe/Rome kickoff expiry is incorrect: %', row_to_json(v_second);
   end if;
 
   insert into storage.objects (bucket_id, name)
@@ -159,6 +160,10 @@ begin
     repeat('d', 64), '{"facebook":true,"instagram":true}'::jsonb,
     jsonb_build_object('score', '2-0', 'scorers', jsonb_build_array('Rossi'), 'clock', jsonb_build_object('phase', 'ft', 'finishedAt', (extract(epoch from (now() - interval '1 hour')) * 1000)::bigint))
   );
+  if v_queue.expires_at <= now() + interval '70 hours'
+     or v_queue.expires_at >= now() + interval '72 hours' then
+    raise exception 'Post-match expiry is not 72 hours after the recorded final whistle: %', v_queue.expires_at;
+  end if;
   select * into v_queue from public.approve_santalbino_editorial_post(v_queue.id, 1, now() - interval '1 minute');
 
   select * into v_retry from public.save_santalbino_editorial_draft(
@@ -167,6 +172,7 @@ begin
     repeat('e', 64), '{"facebook":true,"instagram":false}'::jsonb,
     '{"kind":"retry-test"}'::jsonb
   );
+  if v_retry.expires_at is not null then raise exception 'Club notice must not receive automatic expiry'; end if;
   select * into v_retry from public.approve_santalbino_editorial_post(v_retry.id, 1, now() + interval '1 hour');
 
   select * into v_exhausted from public.save_santalbino_editorial_draft(
@@ -209,6 +215,7 @@ declare
   v_permanent_token uuid;
   v_mixed_id uuid;
   v_mixed_token uuid;
+  v_expiry_claims jsonb;
 begin
   begin
     insert into public.santalbino_editorial_posts (
@@ -371,6 +378,23 @@ begin
   );
   if v_status <> 'unknown' then
     raise exception 'Mixed-platform cap fixture did not close in unknown state: %', v_status;
+  end if;
+
+  insert into public.santalbino_editorial_posts (
+    logical_key, content_type, revision, status, caption, asset_path, asset_sha256,
+    platforms, snapshot, expires_at, scheduled_at, created_by, approved_by, approved_at
+  ) values (
+    'worker:expired-match-day', 'match_day', 1, 'scheduled', 'Scadenza test',
+    'social-editorial/test/expired.jpg', repeat('6', 64), '{"facebook":true}'::jsonb,
+    '{"match":{"date":"2000-01-01","time":"12:00"}}'::jsonb,
+    now() - interval '1 minute', now() - interval '1 day',
+    '11111111-1111-4111-8111-111111111111'::uuid,
+    '11111111-1111-4111-8111-111111111111'::uuid, now()
+  );
+  v_expiry_claims := public.claim_santalbino_editorial_queue(5, true);
+  if jsonb_array_length(v_expiry_claims) <> 0
+     or (select status from public.santalbino_editorial_posts where logical_key = 'worker:expired-match-day') <> 'expired' then
+    raise exception 'Expired pre-match content was not blocked and transitioned to expired';
   end if;
 end
 $worker_tests$;
