@@ -301,14 +301,14 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
           return { publicUrl: signedUrl };
         },
         recordContainer: async (postId, token, containerId) => {
-          const { data: recorded, error: recordError } = await adminClient.rpc(
+          const { data: recorded, error: recordError } = await rpcClient.rpc(
             "record_santalbino_editorial_container",
             { p_post_id: postId, p_platform: "instagram", p_claim_token: token, p_container_id: containerId },
           );
           return !recordError && recorded === true;
         },
         complete: async (postId, platform, token, status, externalPostId, errorSafe) => {
-          const { error: completionError } = await adminClient.rpc("complete_santalbino_editorial_delivery", {
+          const { error: completionError } = await rpcClient.rpc("complete_santalbino_editorial_delivery", {
             p_post_id: postId,
             p_platform: platform,
             p_claim_token: token,
