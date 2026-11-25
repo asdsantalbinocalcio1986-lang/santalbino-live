@@ -4748,7 +4748,8 @@ document.addEventListener('click', async e => {
         }
       }
       if (postBlob) await saveBlob(postBlob, 'santalbino-evento.jpg');
-      window.open(waUrl, '_blank', 'noopener');
+      const whatsappWindow = window.open(waUrl, '_blank');
+      if (whatsappWindow) whatsappWindow.opener = null;
       if (postBlob) toast('Immagine salvata: allegala al messaggio WhatsApp già pronto');
       break;
     }
