@@ -42,10 +42,11 @@ assert.match(source, /editorialSafeKey\([\s\S]*?normalize\('NFKD'\)/,
   'Logical revision keys must be normalized before submission.');
 
 
+
 const queueSql = readFileSync(new URL('../../supabase/proposals/social_editorial_queue.sql', import.meta.url), 'utf8');
-assert.match(queueSql, /lower\(asset_path\) ~ '\[\.\]jpe\?g\/,
-  'Instagram JPEG validation must use a psql-safe character class, not a backslash escape that psql parses as a meta-command.');
-assert.doesNotMatch(queueSql, /lower\(asset_path\) ~ '\\\\?\./,
-  'The editorial SQL must not reintroduce a backslash-dot regex that breaks psql execution.');
+assert.ok(queueSql.includes("lower(asset_path) ~ '[.]jpe?g$'"),
+  'Instagram JPEG validation must use a psql-safe character class.');
+assert.ok(!queueSql.includes("lower(asset_path) ~ '\\.jpe?g$'"),
+  'The editorial SQL must not reintroduce a backslash-dot regex that psql parses as a meta-command.');
 
 console.log('Editorial queue admin UI guard tests passed');
