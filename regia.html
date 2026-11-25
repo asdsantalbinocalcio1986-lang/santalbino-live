@@ -1623,9 +1623,7 @@ async function shareSocialDraft(kind, platform) {
   const rawHashtag = String(S.match.hashtag || '').trim();
   const hashtagBase = (rawHashtag || '#SANTALive').replace(/^#/, '');
   const hashtag = '#' + hashtagBase;
-  const escapedHashtag = hashtagBase.replace(/[.*+?^${}()|[\]\\]/g, '\\  const rawHashtag = String(S.match.hashtag || '').trim();
-  const hashtag = rawHashtag ? (rawHashtag.startsWith('#') ? rawHashtag : '#' + rawHashtag) : '#SANTALive';
-  const escapedHashtag = hashtag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');');
+  const escapedHashtag = hashtagBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const textWithoutHashtag = hashtag
     ? text
         .replace(new RegExp('(^|[\\s([{])#?' + escapedHashtag + '(?=$|[\\s)\\]}>.,!?;:])', 'giu'), '$1')
