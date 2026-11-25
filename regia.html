@@ -4178,7 +4178,10 @@ async function saveMatchResultRevision() {
   try {
     const caption = String($('#matchResultPost')?.value || '').trim();
     if (!caption) throw new Error('Inserisci il testo del post prima di salvare.');
-    const snapshot = matchResultEditor.snapshot || JSON.parse(JSON.stringify(S));
+    const snapshot = matchResultEditor.snapshot || capturePostmatchSnapshot();
+    if (!snapshot || typeof snapshot !== 'object' || !snapshot.match || !Array.isArray(snapshot.events)) {
+      throw new Error('Snapshot partita non valido: riapri MATCH RESULT e riprova.');
+    }
     const matchId = matchResultSafeId(snapshot);
     const environment = TEST_MODE ? 'test' : 'production';
     let graphicPath = matchResultEditor.graphicPath;
