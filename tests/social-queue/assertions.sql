@@ -217,7 +217,7 @@ begin
     ) values (
       'worker:invalid-platform:custom', 'custom', 1, 'Invalid platform',
       'social-editorial/test/invalid.jpg', repeat('7', 64),
-      '{"facebook":true,"tiktok":true}'::jsonb, '{}'::jsonb, auth.uid()
+      '{"facebook":true,"tiktok":true}'::jsonb, '{}'::jsonb, '11111111-1111-4111-8111-111111111111'::uuid
     );
     raise exception 'Unsupported platform key bypassed the table constraint';
   exception when check_violation then null;
