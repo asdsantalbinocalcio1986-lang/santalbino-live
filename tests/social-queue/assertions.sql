@@ -15,6 +15,7 @@ declare
   v_approved_new public.santalbino_editorial_posts%rowtype;
   v_exhausted public.santalbino_editorial_posts%rowtype;
   v_permanent public.santalbino_editorial_posts%rowtype;
+  v_mixed public.santalbino_editorial_posts%rowtype;
   v_count integer;
 begin
   if (select public from storage.buckets where id = 'santalbino-editorial') is distinct from false then
@@ -181,6 +182,13 @@ begin
     repeat('4', 64), '{"facebook":true}'::jsonb, '{"kind":"permanent-error"}'::jsonb
   );
   select * into v_permanent from public.approve_santalbino_editorial_post(v_permanent.id, 1, now() + interval '1 hour');
+
+  select * into v_mixed from public.save_santalbino_editorial_draft(
+    'match:ci-match:mixed-retry-cap:club_notice', 'club_notice', null,
+    'Avviso con una piattaforma esaurita', 'social-editorial/test/mixed-retry-cap.jpg',
+    repeat('5', 64), '{"facebook":true,"instagram":true}'::jsonb, '{"kind":"mixed-retry-cap"}'::jsonb
+  );
+  select * into v_mixed from public.approve_santalbino_editorial_post(v_mixed.id, 1, now() - interval '1 minute');
 end
 $admin_tests$;
 
@@ -199,6 +207,8 @@ declare
   v_exhausted_token uuid;
   v_permanent_id uuid;
   v_permanent_token uuid;
+  v_mixed_id uuid;
+  v_mixed_token uuid;
 begin
   begin
     insert into public.santalbino_editorial_posts (
@@ -333,6 +343,29 @@ begin
   end if;
   if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
     raise exception 'Permanent Meta rejection was automatically retried';
+  end if;
+
+  select id into v_mixed_id from public.santalbino_editorial_posts
+   where logical_key = 'match:ci-match:mixed-retry-cap:club_notice';
+  insert into public.santalbino_editorial_deliveries
+    (post_id, platform, status, attempt_count, last_attempt_at)
+  values (v_mixed_id, 'facebook', 'failed_retryable', 5, now() - interval '2 hours');
+  v_claims := public.claim_santalbino_editorial_queue(5, true);
+  if jsonb_array_length(v_claims) <> 1
+     or jsonb_array_length(v_claims -> 0 -> 'deliveries') <> 1
+     or v_claims -> 0 -> 'deliveries' -> 0 ->> 'platform' <> 'instagram' then
+    raise exception 'An exhausted Facebook delivery was claimed together with a due Instagram delivery: %', v_claims;
+  end if;
+  v_mixed_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
+  if (select status from public.santalbino_editorial_deliveries where post_id = v_mixed_id and platform = 'facebook') <> 'failed_retryable'
+     or (select attempt_count from public.santalbino_editorial_deliveries where post_id = v_mixed_id and platform = 'facebook') <> 5 then
+    raise exception 'The exhausted Facebook delivery was changed by the mixed-platform claim';
+  end if;
+  v_status := public.complete_santalbino_editorial_delivery(
+    v_mixed_id, 'instagram', v_mixed_token, 'unknown', null, 'Mixed-platform cap regression test'
+  );
+  if v_status <> 'unknown' then
+    raise exception 'Mixed-platform cap fixture did not close in unknown state: %', v_status;
   end if;
 end
 $worker_tests$;
