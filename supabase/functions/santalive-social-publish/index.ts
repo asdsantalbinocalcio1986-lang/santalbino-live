@@ -15,39 +15,110 @@ const allowedEvents = new Set(["goal", "red", "halftime", "fulltime"]);
 const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v27.0";
 const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
-function safeError(error: unknown, token?: string) {
+export function safeError(error: unknown, token?: string) {
   let message = error instanceof Error ? error.message : String(error);
   if (token) message = message.split(token).join("[token oscurato]");
-  return message.slice(0, 500);
+  message = message.replace(/access_token=[^&\s]+/gi, "access_token=[redacted]");
+  return message.slice(0, 300);
 }
 
-async function graphGet(path: string, params: Record<string, string>) {
+export type MetaFailureOutcome = "unknown" | "failed_retryable" | "failed";
+
+export class MetaRequestError extends Error {
+  constructor(message: string, readonly outcome: MetaFailureOutcome) {
+    super(message);
+    this.name = "MetaRequestError";
+  }
+}
+
+const retryableMetaCodes = new Set([1, 2, 4, 17, 32, 341, 368, 613, 80001, 80002]);
+
+export function classifyMetaApiError(
+  error: unknown,
+  httpStatus: number,
+  writeOperation: boolean,
+): MetaFailureOutcome {
+  const payload = error && typeof error === "object"
+    ? error as Record<string, unknown>
+    : {};
+  const code = Number(payload.code);
+  const hasCode = Number.isFinite(code);
+
+  // A failed write with a 5xx response may have reached Meta before the error.
+  if (writeOperation && httpStatus >= 500) return "unknown";
+  if (payload.is_transient === true || httpStatus === 429 ||
+      (hasCode && retryableMetaCodes.has(code))) return "failed_retryable";
+
+  // These responses are explicit, non-transient rejections: retrying unchanged
+  // credentials, permissions, parameters or duplicate content cannot help.
+  if (hasCode && (
+    code === 3 || code === 10 || code === 100 || code === 190 ||
+    (code >= 200 && code <= 299) || code === 506
+  )) return "failed";
+
+  if (httpStatus >= 400 && httpStatus < 500) return "failed";
+  if (httpStatus >= 500) return writeOperation ? "unknown" : "failed_retryable";
+  return "unknown";
+}
+
+export function classifyMetaFailure(error: unknown): MetaFailureOutcome {
+  return error instanceof MetaRequestError ? error.outcome : "unknown";
+}
+
+export async function graphGet(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
   const url = new URL(`${graphBase}/${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  const response = await fetch(url);
-  const data = await response.json().catch(() => ({}));
+  let response: Response;
+  try {
+    response = await fetcher(url, { signal: AbortSignal.timeout(15000) });
+  } catch {
+    throw new MetaRequestError("Lettura Meta temporaneamente non disponibile", "failed_retryable");
+  }
+  const data = await response.json().catch(() => null);
+  if (!data) throw new MetaRequestError("Risposta Meta non leggibile durante la lettura", "failed_retryable");
   if (!response.ok || data.error) {
-    throw new Error(data.error?.message || `Meta Graph API HTTP ${response.status}`);
+    throw new MetaRequestError(
+      `Lettura Meta HTTP ${response.status}`,
+      classifyMetaApiError(data.error, response.status, false),
+    );
   }
   return data;
 }
 
-async function graphPost(path: string, params: Record<string, string>) {
-  const response = await fetch(`${graphBase}/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
-  });
-  const data = await response.json().catch(() => ({}));
+export async function graphPost(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
+  let response: Response;
+  try {
+    response = await fetcher(`${graphBase}/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params),
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    // La richiesta potrebbe essere stata accettata prima dell'interruzione.
+    throw new MetaRequestError("Esito della richiesta Meta non determinabile", "unknown");
+  }
+  const data = await response.json().catch(() => null);
+  if (!data) {
+    throw new MetaRequestError("Risposta Meta illeggibile: esito non determinabile", "unknown");
+  }
   if (!response.ok || data.error) {
-    throw new Error(data.error?.message || `Meta Graph API HTTP ${response.status}`);
+    const outcome = classifyMetaApiError(data.error, response.status, true);
+    throw new MetaRequestError(
+      outcome === "unknown"
+        ? `Meta Graph API HTTP ${response.status}: esito non determinabile`
+        : outcome === "failed"
+          ? `Meta Graph API HTTP ${response.status}: richiesta rifiutata in modo permanente`
+          : `Meta Graph API HTTP ${response.status}: rifiuto temporaneo`,
+      outcome,
+    );
   }
   return data;
 }
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-Deno.serve(async (req: Request) => {
+if (import.meta.main) Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
 
@@ -158,7 +229,7 @@ Deno.serve(async (req: Request) => {
         !image.pathname.startsWith("/storage/v1/object/public/santalbino-media/social/")) {
       return json({ error: "L'immagine deve provenire dall'archivio social pubblico SANTA Live" }, 400);
     }
-    const imageCheck = await fetch(imageUrl, { method: "HEAD" });
+    const imageCheck = await fetch(imageUrl, { method: "HEAD", signal: AbortSignal.timeout(10000) });
     if (!imageCheck.ok || !String(imageCheck.headers.get("content-type") || "").startsWith("image/")) {
       return json({ error: "Immagine non raggiungibile o formato non supportato" }, 400);
     }
@@ -167,56 +238,42 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Immagine superiore al limite di 8 MB" }, 400);
     }
 
-    const { data: existing, error: lookupError } = await adminClient
-      .from("santalbino_social_publications")
-      .select("*")
-      .eq("event_id", eventId)
-      .maybeSingle();
-    if (lookupError) return json({ error: "Lettura registro social non riuscita" }, 500);
-    if (existing?.overall_status === "published") {
-      return json({ status: "published", duplicate: true, facebook: existing.facebook_status, instagram: existing.instagram_status });
+    const { data: claim, error: claimError } = await adminClient.rpc(
+      "claim_santalbino_social_publication",
+      {
+        p_event_id: eventId,
+        p_match_id: matchId,
+        p_event_type: eventType,
+        p_caption: caption,
+        p_image_url: imageUrl,
+        p_platforms: platforms,
+      },
+    );
+    if (claimError || !claim) {
+      return json({ error: "Acquisizione pubblicazione non riuscita" }, 500);
     }
-    if (existing?.overall_status === "processing" &&
-        Date.now() - new Date(existing.updated_at).getTime() < 120000) {
-      return json({ status: "processing", duplicate: true, message: "Questo evento è già in elaborazione" }, 202);
+    if (claim.result !== "claimed") {
+      const status = claim.result === "already_published" ? "published"
+        : claim.result === "reconciliation_required" ? "reconciliation_required"
+        : "processing";
+      return json({
+        status,
+        duplicate: true,
+        message: claim.result === "reconciliation_required"
+          ? "Esito precedente da riconciliare: nessun nuovo invio a Meta è stato avviato."
+          : "Evento già acquisito o pubblicato.",
+      }, status === "published" ? 200 : 202);
     }
 
+    const row = claim.row;
+    const claimToken = String(claim.claim_token || "");
+    if (!row?.id || !claimToken) {
+      return json({ error: "Claim incompleto: pubblicazione bloccata in sicurezza" }, 500);
+    }
     const initial = {
-      event_id: eventId,
-      match_id: matchId || null,
-      event_type: eventType,
-      caption,
-      image_url: imageUrl,
-      platforms,
-      overall_status: "processing",
-      facebook_status: platforms.facebook
-        ? (existing?.facebook_status === "published" ? "published" : "processing")
-        : (existing?.facebook_status === "published" ? "published" : "skipped"),
-      instagram_status: platforms.instagram
-        ? (existing?.instagram_status === "published" ? "published" : "processing")
-        : (existing?.instagram_status === "published" ? "published" : "skipped"),
-      facebook_error: null,
-      instagram_error: null,
-      updated_at: new Date().toISOString(),
+      facebook_status: row.facebook_status,
+      instagram_status: row.instagram_status,
     };
-    let row = existing;
-    if (row) {
-      const { data, error } = await adminClient.from("santalbino_social_publications")
-        .update(initial).eq("id", row.id).select("*").single();
-      if (error) return json({ error: "Aggiornamento registro social non riuscito" }, 500);
-      row = data;
-    } else {
-      const { data, error } = await adminClient.from("santalbino_social_publications")
-        .insert(initial).select("*").single();
-      if (error) {
-        if (error.code === "23505") {
-          return json({ status: "processing", duplicate: true, message: "Evento già acquisito dal registro" }, 202);
-        }
-        return json({ error: "Creazione registro social non riuscita" }, 500);
-      }
-      row = data;
-    }
-
     let facebookStatus = initial.facebook_status;
     let instagramStatus = initial.instagram_status;
     let facebookPostId = row.facebook_post_id || null;
@@ -226,7 +283,7 @@ Deno.serve(async (req: Request) => {
     let instagramError: string | null = null;
 
     const persist = async () => {
-      const { error } = await adminClient.from("santalbino_social_publications").update({
+      const { data, error } = await adminClient.from("santalbino_social_publications").update({
         facebook_status: facebookStatus,
         instagram_status: instagramStatus,
         facebook_post_id: facebookPostId,
@@ -235,8 +292,8 @@ Deno.serve(async (req: Request) => {
         facebook_error: facebookError,
         instagram_error: instagramError,
         updated_at: new Date().toISOString(),
-      }).eq("id", row.id);
-      if (error) throw new Error("Salvataggio esito pubblicazione non riuscito");
+      }).eq("id", row.id).eq("claim_token", claimToken).select("id").maybeSingle();
+      if (error || !data) throw new Error("Salvataggio esito pubblicazione non riuscito o claim non più valido");
     };
 
     if (platforms.facebook && facebookStatus !== "published") {
@@ -251,7 +308,7 @@ Deno.serve(async (req: Request) => {
         if (!facebookPostId) throw new Error("Meta non ha restituito l'ID del post Facebook");
         facebookStatus = "published";
       } catch (error) {
-        facebookStatus = "failed";
+        facebookStatus = classifyMetaFailure(error);
         facebookError = safeError(error, pageToken);
       }
       await persist();
@@ -272,11 +329,20 @@ Deno.serve(async (req: Request) => {
         let ready = false;
         for (let attempt = 0; attempt < 8; attempt++) {
           const state = await graphGet(instagramContainerId, { fields: "status_code", access_token: pageToken });
-          if (state.status_code === "ERROR") throw new Error("Meta non ha elaborato l'immagine Instagram");
+          if (state.status_code === "ERROR") {
+            // Il container è fallito prima della pubblicazione: un nuovo tentativo
+            // può crearne uno nuovo senza ripetere un post già pubblicato.
+            instagramContainerId = null;
+            throw new MetaRequestError("Meta non ha elaborato il container Instagram", "failed_retryable");
+          }
           if (!state.status_code || state.status_code === "FINISHED") { ready = true; break; }
           await wait(1500);
         }
-        if (!ready) throw new Error("Elaborazione immagine Instagram ancora in corso; riprova dal registro");
+        if (!ready) {
+          // Il container esiste ed è persistito: il retry riprenderà il polling
+          // sullo stesso ID, senza crearne un altro.
+          throw new MetaRequestError("Container Instagram ancora in elaborazione", "failed_retryable");
+        }
         const published = await graphPost(`${instagramId}/media_publish`, {
           creation_id: instagramContainerId,
           access_token: pageToken,
@@ -285,7 +351,7 @@ Deno.serve(async (req: Request) => {
         if (!instagramMediaId) throw new Error("Meta non ha restituito l'ID del post Instagram");
         instagramStatus = "published";
       } catch (error) {
-        instagramStatus = "failed";
+        instagramStatus = classifyMetaFailure(error);
         instagramError = safeError(error, pageToken);
       }
       await persist();
@@ -295,13 +361,17 @@ Deno.serve(async (req: Request) => {
       (!platforms.instagram || instagramStatus === "published");
     const anyPublished = (platforms.facebook && facebookStatus === "published") ||
       (platforms.instagram && instagramStatus === "published");
-    const overallStatus = allPublished ? "published" : anyPublished ? "partial" : "failed";
-    const { error: finalError } = await adminClient.from("santalbino_social_publications").update({
+    const hasUnknown = facebookStatus === "unknown" || instagramStatus === "unknown";
+    const overallStatus = hasUnknown ? "reconciliation_required"
+      : allPublished ? "published" : anyPublished ? "partial" : "failed";
+    const { data: finalized, error: finalError } = await adminClient.from("santalbino_social_publications").update({
       overall_status: overallStatus,
       published_at: allPublished ? new Date().toISOString() : null,
+      claim_token: null,
+      lease_expires_at: null,
       updated_at: new Date().toISOString(),
-    }).eq("id", row.id);
-    if (finalError) return json({ error: "Pubblicazione completata ma registro finale non aggiornato" }, 500);
+    }).eq("id", row.id).eq("claim_token", claimToken).select("id").maybeSingle();
+    if (finalError || !finalized) return json({ error: "Pubblicazione completata ma registro finale non aggiornato; riconciliazione necessaria" }, 500);
 
     return json({
       status: overallStatus,
