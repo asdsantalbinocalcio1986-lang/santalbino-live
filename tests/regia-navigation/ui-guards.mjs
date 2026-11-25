@@ -7,7 +7,7 @@ assert.ok(source.includes('function ensureAppHistoryGuard()'), 'Regia must defin
 assert.ok(source.includes("history.pushState({ santaliveAppGuard: true }, '', location.href);"), 'The guard must create an in-app history entry.');
 assert.ok(source.includes("window.addEventListener('popstate'"), 'Regia must handle browser Back.');
 assert.ok(source.includes('if (sheetHistoryEntry) {'), 'Back must prioritize the event sheet.');
-assert.ok(source.includes("const openDialogs = $$('dialog[open]');"), 'Back must inspect open dialogs.');
+assert.ok(source.includes("const openDialogs = document.querySelectorAll('dialog[open]');"), 'Back must inspect all open dialogs.');
 assert.ok(source.includes('if (topDialog) topDialog.close();'), 'Back must close the topmost open dialog.');
 assert.ok(source.includes("const mobileMenu = $('.mobile-actions[open]');"), 'Back must inspect the mobile actions menu.');
 assert.ok(source.includes("mobileMenu.removeAttribute('open');"), 'Back must close the mobile actions menu.');
