@@ -148,3 +148,26 @@ Deno.test("worker does not call Meta after losing the editorial lease", async ()
     throw new Error("Worker called Meta or attempted completion after losing its claim");
   }
 });
+
+
+Deno.test("asset failures before any Meta request are safely retryable", async () => {
+  const completed: string[] = [];
+  let metaCalls = 0;
+  await processEditorialClaim({
+    post: {
+      id: "post-asset-failure", caption: "Asset test", asset_path: "social-editorial/test/missing.jpg",
+      asset_sha256: "e".repeat(64), platforms: { facebook: true }, claim_token: "claim-asset",
+    },
+    deliveries: [{ platform: "facebook" }],
+  }, {
+    loadAsset: async () => { throw new Error("temporary storage download failure"); },
+    graphPost: async () => { metaCalls++; return { id: "unexpected" }; },
+    graphGet: async () => ({ status_code: "FINISHED" }),
+    recordContainer: async () => true,
+    complete: async (_id: string, _platform: string, _token: string, status: string) => { completed.push(status); },
+    pageId: "page-test", pageToken: "token-test", instagramId: "ig-test",
+  } as never);
+  if (metaCalls !== 0 || completed.length !== 1 || completed[0] !== "failed_retryable") {
+    throw new Error("Pre-publication asset failure was not safely retried");
+  }
+});
