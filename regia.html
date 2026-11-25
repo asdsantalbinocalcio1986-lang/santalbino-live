@@ -4536,8 +4536,230 @@ function matchTimelineHtml() {
     <div class="match-tl-lane opponent-label">Avversari</div>
   </div>`;
 }
+
+let editorialQueueState = { items: [], deliveries: [], loading: false, loaded: false, error: '', saving: false };
+
+function editorialSafeKey(value) {
+  return String(value || '').normalize('NFKD').toLowerCase()
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9:_-]+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 150);
+}
+function editorialStatusLabel(status) {
+  return ({
+    draft: 'Bozza', approved: 'Approvato · in coda', scheduled: 'Programmato',
+    publishing: 'Pubblicazione in corso', published: 'Pubblicato',
+    partial: 'Pubblicazione parziale', failed: 'Errore recuperabile',
+    unknown: 'Esito incerto · verifica necessaria', cancelled: 'Annullato',
+    superseded: 'Revisione superata', pending: 'In attesa', processing: 'In elaborazione',
+    failed_retryable: 'Riprova differita', published_delivery: 'Consegnato'
+  })[status] || status || '—';
+}
+async function loadEditorialQueue() {
+  if (TEST_MODE || !db || !CAN_EDIT || !dbReady) return;
+  editorialQueueState.loading = true;
+  editorialQueueState.error = '';
+  try {
+    const [posts, deliveries] = await Promise.all([
+      db.from('santalbino_editorial_posts')
+        .select('id,logical_key,match_id,content_type,revision,status,caption,platforms,scheduled_at,timezone,created_at,approved_at,published_at,last_error_safe')
+        .order('created_at', { ascending: false }).limit(40),
+      db.from('santalbino_editorial_deliveries')
+        .select('post_id,platform,status,attempt_count,external_post_id,last_error_safe,published_at,updated_at')
+        .order('updated_at', { ascending: false }).limit(100)
+    ]);
+    if (posts.error) throw posts.error;
+    if (deliveries.error) throw deliveries.error;
+    editorialQueueState.items = posts.data || [];
+    editorialQueueState.deliveries = deliveries.data || [];
+    editorialQueueState.loaded = true;
+  } catch (error) {
+    editorialQueueState.error = error?.code === '42P01' || error?.code === 'PGRST205'
+      ? 'La coda editoriale non è ancora installata su questo ambiente. La proposta SQL non è stata applicata al database online.'
+      : (error?.message || 'Archivio editoriale non disponibile.');
+    editorialQueueState.loaded = false;
+  } finally {
+    editorialQueueState.loading = false;
+  }
+}
+function editorialRomeDateTimeToIso(value) {
+  const match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(String(value || ''));
+  if (!match) throw new Error('Data e ora non valide.');
+  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]));
+  let guess = target;
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  });
+  for (let i = 0; i < 4; i++) {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(guess)).map(part => [part.type, part.value]));
+    const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour), Number(parts.minute), Number(parts.second));
+    const delta = target - represented;
+    if (!delta) break;
+    guess += delta;
+  }
+  const check = Object.fromEntries(formatter.formatToParts(new Date(guess)).map(part => [part.type, part.value]));
+  if (Number(check.year) !== Number(match[1]) || Number(check.month) !== Number(match[2]) ||
+      Number(check.day) !== Number(match[3]) || Number(check.hour) !== Number(match[4]) ||
+      Number(check.minute) !== Number(match[5])) {
+    throw new Error('L’orario scelto non esiste nel fuso Europe/Rome (passaggio all’ora legale).');
+  }
+  return new Date(guess).toISOString();
+}
+function editorialQueueHtml() {
+  const state = editorialQueueState;
+  const items = state.items.map(post => {
+    const deliveries = state.deliveries.filter(item => item.post_id === post.id);
+    const deliveryHtml = deliveries.length ? deliveries.map(item =>
+      '<div class="small" style="padding:5px 0;border-top:1px solid var(--line)"><b>' +
+      esc(item.platform === 'facebook' ? 'Facebook' : 'Instagram') + ':</b> ' +
+      esc(editorialStatusLabel(item.status)) +
+      (item.external_post_id ? ' · ID ' + esc(item.external_post_id) : '') +
+      (item.last_error_safe ? '<div class="muted">' + esc(item.last_error_safe) + '</div>' : '') +
+      '</div>'
+    ).join('') : '<p class="small muted">Nessuna consegna avviata.</p>';
+    const canApprove = post.status === 'draft';
+    const canCancel = ['draft', 'approved', 'scheduled'].includes(post.status);
+    const scheduled = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }) : '';
+    return '<article class="card" data-editorial-post="' + esc(post.id) + '">' +
+      '<div class="row2" style="align-items:center;justify-content:space-between"><b>' +
+      esc(({match_day:'MATCH DAY',convocati:'CONVOCATI',formation:'FORMAZIONE',post_match:'POST PARTITA',club_notice:'AVVISO SOCIETÀ',custom:'CONTENUTO LIBERO'})[post.content_type] || post.content_type) +
+      ' · Rev. ' + Number(post.revision) + '</b><span class="chip ' +
+      (post.status === 'published' ? 'pubblicato' : 'bozza') + '">' + esc(editorialStatusLabel(post.status)) + '</span></div>' +
+      (post.match_id ? '<div class="small muted">Partita: ' + esc(post.match_id) + '</div>' : '') +
+      (scheduled ? '<div class="small">Programmazione: ' + esc(scheduled) + ' · Europe/Rome</div>' : '') +
+      '<p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(post.caption) + '</p>' +
+      '<div class="small muted">Canali: ' + esc([post.platforms?.facebook ? 'Facebook' : '', post.platforms?.instagram ? 'Instagram' : ''].filter(Boolean).join(' · ')) +
+      ' · Creato: ' + esc(new Date(post.created_at).toLocaleString('it-IT')) + '</div>' +
+      deliveryHtml +
+      (post.last_error_safe ? '<p class="small muted">' + esc(post.last_error_safe) + '</p>' : '') +
+      (canApprove ? '<label class="f"><span>Programma (facoltativo · fuso Europe/Rome)</span><input type="datetime-local" data-editorial-schedule="' + esc(post.id) + '"></label>' +
+        '<button class="btn primary block" data-a="editorialApprove" data-id="' + esc(post.id) + '" data-revision="' + Number(post.revision) + '">Approva e metti in coda</button>' : '') +
+      (canCancel ? '<button class="btn danger block" style="margin-top:8px" data-a="editorialCancel" data-id="' + esc(post.id) + '">Annulla contenuto</button>' : '') +
+      '</article>';
+  }).join('');
+  return '<section class="card"><h2>Editoriale social</h2>' +
+    '<p class="small muted">Crea una revisione, carica la grafica, scegli i canali e salva. L’approvazione inserisce il contenuto in coda; non avvia da sola una pubblicazione. La pubblicazione automatica resta disattivata.</p>' +
+    '<div class="row2 stack"><button class="btn" data-a="editorialRefresh" ' + (state.loading ? 'disabled' : '') + '>Aggiorna coda</button><span class="small muted">' + state.items.length + ' contenuti recenti</span></div>' +
+    (state.error ? '<p class="small" role="alert" style="color:var(--c-red)">' + esc(state.error) + '</p>' : '') +
+    (state.loading ? '<p class="small muted">Caricamento archivio…</p>' : '') +
+    '</section>' +
+    '<section class="card"><h2>Nuovo contenuto / revisione</h2>' +
+    '<label class="f"><span>Tipo di contenuto</span><select id="editorialContentType"><option value="match_day">MATCH DAY</option><option value="convocati">Convocati</option><option value="formation">Formazione</option><option value="post_match">Post partita</option><option value="club_notice">Avviso società</option><option value="custom">Altro contenuto</option></select></label>' +
+    '<label class="f"><span>Identificativo revisioni (mantienilo uguale per aggiornare una bozza)</span><input id="editorialLogicalKey" maxlength="180" value="' + esc('santalbino:' + editorialSafeKey(S.match.pollId || (S.match.date + '-' + S.match.home + '-' + S.match.away) || 'club') + ':match_day') + '"></label>' +
+    '<label class="f"><span>Testo del post</span><textarea id="editorialCaption" rows="6" maxlength="2200" placeholder="Scrivi il testo da pubblicare…"></textarea></label>' +
+    '<label class="f"><span>Grafica · JPEG, PNG o WebP · massimo 8 MB</span><input id="editorialAsset" type="file" accept="image/jpeg,image/png,image/webp"></label>' +
+    '<div class="row2 stack"><label class="f"><span><input id="editorialFacebook" type="checkbox" checked> Facebook</span></label><label class="f"><span><input id="editorialInstagram" type="checkbox" checked> Instagram</span></label></div>' +
+    '<p class="small muted">La grafica viene caricata in un archivio privato. La firma SHA-256 è calcolata sul file selezionato e verificata nuovamente dal worker.</p>' +
+    '<button class="btn primary block" data-a="editorialSave" ' + (state.saving ? 'disabled' : '') + '>' + (state.saving ? 'Salvataggio…' : 'Salva come bozza') + '</button>' +
+    '</section>' +
+    '<section><h2>Contenuti recenti</h2>' + (items || '<div class="card"><p class="small muted">Nessun contenuto editoriale presente. Le bozze non vengono pubblicate.</p></div>') + '</section>';
+}
+async function saveEditorialDraft() {
+  if (TEST_MODE || !db || !CAN_EDIT || !authUser) throw new Error('Accesso amministratore necessario. La funzione non è disponibile nella simulazione.');
+  const caption = String($('#editorialCaption')?.value || '').trim();
+  const file = $('#editorialAsset')?.files?.[0];
+  const contentType = String($('#editorialContentType')?.value || 'custom');
+  const logicalKey = editorialSafeKey($('#editorialLogicalKey')?.value || '');
+  const facebook = !!$('#editorialFacebook')?.checked;
+  const instagram = !!$('#editorialInstagram')?.checked;
+  if (!logicalKey || logicalKey.length < 3) throw new Error('Inserisci un identificativo valido per le revisioni.');
+  if (!caption || caption.length > 2200) throw new Error('Il testo deve contenere da 1 a 2200 caratteri.');
+  if (!file) throw new Error('Seleziona la grafica da associare al contenuto.');
+  if (file.size < 1 || file.size > 8 * 1024 * 1024) throw new Error('La grafica deve pesare al massimo 8 MB.');
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Formato non ammesso: usa JPEG, PNG o WebP.');
+  if (!facebook && !instagram) throw new Error('Seleziona almeno un canale social.');
+  editorialQueueState.saving = true;
+  const saveButton = $('[data-a="editorialSave"]');
+  if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'Salvataggio…'; }
+  let uploadedPath = '';
+  let saved = false;
+  try {
+    const bytes = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const sha256 = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+    const matchFolder = editorialSafeKey(S.match.pollId || 'club') || 'club';
+    uploadedPath = 'social-editorial/' + matchFolder + '/' + crypto.randomUUID() + '.' + extension;
+    const { error: uploadError } = await db.storage.from('santalbino-editorial').upload(uploadedPath, file, {
+      contentType: file.type, upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const snapshot = {
+      schema: 'santalive-editorial-v1',
+      contentType,
+      generatedAt: new Date().toISOString(),
+      match: {
+        pollId: String(S.match.pollId || ''), home: String(S.match.home || ''),
+        away: String(S.match.away || ''), comp: String(S.match.comp || ''),
+        venue: String(S.match.venue || ''), date: String(S.match.date || ''),
+        time: String(S.match.time || ''), hashtag: String(S.match.hashtag || '')
+      },
+      rosters: { home: String(S.rosters?.home || ''), away: String(S.rosters?.away || '') },
+      convocati: String(S.convocati || ''),
+      events: (Array.isArray(S.events) ? S.events : []).map(event => ({ ...event }))
+    };
+    if (new TextEncoder().encode(JSON.stringify(snapshot)).length > 65536) throw new Error('Lo snapshot supera il limite consentito di 64 KB.');
+    const { data, error } = await db.rpc('save_santalbino_editorial_draft', {
+      p_logical_key: logicalKey,
+      p_content_type: contentType,
+      p_match_id: String(S.match.pollId || ''),
+      p_caption: caption,
+      p_asset_path: uploadedPath,
+      p_asset_sha256: sha256,
+      p_platforms: { facebook, instagram },
+      p_snapshot: snapshot
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.id) throw new Error('Il database non ha restituito la bozza salvata.');
+    saved = true;
+    $('#editorialCaption').value = '';
+    $('#editorialAsset').value = '';
+    await loadEditorialQueue();
+    L.rtab = 'editorial';
+    saveL();
+    renderMain();
+    toast('Bozza editoriale salvata · non pubblicata');
+  } catch (error) {
+    if (uploadedPath && !saved) {
+      try { await db.storage.from('santalbino-editorial').remove([uploadedPath]); } catch (_) {}
+    }
+    throw error;
+  } finally {
+    editorialQueueState.saving = false;
+    const button = $('[data-a="editorialSave"]');
+    if (button) { button.disabled = false; button.textContent = 'Salva come bozza'; }
+  }
+}
+async function approveEditorialPost(postId, revision) {
+  if (TEST_MODE || !db || !CAN_EDIT) throw new Error('Operazione disponibile solo nella regia amministrativa.');
+  const scheduleInput = [...document.querySelectorAll('[data-editorial-schedule]')].find(el => el.dataset.editorialSchedule === postId);
+  let scheduledAt = null;
+  if (scheduleInput?.value) {
+    scheduledAt = editorialRomeDateTimeToIso(scheduleInput.value);
+    if (new Date(scheduledAt).getTime() <= Date.now()) throw new Error('La data di programmazione deve essere futura.');
+  }
+  const { error } = await db.rpc('approve_santalbino_editorial_post', {
+    p_post_id: postId, p_expected_revision: Number(revision), p_scheduled_at: scheduledAt
+  });
+  if (error) throw error;
+  await loadEditorialQueue();
+  renderMain();
+  toast(scheduledAt ? 'Contenuto approvato e programmato · non pubblicato' : 'Contenuto approvato e inserito in coda · non pubblicato');
+}
+async function cancelEditorialPost(postId) {
+  if (TEST_MODE || !db || !CAN_EDIT) throw new Error('Operazione disponibile solo nella regia amministrativa.');
+  const { data, error } = await db.rpc('cancel_santalbino_editorial_post', { p_post_id: postId });
+  if (error) throw error;
+  if (data !== true) throw new Error('Il contenuto non è più annullabile.');
+  await loadEditorialQueue();
+  renderMain();
+  toast('Contenuto annullato');
+}
+
 function regiaHtml() {
-  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['analytics', 'Statistiche'], ['set', 'Impost.']];
+  const tabs = [['live', 'Live'], ['convocati', 'Convocati'], ['lineup', 'Formazioni'], ['archive', 'Archivio'], ['social', 'Social'], ...(!TEST_MODE ? [['editorial', 'Editoriale']] : []), ['mvp', 'MVP'], ['library', 'Libreria'], ['editor', 'Editor grafiche'], ['analytics', 'Statistiche'], ['set', 'Impost.']];
   const t = tabs.some(x => x[0] === L.rtab) ? L.rtab : 'live';
   let body = '';
   if (t === 'live') body = `<div class="clockrow"><span class="big" id="rClock"></span>${S.clock.phase === 'p1' || S.clock.phase === 'p2' ? '<button class="btn sm" data-a="nudge" data-d="-60000">−1′</button><button class="btn sm" data-a="nudge" data-d="60000">+1′</button>' : ''}</div>
@@ -4562,6 +4784,7 @@ function regiaHtml() {
       <div class="row2 stack"><button class="btn primary" data-a="savelineup" data-s="${s}">Salva bozza</button><button class="btn" data-a="viewlineupgraphic" data-s="${s}">Crea grafica</button><a class="btn" href="${esc(fbLink())}" target="_blank" rel="noopener" data-a="fblineup" data-s="${s}">Copia testo e apri Facebook</a></div></div>`;
   }).join('') + publicationControlsHtml() + mvpDraftSelectorHtml();
   else if (t === 'social') body = `<div class="card">${feedHtml([...S.events].reverse())}</div>${S.clock.phase === 'ft' ? `<section><h2>Statistiche finali</h2>${statsHtml()}</section>` : ''}<div class="row2 stack"><button class="btn" data-a="copyall">Copia tutta la cronaca</button><button class="btn" data-a="export">Salva copia dei dati</button></div>`;
+  else if (t === 'editorial') body = editorialQueueHtml();
   else if (t === 'mvp') body = mvpRegiaHtml();
   else if (t === 'library') body = libraryHtml();
   else if (t === 'editor') body = graphicEditorHtml();
@@ -4921,12 +5144,16 @@ document.addEventListener('click', async e => {
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
   const archiveMatchBtn = t.closest('[data-archive-match]'); if (archiveMatchBtn) { L.archiveFormationId = archiveMatchBtn.dataset.archiveMatch; saveL(); renderMain(); return; }
-  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); return; }
+  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); if (L.rtab === 'editorial') { editorialQueueState.loading = true; renderMain(); void loadEditorialQueue().then(() => { if (L.rtab === 'editorial') renderMain(); }); } return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
   if (TEST_MODE && ['copyig','shareig','markdone','sharewa','sharefb'].includes(act)) { toast('Le azioni di pubblicazione e condivisione social sono disattivate nella simulazione.'); return; }
   switch (act) {
+    case 'editorialRefresh': await loadEditorialQueue(); renderMain(); break;
+    case 'editorialSave': try { await saveEditorialDraft(); } catch (error) { toast('Bozza non salvata: ' + (error?.message || 'errore')); } break;
+    case 'editorialApprove': try { await approveEditorialPost(a.dataset.id, a.dataset.revision); } catch (error) { toast('Approvazione non riuscita: ' + (error?.message || 'errore')); } break;
+    case 'editorialCancel': if (window.confirm('Annullare questo contenuto editoriale?')) { try { await cancelEditorialPost(a.dataset.id); } catch (error) { toast('Annullamento non riuscito: ' + (error?.message || 'errore')); } } break;
     case 'refreshAnalytics': if (!TEST_MODE) await loadAnalytics(); break;
     case 'login': $('#authDlg').showModal(); break;
     case 'logout': signOutAdmin(); break;
