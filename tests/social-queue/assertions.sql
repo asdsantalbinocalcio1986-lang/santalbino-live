@@ -55,6 +55,10 @@ begin
     null;
   end;
 
+  if not public.cancel_santalbino_editorial_post(v_second.id) then
+    raise exception 'Approved editorial revision could not be cancelled before worker claim';
+  end if;
+
   select * into v_third from public.save_santalbino_editorial_draft(
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Terza bozza editoriale', 'social-editorial/test/match-day-r3.jpg',
