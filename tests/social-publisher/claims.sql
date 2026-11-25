@@ -16,6 +16,30 @@ declare
   v_event2 text := 'publisher-platform-expansion-' || gen_random_uuid()::text;
   v_expansion jsonb;
 begin
+  -- The RPC must reject NULL event types and non-boolean platform values
+  -- with the documented validation SQLSTATE.
+  begin
+    perform public.claim_santalbino_social_publication(
+      'publisher-invalid-' || gen_random_uuid()::text, 'local-test', null,
+      'Invalid event type', 'https://example.test/invalid.jpg',
+      '{"facebook":true,"instagram":false}'::jsonb
+    );
+    raise exception 'NULL event type was accepted';
+  exception when sqlstate '22023' then
+    null;
+  end;
+
+  begin
+    perform public.claim_santalbino_social_publication(
+      'publisher-invalid-' || gen_random_uuid()::text, 'local-test', 'goal',
+      'Invalid platform type', 'https://example.test/invalid.jpg',
+      '{"facebook":"true","instagram":false}'::jsonb
+    );
+    raise exception 'Non-boolean platform value was accepted';
+  exception when sqlstate '22023' then
+    null;
+  end;
+
   if (select p.prosecdef
         from pg_catalog.pg_proc p
        where p.oid = 'public.claim_santalbino_social_publication(text,text,text,text,text,jsonb)'::regprocedure) then
