@@ -31,6 +31,26 @@ begin
     raise exception 'First editorial draft was not created as revision 1: %', row_to_json(v_first);
   end if;
 
+  begin
+    perform public.save_santalbino_editorial_draft(
+      'match:ci-match:bad-platform:custom', 'custom', 'ci-match',
+      'Invalid platform test', 'social-editorial/test/invalid.jpg', repeat('9', 64),
+      '{"facebook":true,"tiktok":true}'::jsonb, '{}'::jsonb
+    );
+    raise exception 'Unsupported editorial platform was unexpectedly accepted';
+  exception when sqlstate '22023' then null;
+  end;
+
+  begin
+    perform public.save_santalbino_editorial_draft(
+      'match:ci-match:bad-instagram-image:custom', 'custom', 'ci-match',
+      'Invalid Instagram image test', 'social-editorial/test/invalid.png', repeat('8', 64),
+      '{"instagram":true}'::jsonb, '{}'::jsonb
+    );
+    raise exception 'Non-JPEG Instagram image was unexpectedly accepted';
+  exception when sqlstate '22023' then null;
+  end;
+
   select * into v_second from public.save_santalbino_editorial_draft(
     'match:ci-match:match_day', 'match_day', 'ci-match',
     'Seconda bozza editoriale', 'social-editorial/test/match-day-r2.jpg',
@@ -160,6 +180,19 @@ declare
   v_exhausted_id uuid;
   v_exhausted_token uuid;
 begin
+  begin
+    insert into public.santalbino_editorial_posts (
+      logical_key, content_type, revision, caption, asset_path, asset_sha256,
+      platforms, snapshot, created_by
+    ) values (
+      'worker:invalid-platform:custom', 'custom', 1, 'Invalid platform',
+      'social-editorial/test/invalid.jpg', repeat('7', 64),
+      '{"facebook":true,"tiktok":true}'::jsonb, '{}'::jsonb, auth.uid()
+    );
+    raise exception 'Unsupported platform key bypassed the table constraint';
+  exception when check_violation then null;
+  end;
+
   v_claims := public.claim_santalbino_editorial_queue(5, false);
   if jsonb_array_length(v_claims) <> 0 then
     raise exception 'Queue dispatch kill switch did not block claims';
