@@ -121,3 +121,31 @@ All integration/E2E tests must use disposable local services or a genuinely sepa
 - Gate F — owner explicitly approves any merge/deploy. No automatic merge or production action.
 
 Until Gate D, this draft supports planning and test design only.
+
+## 9. Additional owner requirements — 2026-11-25
+
+These two requirements apply across match creation, match persistence and social/editorial content. They are product requirements, not implementation authorization.
+
+### 9.1 Automatic match hashtag
+
+- When a new match is created, the application must automatically generate and store a match-specific hashtag.
+- Example: Sant'Albino vs Radicofani produces `#SantAlbinoRadicofani`.
+- Generate it deterministically from the two participating team names, using the club's canonical short name for Sant'Albino; remove spaces, punctuation and diacritics, and use stable capitalization.
+- The hashtag must be available immediately after match creation and reused consistently in match-day, convocati and post-match social copy wherever a match hashtag is included.
+- Do not append duplicate copies when a template already contains the hashtag.
+- If the opponent/team names change after creation, regenerate the hashtag only while it is still system-generated; preserve an explicit administrator override if the product supports manual editing. The UI should make the generated value visible.
+- Add acceptance tests for home/away ordering, accented names, punctuation, name changes, manual override and duplicate suppression.
+
+### 9.2 Persistent club crest independent of home/away status
+
+- The club's own team crest/logo must be uploaded or selected once and remain available across page reloads and newly created matches; the operator must not need to upload it again for every match.
+- Store it as a persistent club-level asset/reference, not as a transient match-only image or browser-only state.
+- The rendering logic must identify the club as "our team" independently of whether it is the home or away side.
+- For each match, place/use the club crest on the correct home/away side based on the match's actual team assignment. Do not accidentally replace the club crest with the opponent's crest when home/away order changes.
+- Keep the selected crest stable across match creation, editing, reload and switching between home and away fixtures. Provide an explicit replace/remove action for an administrator.
+- Add acceptance tests: upload once → reload → create home match → create away match → verify the same club crest is retained and displayed on the correct side; verify opponent crest remains distinct; verify test mode cannot overwrite production assets.
+
+### 9.3 Scope and safety
+
+- These requirements must be reviewed against the existing logo persistence model, match data model, hashtag/social-copy builders and PR #106/#107 shared `regia.html` changes.
+- Do not implement them in production as part of the audit. Claude and Gemini must assess current support, required changes, persistence/security implications and regression tests.
