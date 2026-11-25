@@ -77,6 +77,12 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/proposals/social_editorial_queue.sql
       - name: Verify editorial queue lifecycle, RLS, claims and retry backoff
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/social-queue/assertions.sql
+      - name: Prepare isolated legacy social publisher fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/social-publisher/setup.sql
+      - name: Apply social publisher claim hardening migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125120000_santalbino_social_publisher_claims.sql
+      - name: Verify social publisher claim fencing and reconciliation
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/social-publisher/claims.sql
       - name: Verify editorial approval and sharing UI guards
         run: node tests/postmatch/ui-guards.mjs
 
