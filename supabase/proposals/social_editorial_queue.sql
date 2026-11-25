@@ -13,7 +13,7 @@ create table if not exists public.santalbino_editorial_posts (
     check (status in ('draft', 'approved', 'scheduled', 'publishing', 'published',
                       'partial', 'failed', 'unknown', 'cancelled', 'superseded')),
   caption text not null check (char_length(btrim(caption)) between 1 and 2200),
-  asset_path text not null check (left(asset_path, 17) = 'social-editorial/' and length(asset_path) between 18 and 520 and position('..' in asset_path) = 0 and translate(asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') = ''),
+  asset_path text not null check (left(asset_path, 17) = 'social-editorial/' and length(asset_path) between 18 and 520 and strpos(asset_path, '..') = 0 and translate(asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') = ''),
   asset_sha256 text not null check (asset_sha256 ~ '^[a-f0-9]{64}$'),
   platforms jsonb not null
     check (
@@ -204,7 +204,7 @@ begin
   if p_logical_key is null or p_logical_key !~ '^[a-z0-9:_-]{3,180}$'
      or p_content_type not in ('match_day', 'convocati', 'formation', 'post_match', 'club_notice', 'custom')
      or p_caption is null or char_length(btrim(p_caption)) not between 1 and 2200
-     or p_asset_path is null or left(p_asset_path, 17) <> 'social-editorial/' or length(p_asset_path) not between 18 and 520 or position('..' in p_asset_path) > 0 or translate(p_asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') <> ''
+     or p_asset_path is null or left(p_asset_path, 17) <> 'social-editorial/' or length(p_asset_path) not between 18 and 520 or strpos(p_asset_path, '..') > 0 or translate(p_asset_path, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_-.', '') <> ''
      or p_asset_sha256 is null or p_asset_sha256 !~ '^[a-f0-9]{64}$'
      or p_platforms is null or jsonb_typeof(p_platforms) <> 'object'
      or (p_platforms ? 'facebook' and jsonb_typeof(p_platforms -> 'facebook') <> 'boolean')
@@ -512,7 +512,7 @@ revoke all on function public.record_santalbino_editorial_container(uuid,text,uu
 grant execute on function public.record_santalbino_editorial_container(uuid,text,uuid,text) to service_role;
 revoke all on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) from public, anon, authenticated;
 grant execute on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) to service_role;
- and position('..' in asset_path) = 0),
+ and strpos(asset_path, '..') = 0),
   asset_sha256 text not null check (asset_sha256 ~ '^[a-f0-9]{64}$'),
   platforms jsonb not null
     check (
@@ -993,7 +993,7 @@ revoke all on function public.record_santalbino_editorial_container(uuid,text,uu
 grant execute on function public.record_santalbino_editorial_container(uuid,text,uuid,text) to service_role;
 revoke all on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) from public, anon, authenticated;
 grant execute on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) to service_role;
- or position('..' in p_asset_path) > 0
+ or strpos(p_asset_path, '..') > 0
      or p_asset_sha256 is null or p_asset_sha256 !~ '^[a-f0-9]{64}$'
      or p_platforms is null or jsonb_typeof(p_platforms) <> 'object'
      or (p_platforms ? 'facebook' and jsonb_typeof(p_platforms -> 'facebook') <> 'boolean')
@@ -1301,7 +1301,7 @@ revoke all on function public.record_santalbino_editorial_container(uuid,text,uu
 grant execute on function public.record_santalbino_editorial_container(uuid,text,uuid,text) to service_role;
 revoke all on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) from public, anon, authenticated;
 grant execute on function public.complete_santalbino_editorial_delivery(uuid,text,uuid,text,text,text) to service_role;
- and position('..' in asset_path) = 0),
+ and strpos(asset_path, '..') = 0),
   asset_sha256 text not null check (asset_sha256 ~ '^[a-f0-9]{64}$'),
   platforms jsonb not null
     check (
