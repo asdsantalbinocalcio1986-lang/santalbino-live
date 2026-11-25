@@ -121,3 +121,15 @@ These facts must be rechecked against the exact branch/commit before implementat
 - Policy live: social log con SELECT per admin autenticati; bucket `santalbino-media` pubblico, max 8 MiB, upload/update/delete admin-only. Migrazione cron conferma che il job pubblica soltanto il contenuto della pagina live.
 - Creato `AI_WORKSPACE/PUBLISHER_LIVE_CONTRACT_AUDIT_2026-11-25.md`.
 - Nessuna modifica a codice, schema, dati, storage, cron, segreti, account Meta, merge o deploy.
+
+
+## SQL/RLS/sync audit and consolidated blueprint — 2026-11-25
+
+- Read-only inspection of live SQL functions, ACLs, RLS policies, table grants, cron job, triggers and frontend sync path completed.
+- Confirmed `save_santalbino_live_state` and `save_santalbino_test_state` use optimistic concurrency (`p_expected_rev`, conditional UPDATE, SQLSTATE 40001); preserve this behavior.
+- Confirmed RPCs are SECURITY INVOKER, admin checked; `is_santalbino_admin` is STABLE and SECURITY INVOKER. No custom public-table triggers found.
+- Confirmed test mode uses distinct table/RPC/localStorage keys, but same Supabase project and shared Storage bucket; it intentionally imports sponsor references from live. Cron runs every minute and updates both live_state and live_test_state. This is logical isolation, not a separate environment.
+- Confirmed social publication table has admin SELECT RLS and service_role write path; existing cron is for page content, not Meta.
+- Findings documented: SYNC-01 shared project/test isolation; SYNC-02 state JSON has no schema version/whitelist/size validation; SYNC-03 reset preserves positional logo slots; SYNC-04 localStorage recovery is device-specific.
+- Created `AI_WORKSPACE/SQL_RLS_AND_SYNC_AUDIT_2026-11-25.md` and consolidated `AI_WORKSPACE/IMPLEMENTATION_BLUEPRINT_CLUB_SOCIAL_2026-11-25.md`.
+- No schema, rows, policies, functions, cron, Storage, secrets, code, Meta account, merge or deploy changed.
