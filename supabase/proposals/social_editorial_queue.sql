@@ -201,8 +201,11 @@ begin
     raise exception 'invalid scheduled state transition' using errcode = '55000';
   end if;
 
-  if old.status in ('failed', 'partial') and new.status not in (old.status, 'cancelled') then
-    raise exception 'invalid terminal editorial state transition' using errcode = '55000';
+  if old.status = 'failed' and new.status not in ('failed', 'cancelled', 'superseded') then
+    raise exception 'invalid failed editorial state transition' using errcode = '55000';
+  end if;
+  if old.status = 'partial' and new.status not in ('partial', 'cancelled') then
+    raise exception 'invalid partial editorial state transition' using errcode = '55000';
   end if;
   if old.status = 'unknown' and new.status not in ('unknown', 'failed', 'partial', 'published', 'cancelled') then
     raise exception 'invalid reconciliation state transition' using errcode = '55000';
@@ -260,7 +263,7 @@ begin
   update public.santalbino_editorial_posts
      set status = 'superseded', updated_at = now()
    where logical_key = p_logical_key
-     and status in ('draft', 'approved', 'scheduled')
+     and status in ('draft', 'approved', 'scheduled', 'failed')
      and not exists (
        select 1 from public.santalbino_editorial_deliveries d
         where d.post_id = santalbino_editorial_posts.id
