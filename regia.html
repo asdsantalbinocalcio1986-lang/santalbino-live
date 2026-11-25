@@ -1621,17 +1621,15 @@ async function shareSocialDraft(kind, platform) {
   const text = socialDraftText(kind);
   const matchUrl = socialDraftMatchUrl();
   const hashtag = String(S.match.hashtag || '#SANTALive').trim();
-  const escapedHashtag = hashtag.replace(/[.*+?^\${}()|[\]\\]/g, '\\  const textWithoutHashtag = hashtag
-    ? text.split(/\r?\n/).filter(line => line.trim() !== hashtag).join('\n').trim()
-    : text;');
+  const escapedHashtag = hashtag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const textWithoutHashtag = hashtag
     ? text
         .replace(new RegExp('(^|[\\s([{])' + escapedHashtag + '(?=$|[\\s)\\]}>.,!?;:])', 'giu'), '$1')
-        .replace(/[ \t]+([,.;:!?])/g, '$1')
-        .replace(/[ \t]{2,}/g, ' ')
-        .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n[ \t]+/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
+        .replace(/[ \\t]+([,.;:!?])/g, '$1')
+        .replace(/[ \\t]{2,}/g, ' ')
+        .replace(/[ \\t]+\\n/g, '\\n')
+        .replace(/\\n[ \\t]+/g, '\\n')
+        .replace(/\\n{3,}/g, '\\n\\n')
         .trim()
     : text;
   const shareText = [textWithoutHashtag, hashtag, 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\n\n');
