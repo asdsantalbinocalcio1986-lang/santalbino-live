@@ -108,3 +108,14 @@ Current PR heads at the time of this handoff:
 All are open Drafts; #106/#107 both modify `regia.html`. #108 has six documentation-only changed files.
 
 Please do not treat these observations as settled without checking exact branch content. Do not write to production or modify any branch/PR. Update the report with VERIFIED/UNKNOWN distinctions and line-level evidence.
+
+
+## Nuovi finding indipendenti da verificare — 2026-11-25
+Leggere `AI_WORKSPACE/INDEPENDENT_REVIEW_PR106_PR107_2026-11-25.md` prima di qualsiasi implementazione. Verificare in particolare:
+- PM-01: la RPC valida il formato SHA-256 ma non i byte effettivi dell'oggetto Storage;
+- PM-02: environment test/prod è namespace logico, non isolamento di sicurezza;
+- SC-01: socialDrafts #107 sono bozza nello stato applicativo, non queue server-side;
+- SC-02: possibile falso popup bloccato per `window.open(..., 'noopener')`;
+- SC-03: possibile hashtag duplicato tra testo MATCH DAY e composizione condivisione;
+- SC-04: #107 non implementa pubblicazione automatica né programmazione.
+Richiesta: confermare o confutare ogni punto con riferimenti file/funzione/righe e proporre test; non correggere il codice senza autorizzazione. Non eseguire status/publish verso Edge Function live, non leggere segreti, non toccare produzione.
