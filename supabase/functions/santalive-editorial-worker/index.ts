@@ -231,7 +231,7 @@ export async function dispatchEditorialQueue(
   dispatchEnabled: boolean,
   limit = 10,
 ) {
-  if (!dispatchEnabled) return { claimed: 0, processed: 0, disabled: true };
+  if (!dispatchEnabled) return { claimed: 0, processed: 0, disabled: true, claims: [] as EditorialClaim[] };
   const { data, error } = await adminClient.rpc("claim_santalbino_editorial_queue", {
     p_limit: 1,
     p_dispatch_enabled: true,
