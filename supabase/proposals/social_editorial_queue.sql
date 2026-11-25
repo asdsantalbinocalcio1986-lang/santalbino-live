@@ -592,7 +592,8 @@ declare
   v_new_status text;
   v_count integer;
 begin
-  if p_status not in ('published', 'failed_retryable', 'failed', 'unknown')
+  if p_status is null or p_platform is null
+     or p_status not in ('published', 'failed_retryable', 'failed', 'unknown')
      or p_platform not in ('facebook', 'instagram')
      or (p_status = 'published' and (p_external_post_id is null or length(p_external_post_id) > 300)) then
     raise exception 'invalid delivery completion' using errcode = '22023';
@@ -655,6 +656,86 @@ revoke all on function public.approve_santalbino_editorial_post(uuid,integer,tim
 grant execute on function public.approve_santalbino_editorial_post(uuid,integer,timestamptz) to authenticated;
 revoke all on function public.cancel_santalbino_editorial_post(uuid) from public, anon;
 grant execute on function public.cancel_santalbino_editorial_post(uuid) to authenticated;
+
+create or replace function public.resolve_santalbino_editorial_delivery(
+  p_post_id uuid,
+  p_platform text,
+  p_resolution text,
+  p_external_post_id text default null,
+  p_note text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_post public.santalbino_editorial_posts%rowtype;
+  v_delivery public.santalbino_editorial_deliveries%rowtype;
+  v_new_status text;
+begin
+  if auth.uid() is null or not public.is_santalbino_admin() then
+    raise exception 'SANTA Live admin required' using errcode = '42501';
+  end if;
+  if p_platform is null or p_resolution is null
+     or p_platform not in ('facebook', 'instagram')
+     or p_resolution not in ('published', 'retry')
+     or p_note is null or char_length(btrim(p_note)) not between 8 and 500
+     or (p_resolution = 'published' and (p_external_post_id is null or length(p_external_post_id) not between 1 and 300))
+     or (p_resolution = 'retry' and p_external_post_id is not null) then
+    raise exception 'invalid editorial reconciliation input' using errcode = '22023';
+  end if;
+
+  select * into v_post from public.santalbino_editorial_posts
+   where id = p_post_id for update;
+  if not found or v_post.status <> 'unknown' then
+    raise exception 'editorial post is not awaiting reconciliation' using errcode = '40001';
+  end if;
+  select * into v_delivery from public.santalbino_editorial_deliveries
+   where post_id = p_post_id and platform = p_platform for update;
+  if not found or v_delivery.status <> 'unknown' then
+    raise exception 'editorial delivery is not awaiting reconciliation' using errcode = '40001';
+  end if;
+  if exists (
+    select 1 from public.santalbino_editorial_deliveries d
+     where d.post_id = p_post_id and d.id <> v_delivery.id and d.status = 'processing'
+  ) then
+    raise exception 'another platform delivery is still processing' using errcode = '55000';
+  end if;
+
+  insert into public.santalbino_editorial_delivery_resolutions
+    (delivery_id, post_id, platform, resolution, external_post_id, note, resolved_by)
+  values
+    (v_delivery.id, p_post_id, p_platform, p_resolution, p_external_post_id, btrim(p_note), auth.uid());
+
+  update public.santalbino_editorial_deliveries
+     set status = case when p_resolution = 'published' then 'published' else 'pending' end,
+         external_post_id = case when p_resolution = 'published' then p_external_post_id else null end,
+         external_container_id = case when p_resolution = 'retry' then null else external_container_id end,
+         attempt_count = case when p_resolution = 'retry' then 0 else attempt_count end,
+         published_at = case when p_resolution = 'published' then now() else null end,
+         last_error_safe = 'Riconciliazione amministrativa: ' || btrim(p_note),
+         claim_token = null, lease_expires_at = null, updated_at = now()
+   where id = v_delivery.id;
+
+  select case
+    when bool_or(status = 'unknown') then 'unknown'
+    when bool_and(status = 'published') then 'published'
+    when bool_or(status = 'published') then 'partial'
+    else 'failed'
+  end into v_new_status
+  from public.santalbino_editorial_deliveries where post_id = p_post_id;
+
+  update public.santalbino_editorial_posts
+     set status = v_new_status,
+         published_at = case when v_new_status = 'published' then now() else null end,
+         claim_token = null, lease_expires_at = null,
+         last_error_safe = 'Riconciliazione amministrativa registrata.', updated_at = now()
+   where id = p_post_id;
+
+  return v_new_status;
+end;
+$;
 
 revoke all on function public.resolve_santalbino_editorial_delivery(uuid,text,text,text,text) from public, anon;
 grant execute on function public.resolve_santalbino_editorial_delivery(uuid,text,text,text,text) to authenticated;
