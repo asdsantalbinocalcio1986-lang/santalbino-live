@@ -4086,7 +4086,11 @@ async function renderMatchResultGraphic() {
   await addSponsorToGraphic(canvas,'matchday');
   return canvas;
 }
-let matchResultEditor = { snapshot: null, graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false, dbError: '' };
+let matchResultEditor = { snapshot: null, graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false, dbError: '', refreshWarning: '', previewObjectUrl: '' };
+function releaseMatchResultPreviewUrl() {
+  if (matchResultEditor?.previewObjectUrl) URL.revokeObjectURL(matchResultEditor.previewObjectUrl);
+  if (matchResultEditor) matchResultEditor.previewObjectUrl = '';
+}
 function capturePostmatchSnapshot() {
   return {
     rev: Number(S.rev || 0),
@@ -4133,6 +4137,7 @@ async function loadMatchResultEditions() {
   return matchResultEditor.editions;
 }
 async function displayMatchResultEdition(edition) {
+  releaseMatchResultPreviewUrl();
   const url = await matchResultSignedUrl(edition.graphic_path);
   matchResultEditor.active = edition;
   matchResultEditor.snapshot = edition.snapshot;
@@ -4163,6 +4168,7 @@ function matchResultEditorHtml(imageUrl, caption, edition) {
     '<button class="btn" data-a="approvePostmatchRevision" ' + (canApprove ? '' : 'disabled') + '>Approva questa revisione</button></div>' +
     '<p class="small muted">L’approvazione è solo editoriale: non pubblica sui social. Ogni salvataggio crea una nuova revisione.</p>' +
     (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '') +
+    (matchResultEditor.refreshWarning ? '<p class="small muted">Aggiornamento: ' + esc(matchResultEditor.refreshWarning) + '</p>' : '') +
     '<div class="row2 stack"><button class="btn" data-a="saveMatchResultGraphic">Scarica grafica</button>' +
     '<button class="btn" data-a="copyMatchResultPost">Copia testo</button><button class="btn" data-a="shareMatchResultPost" ' + (canShare ? '' : 'disabled') + '>Condividi su WhatsApp</button></div>' +
     (history ? '<div class="card"><b>Revisioni precedenti</b><div class="row2 stack">' + history + '</div></div>' : '');
@@ -4170,6 +4176,7 @@ function matchResultEditorHtml(imageUrl, caption, edition) {
 async function saveMatchResultRevision() {
   if (!db || !CAN_EDIT || !authUser) throw new Error('Devi accedere come amministratore per salvare una bozza.');
   if (matchResultEditor.busy) return;
+  matchResultEditor.refreshWarning = '';
   matchResultEditor.busy = true;
   const button = $('[data-a="savePostmatchRevision"]');
   if (button) { button.disabled = true; button.textContent = 'Salvataggio…'; }
@@ -4215,11 +4222,41 @@ async function saveMatchResultRevision() {
       const edition = matchResultEditor.editions.find(x => x.id === saved.id);
       if (edition) await displayMatchResultEdition(edition);
     } catch (refreshError) {
-      matchResultEditor.dbError = 'La bozza è stata salvata, ma lo storico non si è aggiornato: ' + (refreshError?.message || 'errore');
+      matchResultEditor.refreshWarning = 'La bozza è stata salvata, ma lo storico non si è aggiornato: ' + (refreshError?.message || 'errore');
     }
     toast('Bozza post-partita salvata · revisione ' + saved.revision);
   } catch (error) {
     if (uploadedPath && !recordSaved) {
+      let persistedEdition = null;
+      let verificationError = null;
+      try {
+        const { data, error: lookupError } = await db.from('santalbino_postmatch_editions')
+          .select('id,environment,match_id,revision,status,caption,snapshot,source_state_rev,graphic_path,graphic_sha256,created_at,approved_at')
+          .eq('graphic_path', uploadedPath).maybeSingle();
+        if (lookupError) throw lookupError;
+        persistedEdition = data;
+      } catch (lookupError) {
+        verificationError = lookupError;
+      }
+      if (persistedEdition?.id) {
+        recordSaved = true;
+        matchResultEditor.graphicPath = uploadedPath;
+        matchResultEditor.graphicSha256 = persistedEdition.graphic_sha256 || matchResultEditor.graphicSha256;
+        matchResultEditor.graphicBlob = null;
+        matchResultEditor.active = persistedEdition;
+        try {
+          await loadMatchResultEditions();
+          const confirmed = matchResultEditor.editions.find(x => x.id === persistedEdition.id);
+          if (confirmed) await displayMatchResultEdition(confirmed);
+        } catch (refreshError) {
+          matchResultEditor.refreshWarning = 'Il salvataggio è confermato dal database, ma lo storico non si è aggiornato: ' + (refreshError?.message || 'errore');
+        }
+        toast('Bozza post-partita salvata: conferma recuperata dopo un’interruzione della risposta.');
+        return;
+      }
+      if (verificationError) {
+        throw new Error((error?.message || 'Errore durante il salvataggio') + ' Esito del salvataggio incerto: non è stato possibile verificare il database. Il file è stato conservato per evitare di cancellare una revisione eventualmente registrata (' + uploadedPath + '). Riprova il controllo dello storico prima di intervenire.');
+      }
       let cleanupError = null;
       try {
         const { error: removeError } = await db.storage.from('santalbino-postmatch').remove([uploadedPath]);
@@ -4235,9 +4272,11 @@ async function saveMatchResultRevision() {
     throw error;
   } finally {
     matchResultEditor.busy = false;
+    if (button?.isConnected) { button.disabled = false; button.textContent = 'Salva nuova bozza'; }
   }
 }
 async function approveMatchResultRevision() {
+  matchResultEditor.refreshWarning = '';
   const edition = matchResultEditor.active;
   if (!edition || edition.status !== 'draft') throw new Error('Seleziona una bozza da approvare.');
   const editedCaption = String($('#matchResultPost')?.value || '').trim();
@@ -4258,14 +4297,19 @@ async function approveMatchResultRevision() {
     const approved = matchResultEditor.editions.find(x => x.id === edition.id);
     if (approved) await displayMatchResultEdition(approved);
   } catch (refreshError) {
-    matchResultEditor.dbError = 'Approvazione registrata; aggiornamento storico non riuscito: ' + (refreshError?.message || 'errore');
+    matchResultEditor.refreshWarning = 'Approvazione registrata; aggiornamento storico non riuscito: ' + (refreshError?.message || 'errore');
     $('#graphicDlg').innerHTML = matchResultEditorHtml(currentImage, currentCaption, edition);
   }
   toast('Revisione ' + edition.revision + ' approvata. Nessuna pubblicazione social è stata avviata.');
 }
 async function openMatchResult() {
   const dlg = $('#graphicDlg');
-  matchResultEditor = { snapshot: capturePostmatchSnapshot(), graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false, dbError: '' };
+  releaseMatchResultPreviewUrl();
+  if (!dlg.dataset.postmatchCleanupBound) {
+    dlg.addEventListener('close', releaseMatchResultPreviewUrl);
+    dlg.dataset.postmatchCleanupBound = '1';
+  }
+  matchResultEditor = { snapshot: capturePostmatchSnapshot(), graphicBlob: null, graphicPath: '', graphicSha256: '', editions: [], active: null, busy: false, dbError: '', refreshWarning: '', previewObjectUrl: '' };
   dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica e recupero bozze…</p>';
   if (!dlg.open) dlg.showModal();
   try {
@@ -4275,6 +4319,7 @@ async function openMatchResult() {
     }
     matchResultEditor.graphicBlob = await matchResultBlob(canvas);
     const previewUrl = URL.createObjectURL(matchResultEditor.graphicBlob);
+    matchResultEditor.previewObjectUrl = previewUrl;
     const generatedCaption = buildMatchSummary();
     let editions = [];
     if (db && CAN_EDIT) {
@@ -4283,11 +4328,11 @@ async function openMatchResult() {
     } else {
       matchResultEditor.dbError = 'Accesso amministratore necessario per salvare e recuperare le revisioni.';
     }
-    if (!dlg.open) { URL.revokeObjectURL(previewUrl); return; }
+    if (!dlg.open) { releaseMatchResultPreviewUrl(); return; }
     const currentMatchId = matchResultSafeId(matchResultEditor.snapshot);
     const latest = editions.find(item => item.match_id === currentMatchId);
     if (latest) {
-      URL.revokeObjectURL(previewUrl);
+      releaseMatchResultPreviewUrl();
       await displayMatchResultEdition(latest);
     } else {
       dlg.innerHTML = matchResultEditorHtml(previewUrl, generatedCaption, null) +
@@ -4295,6 +4340,7 @@ async function openMatchResult() {
         (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '');
     }
   } catch (err) {
+    releaseMatchResultPreviewUrl();
     dlg.innerHTML = '<div class="sheethead"><h2>MATCH RESULT</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">' + esc(err?.message || 'Errore nel caricamento della bozza') + '</p>';
   }
 }
