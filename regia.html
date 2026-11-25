@@ -4201,7 +4201,20 @@ function capturePostmatchSnapshot() {
 function matchResultSnapshotKey(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return '';
   const { rev, ...content } = snapshot;
-  return JSON.stringify(content);
+  // PostgreSQL JSONB does not preserve JavaScript object-key insertion order.
+  // Canonicalize every object recursively so a round-tripped snapshot compares
+  // equal while arrays (chronology order) remain significant.
+  const canonical = value => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object') {
+      return Object.keys(value).sort().reduce((out, key) => {
+        out[key] = canonical(value[key]);
+        return out;
+      }, {});
+    }
+    return value;
+  };
+  return JSON.stringify(canonical(content));
 }
 function matchResultSnapshotMatchesCurrent(snapshot) {
   return !!snapshot && matchResultSnapshotKey(snapshot) === matchResultSnapshotKey(capturePostmatchSnapshot());
