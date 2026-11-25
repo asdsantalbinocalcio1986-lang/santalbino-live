@@ -4537,7 +4537,7 @@ function matchTimelineHtml() {
   </div>`;
 }
 
-let editorialQueueState = { items: [], deliveries: [], loading: false, loaded: false, error: '', saving: false };
+let editorialQueueState = { items: [], deliveries: [], loading: false, loaded: false, error: '', saving: false, draft: { contentType: 'match_day', logicalKey: '', caption: '', file: null, facebook: true, instagram: true } };
 
 function editorialSafeKey(value) {
   return String(value || '').normalize('NFKD').toLowerCase()
@@ -4547,6 +4547,42 @@ function editorialSafeKey(value) {
 function editorialDefaultLogicalKey(contentType) {
   const matchKey = editorialSafeKey(S.match.pollId || (S.match.date + '-' + S.match.home + '-' + S.match.away) || 'club') || 'club';
   return 'santalbino:' + matchKey + ':' + String(contentType || 'custom');
+}
+function captureEditorialDraftForm(changedTarget = null) {
+  const contentType = $('#editorialContentType');
+  if (!contentType) return;
+  const previous = editorialQueueState.draft || {};
+  const asset = $('#editorialAsset');
+  const file = asset?.files?.[0] || (changedTarget?.id === 'editorialAsset' ? null : previous.file || null);
+  editorialQueueState.draft = {
+    contentType: contentType.value || 'match_day',
+    logicalKey: $('#editorialLogicalKey')?.value || '',
+    caption: $('#editorialCaption')?.value || '',
+    file,
+    facebook: !!$('#editorialFacebook')?.checked,
+    instagram: !!$('#editorialInstagram')?.checked
+  };
+}
+function restoreEditorialDraftForm() {
+  const draft = editorialQueueState.draft || {};
+  const contentType = $('#editorialContentType');
+  const logicalKey = $('#editorialLogicalKey');
+  const caption = $('#editorialCaption');
+  const asset = $('#editorialAsset');
+  if (contentType) contentType.value = draft.contentType || 'match_day';
+  if (logicalKey) logicalKey.value = draft.logicalKey || editorialDefaultLogicalKey(contentType?.value || 'match_day');
+  if (caption) caption.value = draft.caption || '';
+  const facebook = $('#editorialFacebook');
+  const instagram = $('#editorialInstagram');
+  if (facebook) facebook.checked = draft.facebook !== false;
+  if (instagram) instagram.checked = draft.instagram !== false;
+  if (asset && draft.file && typeof DataTransfer !== 'undefined') {
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(draft.file);
+      asset.files = transfer.files;
+    } catch (_) {}
+  }
 }
 function editorialStatusLabel(status) {
   return ({
@@ -4673,8 +4709,9 @@ function editorialQueueHtml() {
 }
 async function saveEditorialDraft() {
   if (TEST_MODE || !db || !CAN_EDIT || !authUser) throw new Error('Accesso amministratore necessario. La funzione non è disponibile nella simulazione.');
+  captureEditorialDraftForm();
   const caption = String($('#editorialCaption')?.value || '').trim();
-  const file = $('#editorialAsset')?.files?.[0];
+  const file = $('#editorialAsset')?.files?.[0] || editorialQueueState.draft?.file;
   const contentType = String($('#editorialContentType')?.value || 'custom');
   const logicalKey = editorialSafeKey($('#editorialLogicalKey')?.value || '');
   const facebook = !!$('#editorialFacebook')?.checked;
@@ -4731,6 +4768,7 @@ async function saveEditorialDraft() {
     const row = Array.isArray(data) ? data[0] : data;
     if (!row?.id) throw new Error('Il database non ha restituito la bozza salvata.');
     saved = true;
+    editorialQueueState.draft = { contentType, logicalKey, caption: '', file: null, facebook, instagram };
     $('#editorialCaption').value = '';
     $('#editorialAsset').value = '';
     await loadEditorialQueue();
@@ -5149,7 +5187,7 @@ function topHtml() {
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
   return `${banner}<div class="top">${brandHtml}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
-function renderMain() { const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
+function renderMain() { if (CAN_EDIT && L.mode === 'regia') captureEditorialDraftForm(); const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); if (CAN_EDIT && L.mode === 'regia' && L.rtab === 'editorial') restoreEditorialDraftForm(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
 let lastVote = 'none';
 function renderAll() {
   if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
@@ -5457,6 +5495,7 @@ function saveMatch() {
 }
 /* campi e file */
 document.addEventListener('input', e => {
+  if (e.target.matches('#editorialLogicalKey, #editorialCaption')) captureEditorialDraftForm(e.target);
   if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope,target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(['accent','fontFamily'].includes(k)?e.target.value:(k==='fontScale'?Number(e.target.value)/100:Number(e.target.value)));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
   const s = e.target.dataset && e.target.dataset.roster;
   if (s) { const pl = parseRoster(e.target.value), n = pl.filter(p => p.starter).length; $(`[data-count="${s}"]`).textContent = `${n} titolari · ${pl.length - n} in panchina`; return; }
@@ -5471,6 +5510,11 @@ document.addEventListener('change', async e => {
   if (t.id === 'editorialContentType') {
     const key = $('#editorialLogicalKey');
     if (key) key.value = editorialDefaultLogicalKey(t.value);
+    captureEditorialDraftForm(t);
+    return;
+  }
+  if (t.matches('#editorialAsset, #editorialFacebook, #editorialInstagram')) {
+    captureEditorialDraftForm(t);
     return;
   }
   if (t.matches('[data-attack-direction]')) { if (S.clock.phase !== 'pre') return; S.match.attackDirectionFirst = ['left','right'].includes(t.value) ? t.value : ''; commit(true); renderMain(); return; }
