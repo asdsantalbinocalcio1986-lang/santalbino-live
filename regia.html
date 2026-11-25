@@ -4198,6 +4198,15 @@ function capturePostmatchSnapshot() {
   };
 }
 
+function matchResultSnapshotKey(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return '';
+  const { rev, ...content } = snapshot;
+  return JSON.stringify(content);
+}
+function matchResultSnapshotMatchesCurrent(snapshot) {
+  return !!snapshot && matchResultSnapshotKey(snapshot) === matchResultSnapshotKey(capturePostmatchSnapshot());
+}
+
 function matchResultSafeId(snapshot) {
   const raw = snapshot?.match?.pollId || [snapshot?.match?.date, snapshot?.match?.home, snapshot?.match?.away].filter(Boolean).join('_');
   const id = String(raw || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
@@ -4232,6 +4241,7 @@ async function displayMatchResultEdition(edition) {
   const url = await matchResultSignedUrl(edition.graphic_path);
   matchResultEditor.active = edition;
   matchResultEditor.snapshot = edition.snapshot;
+  matchResultEditor.stale = !matchResultSnapshotMatchesCurrent(edition.snapshot);
   matchResultEditor.graphicBlob = null;
   matchResultEditor.graphicPath = edition.graphic_path;
   matchResultEditor.graphicSha256 = edition.graphic_sha256;
@@ -4239,25 +4249,29 @@ async function displayMatchResultEdition(edition) {
   dlg.innerHTML = matchResultEditorHtml(url, edition.caption, edition);
 }
 function matchResultEditorHtml(imageUrl, caption, edition) {
-  const status = edition ? (edition.status === 'approved' ? 'Approvata' : edition.status === 'superseded' ? 'Superata' : 'Bozza') : 'Non salvata';
+  const stale = !!edition && !matchResultSnapshotMatchesCurrent(edition.snapshot);
+  const status = edition ? (edition.status === 'approved' ? 'Approvata' : edition.status === 'superseded' ? 'Superata' : 'Bozza') + (stale ? ' · DATI SUPERATI' : '') : 'Non salvata';
   const history = matchResultEditor.editions.map(item => {
     const match = item.snapshot?.match || {};
     const title = [match.home || 'Casa', match.away || 'Ospiti'].join(' – ');
     const date = match.date ? ' · ' + match.date : '';
+    const itemStale = !matchResultSnapshotMatchesCurrent(item.snapshot);
+    const itemStatus = itemStale ? 'Storica · dati superati' : (item.status === 'approved' ? 'Approvata' : item.status === 'superseded' ? 'Superata' : 'Bozza');
     return '<button type="button" class="btn sm" data-postmatch-revision="' + esc(item.id) + '">' +
       esc(title) + esc(date) + ' · Rev. ' + Number(item.revision) + ' · ' +
-      esc(item.status === 'approved' ? 'Approvata' : item.status === 'superseded' ? 'Superata' : 'Bozza') +
+      esc(itemStatus) +
       '</button>';
   }).join(' ');
-  const canSave = !!(db && CAN_EDIT && !matchResultEditor.dbError);
+  const canSave = !!(db && CAN_EDIT && !matchResultEditor.dbError && !stale);
   const canApprove = !!edition && edition.status === 'draft' && canSave;
-  const canShare = !!edition && edition.status === 'approved' && !TEST_MODE;
+  const canShare = !!edition && edition.status === 'approved' && !TEST_MODE && !stale;
   return '<div class="sheethead"><h2>MATCH RESULT · ' + status + '</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div>' +
     '<img class="graphic-preview" src="' + esc(imageUrl) + '" alt="Grafica MATCH RESULT salvata">' +
     '<label class="f"><span>Post con mini riassunto · modificabile</span><textarea id="matchResultPost" rows="7">' + esc(caption) + '</textarea></label>' +
     '<div class="row2 stack"><button class="btn primary" data-a="savePostmatchRevision" ' + (canSave ? '' : 'disabled') + '>Salva nuova bozza</button>' +
     '<button class="btn" data-a="approvePostmatchRevision" ' + (canApprove ? '' : 'disabled') + '>Approva questa revisione</button></div>' +
     '<p class="small muted">L’approvazione è solo editoriale: non pubblica sui social. Ogni salvataggio crea una nuova revisione.</p>' +
+    (stale ? '<p class="small muted">Questa è una revisione storica: la cronaca o i marcatori sono cambiati. Non può essere approvata o condivisa. Riapri MATCH RESULT per generare la grafica aggiornata e salvarla come nuova revisione.</p>' : '') +
     (matchResultEditor.dbError ? '<p class="small muted">Archivio non disponibile: ' + esc(matchResultEditor.dbError) + '</p>' : '') +
     (matchResultEditor.refreshWarning ? '<p class="small muted">Aggiornamento: ' + esc(matchResultEditor.refreshWarning) + '</p>' : '') +
     '<div class="row2 stack"><button class="btn" data-a="saveMatchResultGraphic">Scarica grafica</button>' +
@@ -4279,6 +4293,9 @@ async function saveMatchResultRevision() {
     const snapshot = matchResultEditor.snapshot || capturePostmatchSnapshot();
     if (!snapshot || typeof snapshot !== 'object' || !snapshot.match || !Array.isArray(snapshot.events)) {
       throw new Error('Snapshot partita non valido: riapri MATCH RESULT e riprova.');
+    }
+    if (!matchResultSnapshotMatchesCurrent(snapshot)) {
+      throw new Error('La cronaca o i marcatori sono cambiati. Riapri MATCH RESULT per generare e salvare la grafica aggiornata.');
     }
     const matchId = matchResultSafeId(snapshot);
     const environment = TEST_MODE ? 'test' : 'production';
@@ -4370,6 +4387,9 @@ async function approveMatchResultRevision() {
   matchResultEditor.refreshWarning = '';
   const edition = matchResultEditor.active;
   if (!edition || edition.status !== 'draft') throw new Error('Seleziona una bozza da approvare.');
+  if (!matchResultSnapshotMatchesCurrent(edition.snapshot)) {
+    throw new Error('Questa revisione non corrisponde più alla cronaca corrente. Riapri MATCH RESULT e salva una nuova bozza aggiornata.');
+  }
   const editedCaption = String($('#matchResultPost')?.value || '').trim();
   if (editedCaption !== String(edition.caption || '').trim()) {
     throw new Error('Hai modificato il testo dopo l’ultimo salvataggio. Salva una nuova bozza prima di approvare, così approvi esattamente il contenuto visualizzato.');
@@ -4422,7 +4442,7 @@ async function openMatchResult() {
     if (!dlg.open) { releaseMatchResultPreviewUrl(); return; }
     const currentMatchId = matchResultSafeId(matchResultEditor.snapshot);
     const latest = editions.find(item => item.match_id === currentMatchId);
-    const latestSnapshotMatches = !!latest && JSON.stringify(latest.snapshot) === JSON.stringify(matchResultEditor.snapshot);
+    const latestSnapshotMatches = !!latest && matchResultSnapshotKey(latest.snapshot) === matchResultSnapshotKey(matchResultEditor.snapshot);
     if (latestSnapshotMatches) {
       releaseMatchResultPreviewUrl();
       await displayMatchResultEdition(latest);
@@ -5294,6 +5314,7 @@ document.addEventListener('click', async e => {
       const txt = String($('#matchResultPost')?.value || '').trim();
       if (TEST_MODE) { toast('Condivisione esterna disattivata in modalità prova.'); break; }
       if (!approved || approved.status !== 'approved') { toast('Puoi condividere solo una revisione approvata.'); break; }
+      if (!matchResultSnapshotMatchesCurrent(approved.snapshot)) { toast('Questa grafica approvata è superata: rigenera MATCH RESULT e approva una nuova revisione prima di condividerla.'); break; }
       if (txt !== String(approved.caption || '').trim()) { toast('Il testo è stato modificato: salva una nuova bozza e falla approvare prima di condividerlo.'); break; }
       const pollId=approved.snapshot?.match?.pollId;
       const url=pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
