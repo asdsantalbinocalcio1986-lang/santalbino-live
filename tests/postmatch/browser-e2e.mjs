@@ -214,17 +214,17 @@ async function main() {
     await editorialTab.click();
     await page.locator('#editorialCaption').waitFor({ state: 'visible', timeout: 30000 });
 
-    const editorialPng = {
-      name: 'editorial-ci.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/vU8AAAAASUVORK5CYII=', 'base64')
+    const editorialJpeg = {
+      name: 'editorial-ci.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD1CiiivgD2j//Z', 'base64')
     };
     const editorialKey = `ci-editorial:${pollId}:custom`;
     const editorialCaption = 'TEST E2E · Bozza editoriale amministrativa.';
     await page.locator('#editorialContentType').selectOption('custom');
     await page.locator('#editorialLogicalKey').fill(editorialKey);
     await page.locator('#editorialCaption').fill(editorialCaption);
-    await page.locator('#editorialAsset').setInputFiles(editorialPng);
+    await page.locator('#editorialAsset').setInputFiles(editorialJpeg);
     await page.locator('#editorialFacebook').check();
     await page.locator('#editorialInstagram').check();
     await page.locator('[data-a="editorialSave"]').click();
@@ -260,7 +260,7 @@ async function main() {
     await page.locator('#editorialContentType').selectOption('club_notice');
     await page.locator('#editorialLogicalKey').fill(scheduledKey);
     await page.locator('#editorialCaption').fill(scheduledCaption);
-    await page.locator('#editorialAsset').setInputFiles(editorialPng);
+    await page.locator('#editorialAsset').setInputFiles(editorialJpeg);
     await page.locator('#editorialFacebook').check();
     await page.locator('#editorialInstagram').uncheck();
     await page.locator('[data-a="editorialSave"]').click();
