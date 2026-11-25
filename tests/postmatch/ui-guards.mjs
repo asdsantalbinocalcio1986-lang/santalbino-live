@@ -53,6 +53,14 @@ assert.ok(publicSource.includes(": { rosters: {home:'',away:''}, convocati: '' }
   'The live public view must show no convocati or lineups when the current match has no published snapshot.');
 assert.ok(publicSource.includes('localStorage.removeItem(DK)'),
   'Resetting a match must discard any stale local draft before saving the new empty match.');
+assert.ok(source.includes('localStorage.removeItem(DK)') && source.includes("S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }"),
+  'The actual control-room page must clear the old draft and reset published convocati/formations for a new match.');
+assert.doesNotMatch(source, /if \(!S\.publication\.published\) S\.publication\.published\s*=|if \(!state\.publication\.published\) state\.publication\.published\s*=/,
+  'The control room must not recreate a missing publication snapshot from the previous mutable roster/convocati fields.');
+assert.doesNotMatch(publicSource, /if \(!S\.publication\.published\) S\.publication\.published\s*=|if \(!state\.publication\.published\) state\.publication\.published\s*=/,
+  'The public/index page must not recreate a missing publication snapshot from mutable roster/convocati fields.');
+assert.ok(source.includes(": { rosters: {home:'',away:''}, convocati: '' };"),
+  'The control room public-content helper must return empty published content if no snapshot exists.');
 assert.ok(previewSource.includes("db.from('match_archive').select('state')"),
   'The public preview must load the immutable archived state when the match is no longer live.');
 assert.ok(homeSource.includes("CONSULTA PARTITA ARCHIVIATA"),
