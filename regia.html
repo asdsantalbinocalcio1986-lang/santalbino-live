@@ -1620,14 +1620,20 @@ async function shareSocialDraft(kind, platform) {
   if (TEST_MODE) { toast('Condivisione esterna disattivata nella simulazione.'); return; }
   const text = socialDraftText(kind);
   const matchUrl = socialDraftMatchUrl();
-  const shareText = [text, S.match.hashtag || '#SANTALive', 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\n\n');
+  const hashtag = String(S.match.hashtag || '#SANTALive').trim();
+  const textWithoutHashtag = hashtag
+    ? text.split(/\r?\n/).filter(line => line.trim() !== hashtag).join('\n').trim()
+    : text;
+  const shareText = [textWithoutHashtag, hashtag, 'Segui la partita su SANTA Live: ' + matchUrl].filter(Boolean).join('\n\n');
   if (platform === 'whatsapp') {
-    window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank', 'noopener');
-    toast('WhatsApp pronto: scegli i destinatari e conferma l’invio.');
+    const whatsappWindow = window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank');
+    if (whatsappWindow) whatsappWindow.opener = null;
+    toast(whatsappWindow ? 'WhatsApp pronto: scegli i destinatari e conferma l’invio.' : 'Popup WhatsApp bloccato: abilita i popup e riprova.');
     return;
   }
-  const facebookWindow = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank', 'noopener');
-  await copyText(text);
+  const facebookWindow = window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(matchUrl), '_blank');
+  if (facebookWindow) facebookWindow.opener = null;
+  await copyText(shareText);
   if (!facebookWindow) toast('Popup Facebook bloccato: abilita i popup e riprova.');
   else toast('Testo copiato: incollalo nella finestra di condivisione Facebook.');
 }
@@ -4869,7 +4875,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.socialDrafts = { matchDay: '', convocati: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
