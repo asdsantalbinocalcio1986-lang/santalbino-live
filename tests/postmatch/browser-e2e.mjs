@@ -226,6 +226,8 @@ async function main() {
     await page.locator('#editorialAsset').setInputFiles(editorialJpeg);
     await page.locator('#editorialFacebook').check();
     await page.locator('#editorialInstagram').check();
+    assert.equal(await page.locator('#editorialLogicalKey').inputValue(), editorialKey,
+      'Editorial revision key changed unexpectedly while completing the form.');
     await page.locator('[data-a="editorialSave"]').click();
     await page.getByText('Bozza editoriale salvata', { exact: false }).waitFor({ timeout: 30000 });
     const editorialCard = page.locator('[data-editorial-post]').filter({ hasText: editorialCaption });
