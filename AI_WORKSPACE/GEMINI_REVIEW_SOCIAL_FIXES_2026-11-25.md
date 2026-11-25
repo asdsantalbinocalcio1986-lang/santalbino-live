@@ -13,7 +13,7 @@ Repository: https://github.com/asdsantalbinocalcio1986-lang/santalbino-live
 
 Current head commits at preparation:
 - PR #106 `bc75b97690b867e279df5d68bef55b5890221b25`
-- PR #107 `588aaefcaac7b8bc79b081ea0726195dc08ffa7d`
+- PR #107 `bb188086faa0c0328d6f73293c160a7e508eb9e6`
 
 ## Corrections to review
 
