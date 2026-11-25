@@ -4970,8 +4970,7 @@ document.addEventListener('click', async e => {
       if (TEST_MODE) { toast('Condivisione esterna disattivata in modalità prova.'); break; }
       if (!approved || approved.status !== 'approved') { toast('Puoi condividere solo una revisione approvata.'); break; }
       if (txt !== String(approved.caption || '').trim()) { toast('Il testo è stato modificato: salva una nuova bozza e falla approvare prima di condividerlo.'); break; }
-      const pollId=approved.snapshot?.match?.pollId;
-      const url=pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match='+encodeURIComponent(pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html';
+      const url = socialDraftMatchUrl();
       window.open('https://wa.me/?text='+encodeURIComponent(txt+'\n\nSegui SANTA Live: '+url),'_blank','noopener');
       break;
     }
@@ -5002,9 +5001,7 @@ document.addEventListener('click', async e => {
     }
     case 'sharewa': {
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
-      const matchUrl = TEST_MODE
-        ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/index.html?test=1&view=public'
-        : (S.match.pollId ? 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/preview.html?match=' + encodeURIComponent(S.match.pollId) : 'https://asdsantalbinocalcio1986-lang.github.io/santalbino-live/home.html');
+      const matchUrl = socialDraftMatchUrl();
       const shareText = (TEST_MODE ? '⚠️ TEST SANTA LIVE — CONTENUTO DIMOSTRATIVO, NON UFFICIALE ⚠️\n\n' : '') + so.text + '\n\n#SANTALive\n\nSegui la partita su SANTA Live: ' + matchUrl;
       const waUrl = 'https://wa.me/?text=' + encodeURIComponent(shareText);
       const ev2 = S.events.find(x => x.id === postId);
