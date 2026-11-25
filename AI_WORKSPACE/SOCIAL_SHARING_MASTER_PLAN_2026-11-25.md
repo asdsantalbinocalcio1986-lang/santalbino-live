@@ -155,7 +155,7 @@ Non promettere exactly-once: la garanzia realistica è ridurre duplicazioni con 
 ### Fase 0 — chiusura specifica e backlog
 - [x] Audit read-only del publisher, RLS, cron, hashtag/logo e PR.
 - [x] Architettura proposta di coda e delivery.
-- [ ] Registrare questo master plan nel workspace condiviso.
+- [x] Registrare questo master plan nel workspace condiviso.
 - [ ] Claude: correggere i difetti verificati su branch autorizzato, senza toccare main.
 - [ ] Gemini: review indipendente del diff e dei test.
 - [ ] ChatGPT: riconciliare evidenze, test e decisione go/no-go.
