@@ -32,7 +32,7 @@ function render(){
    if(e.type==='foul')detail=e.kind==='rigore'&&e.foulInArea!==false?'Calcio di rigore assegnato':e.handball?'Fallo di mano':'Fallo';
    else if(e.type==='sub')detail=[e.out,e.inn].filter(Boolean).map(esc).join(' → ');
    else if(e.type==='freekick')detail=({difensiva:'3/4 difensiva',offensiva:'3/4 offensiva','limite-centro':'Limite area centrale','limite-destra':'Limite area destra','limite-sinistra':'Limite area sinistra'})[e.freeKickZone]||'';
-   else if(e.type==='corner'&&e.cornerSide)detail='da '+e.cornerSide;
+   else if(e.type==='corner'&&e.cornerSide)detail='da '+esc(e.cornerSide);
    if(e.note)detail+=(detail?' · ':'')+esc(e.note);
    return '<article class="event-row"><div class="event-minute">'+esc(e.min||'–')+(e.min?'′':'')+'</div><div><div class="event-title">'+esc(label+own+penalty)+person+'</div><div class="event-detail">'+esc(sideName)+(detail?(sideName?' · ':'')+detail:'')+'</div></div></article>';
  }).join('');
