@@ -90,3 +90,26 @@ Non trattare `unknown` come retry automatico. Prevedere riconciliazione mediante
 - Non invocare la funzione hosted, neppure con `action=status`: il ramo status effettua una richiesta Graph API a Meta.
 - Nessuna chiamata Graph API, collegamento account, pubblicazione o test con contenuti reali.
 - Mantenere questa PR in Draft fino a completamento di tutti i test.
+
+
+## Stato implementazione — 25 novembre 2026
+
+È stata avviata l'implementazione sul branch dedicato della PR #110.
+
+### Implementato nel branch
+- Migration additiva con `claim_token`, `lease_expires_at`, stati `unknown`, `failed_retryable` e `reconciliation_required`.
+- RPC `claim_santalbino_social_publication`: acquisizione transazionale su `event_id`, con lock della riga esistente; un claim attivo o un esito incerto blocca ogni nuovo invio.
+- Le scritture del publisher sono condizionate al `claim_token`, così un worker con token obsoleto non può sovrascrivere lo stato.
+- Timeout sulle richieste Graph; gli errori di rete, le risposte illeggibili e i 5xx sulle POST sono classificati `unknown`; le risposte 4xx esplicite sono `failed_retryable`.
+- Persistenza dell'ID del container Instagram prima del polling; i retry riprendono il container già creato. Un container esplicitamente fallito viene scartato prima di un nuovo tentativo.
+- Trasporto HTTP iniettabile e test Deno con risposte simulate, senza account o pagina Facebook di prova.
+- Test SQL per claim ripetuto, retry dopo rifiuto certo, fencing del token obsoleto e blocco degli esiti incerti; agganciati al test harness Supabase locale effimero.
+
+### Limiti ancora da verificare
+- I test non sono ancora stati eseguiti in questa sessione: non è stato avviato un ambiente Deno/PostgreSQL locale.
+- La suite SQL copre la logica di claim e fencing, ma non sostituisce una prova di concorrenza multi-sessione PostgreSQL né l'intero ciclo Edge Function.
+- La migrazione tratta i vecchi stati `failed` come `unknown`, perché la versione precedente non distingueva un rifiuto certo da un timeout ambiguo.
+- Un record rimasto `processing` dopo un crash non viene riacquisito automaticamente, anche se la lease è scaduta: è una scelta deliberatamente conservativa per non duplicare contenuti. Serve riconciliazione amministrativa.
+- Nessun deploy, migrazione hosted, lettura/modifica dei segreti, invocazione della funzione hosted o chiamata Meta è stato eseguito.
+
+**Gate prima di domenica:** eseguire i test locali/CI, revisione indipendente del SQL e del publisher, verificare l'allineamento del sorgente con la versione hosted e preparare una procedura manuale di riconciliazione. L'installazione in produzione e l'eventuale attivazione restano passaggi distinti e soggetti ad autorizzazione.
