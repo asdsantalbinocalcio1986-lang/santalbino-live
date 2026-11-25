@@ -29,6 +29,8 @@ jobs:
           node-version: 22
       - name: Validate application and security migration
         run: node scripts/validate-project.mjs
+      - name: Verify social copy editor guards
+        run: node tests/social-copy/ui-guards.mjs
 
   postmatch-sql-tests:
     name: Post-match SQL integration tests (ephemeral PostgreSQL)
