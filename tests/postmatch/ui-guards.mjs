@@ -32,9 +32,9 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 console.log('Post-match editorial UI guard tests passed');
 
 
-assert.match(source, /\\.eq\\('graphic_path', uploadedPath\\)\\.maybeSingle\\(\\)/, 'Ambiguous RPC failures must verify whether the uploaded graphic is already referenced before cleanup.');
-assert.match(source, /if \\(verificationError\\)[\\s\\S]{0,500}Il file è stato conservato/, 'If persistence cannot be checked, keep the upload rather than risking deletion of a committed revision.');
+assert.match(source, /\.eq\('graphic_path', uploadedPath\)\s*\.maybeSingle\(\)/, 'Ambiguous RPC failures must verify whether the uploaded graphic is already referenced before cleanup.');
+assert.match(source, /if \(verificationError\)[\s\S]{0,500}Il file è stato conservato/, 'If persistence cannot be checked, keep the upload rather than risking deletion of a committed revision.');
 assert.match(source, /refreshWarning = 'La bozza è stata salvata, ma lo storico non si è aggiornato/, 'A refresh failure after a successful save must not be treated as a persistence failure.');
-assert.match(source, /function releaseMatchResultPreviewUrl\\(\\)/, 'The generated preview object URL must have a cleanup helper.');
-assert.match(source, /dlg\\.addEventListener\\('close', releaseMatchResultPreviewUrl\\)/, 'Closing MATCH RESULT must release its generated preview object URL.');
-assert.match(source, /displayMatchResultEdition\\(edition\\) \\{\\s*releaseMatchResultPreviewUrl\\(\\)/, 'Switching to a saved revision must release the generated preview object URL.');
+assert.match(source, /function releaseMatchResultPreviewUrl\(\)/, 'The generated preview object URL must have a cleanup helper.');
+assert.match(source, /dlg\.addEventListener\('close', releaseMatchResultPreviewUrl\)/, 'Closing MATCH RESULT must release its generated preview object URL.');
+assert.match(source, /displayMatchResultEdition\(edition\) \{\s*releaseMatchResultPreviewUrl\(\)/, 'Switching to a saved revision must release the generated preview object URL.');
