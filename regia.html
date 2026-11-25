@@ -1400,7 +1400,7 @@ let S = (() => {
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
 S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
 S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts || {});
-if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
+// Non ricostruire pubblicazioni mancanti dai contenuti correnti: potrebbero appartenere a una gara precedente.
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
@@ -2228,7 +2228,6 @@ function migrateBundledLogos(state) {
 function mergeState(raw) {
   const d = defaults();
   const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
-  if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
   return state;
 }
 async function verifyAdminAccess() {
@@ -3694,7 +3693,7 @@ function publicContent() {
   const published = S.publication?.published;
   return published && typeof published === 'object'
     ? { rosters: Object.assign({home:'',away:''}, published.rosters || {}), convocati: published.convocati || '' }
-    : { rosters: S.rosters, convocati: S.convocati || '' };
+    : { rosters: {home:'',away:''}, convocati: '' };
 }
 function localDateTimeValue(value) {
   if (!value) return '';
@@ -5518,7 +5517,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.socialDrafts = { matchDay: '', convocati: '' }; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { try { localStorage.removeItem(DK); } catch (e) {} S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.socialDrafts = { matchDay: '', convocati: '' }; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
