@@ -98,3 +98,14 @@ These facts must be rechecked against the exact branch/commit before implementat
 - Aggiunto audit indipendente `AI_WORKSPACE/INDEPENDENT_REVIEW_PR106_PR107_2026-11-25.md` con 5 finding post-match e 4 social-copy. Finding chiave: SHA-256 grafica non verificato server-side sui byte Storage; environment test/prod è solo namespace logico nello stesso progetto; bozze social #107 sono nello stato applicativo locale e non una coda server-side; popup Facebook con noopener può dare falso negativo; possibile hashtag duplicato.
 - PR #106 non collega approvazione post-match al publisher Meta; PR #107 realizza condivisione manuale, non pubblicazione automatica né scheduling.
 - Nessun codice modificato, branch d'integrazione creato, merge, deploy, modifica Supabase o invio social effettuato.
+
+
+## Audit hashtag e logo club — 2026-11-25
+
+- Audit read-only di `regia.html` main: `saveMatch()` salva il valore digitato in `#s-tag`, non genera un hashtag dall'avversario; i generatori di cronaca, convocati, formazioni e grafiche consumano già `S.match.hashtag`.
+- Il modello loghi è posizionale `S.logos.home/away`; upload e persistenza condivisa esistono già, ma il logo del club non è ancora una proprietà canonica indipendente da casa/trasferta. `resetMatch()` non azzera esplicitamente `S.logos`.
+- Creato `AI_WORKSPACE/HASHTAG_AND_CLUB_LOGO_AUDIT_2026-11-25.md` con finding, modello proposto e 17 test di accettazione.
+- Nuovo controllo Supabase: `santalbino_social_publications` esiste, RLS attiva, 0 righe; contiene schema di log per eventi live (goal/red/halftime/fulltime), non una coda editoriale. Edge Function `santalive-social-publish` ACTIVE v2, JWT verification attiva. Migrations elencate fino a `scheduled_public_content` (2026-11-22).
+- Creato `AI_WORKSPACE/SOCIAL_QUEUE_SCHEMA_DESIGN_DRAFT.md`: proposta separazione coda editoriale / delivery per piattaforma, snapshot immutabile, claim atomico, lease, stati unknown e kill switch. Non è migration pronta né approvata.
+- PR #108 resta open/Draft/non merged al controllo; i due nuovi documenti sono nel branch `ai-workspace/bootstrap` e quindi nel perimetro della PR.
+- Nessuna modifica a codice applicativo, schema/dati/storage/cron, segreti, account social, merge o deploy.
