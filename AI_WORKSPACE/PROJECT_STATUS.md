@@ -90,3 +90,11 @@ These facts must be rechecked against the exact branch/commit before implementat
 - Preparato `AI_WORKSPACE/PR_INTEGRATION_AND_META_MOCK_TEST_PLAN_2026-11-25.md`: strategia branch combinato, gate di stop, test MOCK-01..MOCK-18 e incarico Claude non ancora inviato.
 - La strategia non crea branch né modifica codice: merge a tre vie controllato solo dopo mappa conflitti e approvazione. Il publisher va testato con adapter Graph mock e blocco esplicito di ogni traffico esterno.
 - Nessun codice, workflow, database, storage, cron, segreto, account social, merge o deploy è stato modificato.
+
+
+## Revisione indipendente PR #106/#107 — 2026-11-25
+
+- Confronto GitHub: entrambe le PR condividono la stessa base main `8166deeb4b70397af9b021b9420f93afdab2501f`; #106 è 58 commit ahead, #107 17 commit ahead, entrambe 0 behind. I due file sovrapposti restano `regia.html` e `.github/workflows/pages.yml`.
+- Aggiunto audit indipendente `AI_WORKSPACE/INDEPENDENT_REVIEW_PR106_PR107_2026-11-25.md` con 5 finding post-match e 4 social-copy. Finding chiave: SHA-256 grafica non verificato server-side sui byte Storage; environment test/prod è solo namespace logico nello stesso progetto; bozze social #107 sono nello stato applicativo locale e non una coda server-side; popup Facebook con noopener può dare falso negativo; possibile hashtag duplicato.
+- PR #106 non collega approvazione post-match al publisher Meta; PR #107 realizza condivisione manuale, non pubblicazione automatica né scheduling.
+- Nessun codice modificato, branch d'integrazione creato, merge, deploy, modifica Supabase o invio social effettuato.
