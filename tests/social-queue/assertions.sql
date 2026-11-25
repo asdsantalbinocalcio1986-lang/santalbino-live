@@ -14,6 +14,7 @@ declare
   v_approved_old public.santalbino_editorial_posts%rowtype;
   v_approved_new public.santalbino_editorial_posts%rowtype;
   v_exhausted public.santalbino_editorial_posts%rowtype;
+  v_permanent public.santalbino_editorial_posts%rowtype;
   v_count integer;
 begin
   if (select public from storage.buckets where id = 'santalbino-editorial') is distinct from false then
@@ -173,6 +174,13 @@ begin
     repeat('3', 64), '{"facebook":true}'::jsonb, '{"kind":"retry-limit"}'::jsonb
   );
   select * into v_exhausted from public.approve_santalbino_editorial_post(v_exhausted.id, 1, now() + interval '1 hour');
+
+  select * into v_permanent from public.save_santalbino_editorial_draft(
+    'match:ci-match:permanent-error:club_notice', 'club_notice', null,
+    'Avviso con rifiuto permanente Meta', 'social-editorial/test/permanent-error.jpg',
+    repeat('4', 64), '{"facebook":true}'::jsonb, '{"kind":"permanent-error"}'::jsonb
+  );
+  select * into v_permanent from public.approve_santalbino_editorial_post(v_permanent.id, 1, now() + interval '1 hour');
 end
 $admin_tests$;
 
@@ -189,6 +197,8 @@ declare
   v_retry_token uuid;
   v_exhausted_id uuid;
   v_exhausted_token uuid;
+  v_permanent_id uuid;
+  v_permanent_token uuid;
 begin
   begin
     insert into public.santalbino_editorial_posts (
@@ -302,6 +312,27 @@ begin
   end if;
   if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
     raise exception 'Terminally failed delivery was automatically retried';
+  end if;
+
+  select id into v_permanent_id from public.santalbino_editorial_posts
+   where logical_key = 'match:ci-match:permanent-error:club_notice';
+  update public.santalbino_editorial_posts
+     set scheduled_at = now() - interval '1 minute'
+   where id = v_permanent_id;
+  v_claims := public.claim_santalbino_editorial_queue(5, true);
+  if jsonb_array_length(v_claims) <> 1 then
+    raise exception 'Permanent Meta rejection test post was not claimed';
+  end if;
+  v_permanent_token := (v_claims -> 0 -> 'post' ->> 'claim_token')::uuid;
+  v_status := public.complete_santalbino_editorial_delivery(
+    v_permanent_id, 'facebook', v_permanent_token, 'failed', null, 'Meta invalid token'
+  );
+  if v_status <> 'failed'
+     or (select status from public.santalbino_editorial_deliveries where post_id = v_permanent_id and platform = 'facebook') <> 'failed' then
+    raise exception 'Permanent Meta rejection was not stored as terminal failure: %', v_status;
+  end if;
+  if jsonb_array_length(public.claim_santalbino_editorial_queue(5, true)) <> 0 then
+    raise exception 'Permanent Meta rejection was automatically retried';
   end if;
 end
 $worker_tests$;
