@@ -104,3 +104,12 @@ Event log append-only: actor, action, post_id, revision, timestamp, metadata san
 - Completare merge di #106/#107 solo dopo revisione combinata e autorizzazione; mantenere i test esistenti.
 - Definire ambiente Supabase separato per test.
 - Approvazione esplicita della specifica e del piano di rilascio.
+
+
+## Addendum — publisher live contract verification (2026-11-25)
+- Deployed Edge Function v2 source matches byte-for-byte `main/supabase/functions/santalive-social-publish/index.ts` (14,016 chars). No function invocation or Meta request was made.
+- Confirmed server-side JWT + admin-table check and `META_PUBLISH_ENABLED` gate.
+- New blockers PUB-01/02/03: the processing check is SELECT-then-UPDATE and not an atomic claim; all Meta exceptions are recorded as failed even when external outcome may be ambiguous; unique event_id prevents duplicate rows, not duplicate external posts. A claim RPC/lease and `unknown/reconciliation_required` are prerequisites before extending the publisher.
+- Existing function supports only goal/red/halftime/fulltime, so editorial types need a deliberate contract extension, not merely a new queue row.
+- Existing `status` action contacts Graph API; do not call it as a harmless health check during isolated testing.
+- Live RLS inventory: social log has authenticated-admin SELECT policy; storage media bucket is public with 8 MiB limit and admin-only upload/update/delete policies. Bucket is `santalbino-media`.
