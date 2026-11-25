@@ -10,7 +10,10 @@ create table if not exists public.santalbino_postmatch_editions (
   status text not null default 'draft'
     check (status in ('draft', 'approved', 'superseded')),
   caption text not null check (char_length(caption) <= 10000),
-  snapshot jsonb not null check (jsonb_typeof(snapshot) = 'object'),
+  snapshot jsonb not null check (
+    jsonb_typeof(snapshot) = 'object'
+    and pg_catalog.pg_column_size(snapshot) <= 65536
+  ),
   source_state_rev bigint,
   graphic_path text not null,
   graphic_sha256 text not null check (graphic_sha256 ~ '^[a-f0-9]{64}$'),
@@ -140,6 +143,7 @@ begin
      or char_length(p_caption) > 10000
      or p_snapshot is null
      or jsonb_typeof(p_snapshot) <> 'object'
+     or pg_catalog.pg_column_size(p_snapshot) > 65536
      or p_graphic_path is null
      or p_graphic_path not like ('postmatch/' || p_environment || '/' || p_match_id || '/%')
      or p_graphic_sha256 is null
