@@ -37,6 +37,18 @@ begin
        'EXECUTE') then
     raise exception 'service_role must execute the privileged claim RPC';
   end if;
+  if has_table_privilege('anon', 'public.santalbino_social_publications', 'SELECT') then
+    raise exception 'anon must not read the social publication log';
+  end if;
+  if not has_table_privilege('authenticated', 'public.santalbino_social_publications', 'SELECT') then
+    raise exception 'authenticated role needs SELECT grant for the admin-only RLS policy';
+  end if;
+  if has_table_privilege('authenticated', 'public.santalbino_social_publications', 'INSERT') then
+    raise exception 'authenticated must not write social publication records';
+  end if;
+  if not has_table_privilege('service_role', 'public.santalbino_social_publications', 'INSERT') then
+    raise exception 'service_role must write social publication records';
+  end if;
 
   v_first := public.claim_santalbino_social_publication(
     v_event, 'local-test', 'goal', 'Test caption', 'https://example.test/test.jpg',
