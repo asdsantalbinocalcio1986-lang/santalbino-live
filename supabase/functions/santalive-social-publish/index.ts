@@ -77,7 +77,7 @@ async function graphPost(path: string, params: Record<string, string>) {
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-Deno.serve(async (req: Request) => {
+if (import.meta.main) Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
 
@@ -242,7 +242,7 @@ Deno.serve(async (req: Request) => {
     let instagramError: string | null = null;
 
     const persist = async () => {
-      const { error } = await adminClient.from("santalbino_social_publications").update({
+      const { data, error } = await adminClient.from("santalbino_social_publications").update({
         facebook_status: facebookStatus,
         instagram_status: instagramStatus,
         facebook_post_id: facebookPostId,
