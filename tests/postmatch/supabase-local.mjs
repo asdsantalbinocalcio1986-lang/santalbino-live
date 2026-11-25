@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID, randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -94,8 +94,69 @@ async function main() {
   `);
 
   psql('supabase/proposals/postmatch_editorial_revisions.sql', true);
+  // The CI job moves hosted migrations out of supabase/migrations before booting
+  // the isolated stack. Resolve the preserved copy there; use the repository path
+  // for a direct local invocation.
+  const migrationRoot = existsSync('/tmp/santalbino-hosted-migrations')
+    ? '/tmp/santalbino-hosted-migrations'
+    : 'supabase/migrations';
+  // Exercise the additive social publisher schema only on this disposable local stack.
+  psql(`${migrationRoot}/20261123160000_santalbino_social_publications.sql`, true);
+  psql(`${migrationRoot}/20261125120000_santalbino_social_publisher_claims.sql`, true);
+  psql('tests/social-publisher/claims.sql', true);
+  execFileSync('node', ['tests/social-publisher/claim-concurrency.mjs'], {
+    stdio: 'inherit',
+    env: process.env
+  });
   const adminToken = await signIn(adminEmail);
   const nonAdminToken = await signIn(nonAdminEmail);
+
+  // The social publication log is readable only by the registered SANTA Live admin.
+  const socialRlsEventId = `publisher-rls-${randomUUID()}`;
+  await request('/rest/v1/santalbino_social_publications', {
+    method: 'POST', token: service, key: service,
+    body: {
+      event_id: socialRlsEventId, match_id: 'local-rls', event_type: 'goal',
+      caption: 'RLS integration test', image_url: 'https://example.test/rls.jpg',
+      platforms: { facebook: true, instagram: false }
+    },
+    expected: [201]
+  });
+  const adminSocialRows = await request(
+    '/rest/v1/santalbino_social_publications?select=event_id&event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { token: adminToken }
+  );
+  assert.equal(adminSocialRows.data?.length, 1, 'SANTA Live admin must read the social publication log.');
+  const nonAdminSocialRows = await request(
+    '/rest/v1/santalbino_social_publications?select=event_id&event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { token: nonAdminToken }
+  );
+  assert.equal(nonAdminSocialRows.data?.length, 0, 'Non-admin users must not read the social publication log.');
+  await request(
+    '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(socialRlsEventId),
+    { method: 'DELETE', token: service, key: service, expected: [204] }
+  );
+
+  // Exercise the claim RPC through PostgREST as the same service_role used by the Edge Function.
+  const rpcEventId = `publisher-rpc-${randomUUID()}`;
+  const rpcParams = {
+    p_event_id: rpcEventId, p_match_id: 'local-rpc', p_event_type: 'goal',
+    p_caption: 'Claim RPC integration test', p_image_url: 'https://example.test/rpc.jpg',
+    p_platforms: { facebook: true, instagram: false }
+  };
+  const firstRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
+    method: 'POST', token: service, key: service, body: rpcParams
+  });
+  assert.equal(firstRpcClaim.data?.result, 'claimed', 'service_role must acquire the first claim via PostgREST.');
+  const secondRpcClaim = await request('/rest/v1/rpc/claim_santalbino_social_publication', {
+    method: 'POST', token: service, key: service, body: rpcParams
+  });
+  assert.equal(secondRpcClaim.data?.result, 'processing',
+    'A second service_role request must report the active claim without starting another Meta request.');
+  await request(
+    '/rest/v1/santalbino_social_publications?event_id=eq.' + encodeURIComponent(rpcEventId),
+    { method: 'DELETE', token: service, key: service, expected: [204] }
+  );
 
   // One tiny JPEG is enough to exercise the real Storage API and signed downloads.
   const jpeg = new Uint8Array(Buffer.from(
