@@ -94,6 +94,10 @@ async function main() {
   `);
 
   psql('supabase/proposals/postmatch_editorial_revisions.sql', true);
+  // Exercise the additive social publisher schema only on this disposable local stack.
+  psql('supabase/migrations/20261123160000_santalbino_social_publications.sql', true);
+  psql('supabase/migrations/20261125120000_santalbino_social_publisher_claims.sql', true);
+  psql('tests/social-publisher/claims.sql', true);
   const adminToken = await signIn(adminEmail);
   const nonAdminToken = await signIn(nonAdminEmail);
 
