@@ -17,11 +17,11 @@ assert.match(source, /db\.rpc\('approve_santalbino_editorial_post'/,
   'Approval and scheduling must use the dedicated admin RPC.');
 assert.match(source, /db\.rpc\('cancel_santalbino_editorial_post'/,
   'Cancellation must use the dedicated admin RPC.');
-assert.match(source, /date\.getTime\(\) <= Date\.now\(\)/,
+assert.match(source, /new Date\(scheduledAt\)\.getTime\(\) <= Date\.now\(\)/,
   'Scheduled publication must reject past timestamps.');
 assert.match(source, /La pubblicazione automatica resta disattivata/,
   'The UI must explicitly distinguish approval/queueing from actual publication.');
-assert.match(source, /status === 'unknown'[\s\S]*?verifica necessaria/,
+assert.match(source, /unknown: 'Esito incerto · verifica necessaria'/,
   'Unknown outcomes must be clearly labelled as requiring reconciliation.');
 assert.doesNotMatch(source, /db\.rpc\('claim_santalbino_editorial_queue'/,
   'The browser must never claim editorial deliveries or dispatch the worker.');
