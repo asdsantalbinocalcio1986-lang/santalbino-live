@@ -1,4 +1,4 @@
-import { classifyMetaFailure, graphPost, MetaRequestError, safeError } from "./index.ts";
+import { classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
 
 Deno.test("explicit Meta rejection is retryable", () => {
   const error = new MetaRequestError("Meta HTTP 400: rejected", "failed_retryable");
@@ -105,6 +105,36 @@ Deno.test("Graph POST treats malformed responses as unknown", async () => {
   } catch (error) {
     if (classifyMetaFailure(error) !== "unknown") {
       throw new Error("Malformed response must require reconciliation");
+    }
+  }
+});
+
+
+Deno.test("Graph GET transport failure is retryable because reads have no publication side effect", async () => {
+  const fakeFetch: typeof fetch = async () => {
+    throw new TypeError("simulated read timeout");
+  };
+  try {
+    await graphGet("mock/container", { fields: "status_code" }, fakeFetch);
+    throw new Error("Expected the read transport to fail");
+  } catch (error) {
+    if (classifyMetaFailure(error) !== "failed_retryable") {
+      throw new Error("A failed read must remain safely retryable");
+    }
+  }
+});
+
+Deno.test("Graph GET server error is retryable and does not become an unknown publication", async () => {
+  const fakeFetch: typeof fetch = async () => new Response(
+    JSON.stringify({ error: { message: "temporary read failure" } }),
+    { status: 503, headers: { "Content-Type": "application/json" } }
+  );
+  try {
+    await graphGet("mock/container", { fields: "status_code" }, fakeFetch);
+    throw new Error("Expected the read server error");
+  } catch (error) {
+    if (classifyMetaFailure(error) !== "failed_retryable") {
+      throw new Error("A read-only 5xx must remain safely retryable");
     }
   }
 });
