@@ -242,10 +242,11 @@ async function main() {
     const adminAccessToken = (await apiRequest('/auth/v1/token?grant_type=password', {
       method: 'POST', token: anon, key: anon, body: { email, password }
     })).access_token;
-    const editorialRows = await apiRequest(`/rest/v1/santalbino_editorial_posts?select=id,revision,status,asset_path,asset_sha256,platforms,scheduled_at&logical_key=eq.${encodeURIComponent(editorialKey)}`, {
+    const editorialRows = await apiRequest(`/rest/v1/santalbino_editorial_posts?select=id,logical_key,revision,status,asset_path,asset_sha256,platforms,scheduled_at&match_id=eq.${encodeURIComponent(pollId)}&caption=eq.${encodeURIComponent(editorialCaption)}`, {
       token: adminAccessToken, key: anon
     });
-    assert.equal(editorialRows.length, 1, 'Expected one editorial revision in the local database.');
+    assert.equal(editorialRows.length, 1, `Expected one editorial revision for the unique test match/caption; found ${editorialRows.length}.`);
+    assert.equal(editorialRows[0].logical_key, editorialKey, 'Saved editorial revision key did not match the form value.');
     assert.equal(editorialRows[0].status, 'approved');
     assert.match(editorialRows[0].asset_sha256, /^[a-f0-9]{64}$/);
     assert.deepEqual(editorialRows[0].platforms, { facebook: true, instagram: true });
