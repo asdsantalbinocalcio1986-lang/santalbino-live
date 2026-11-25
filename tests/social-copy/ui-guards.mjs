@@ -27,7 +27,9 @@ assert.match(source, /data-a="sharefb">Condividi su Facebook/, 'Event sharing mu
 assert.match(source, /'sharewa','sharefb'/, 'External event sharing must be blocked in test mode.');
 assert.match(source, /case 'sharefb':[\s\S]{0,500}facebook\.com\/sharer\/sharer\.php/, 'Event Facebook sharing must open the share dialog.');
 assert.match(source, /S\.socialDrafts\s*=\s*\{\s*matchDay:\s*'',\s*convocati:\s*''\s*\}/, 'Starting a new match must clear previous social drafts.');
-assert.match(source, /textWithoutHashtag[\s\S]{0,220}filter\(line => line\.trim\(\) !== hashtag\)/, 'Sharing must remove a hashtag already present in the edited text before appending it once.');
+assert.match(source, /escapedHashtag = hashtag\.replace\(/, 'Sharing must escape the configured hashtag before building a safe matcher.');
+assert.match(source, /new RegExp\('\(\^\|\[\\\\s\(\[\{\]\)' \+ escapedHashtag/, 'Sharing must remove an existing hashtag token even when it is inline in edited text.');
+assert.match(source, /textWithoutHashtag[\s\S]{0,500}replace\(\/\\n\{3,\}\//, 'Hashtag removal must normalize excess blank lines before appending the hashtag once.');
 assert.match(source, /window\.open\([^\n]*'_blank'\);\s*if \(facebookWindow\) facebookWindow\.opener = null/, 'Facebook popup detection must not rely on noopener return semantics and must sever opener immediately.');
 assert.match(source, /window\.open\([^\n]*'_blank'\);\s*if \(whatsappWindow\) whatsappWindow\.opener = null/, 'WhatsApp popup must sever opener immediately.');
 assert.match(source, /case 'sharefb':[\s\S]{0,420}window\.open\([^\n]*'_blank'\);\s*if \(popup\) popup\.opener = null/,
