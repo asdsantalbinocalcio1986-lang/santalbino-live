@@ -39,6 +39,46 @@ Deno.test("Graph POST uses injected transport and never needs a Facebook test pa
   }
 });
 
+Deno.test("Graph POST sends access token only in Authorization header", async () => {
+  const token = "mock-secret-token";
+  let requestUrl = "";
+  let requestBody = "";
+  let authorization = "";
+  const fakeFetch: typeof fetch = async (input, init) => {
+    requestUrl = String(input);
+    requestBody = String(init?.body || "");
+    authorization = new Headers(init?.headers).get("authorization") || "";
+    return new Response(JSON.stringify({ id: "mock-post" }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  };
+  await graphPost("mock/photos", { caption: "test", access_token: token }, fakeFetch);
+  if (requestUrl.includes(token) || requestBody.includes(token)) {
+    throw new Error("Access token leaked into Graph POST URL or body");
+  }
+  if (authorization !== `Bearer ${token}`) {
+    throw new Error("Graph POST did not send the Bearer authorization header");
+  }
+});
+
+Deno.test("Graph GET sends access token only in Authorization header", async () => {
+  const token = "mock-secret-token";
+  let requestUrl = "";
+  let authorization = "";
+  const fakeFetch: typeof fetch = async (input, init) => {
+    requestUrl = String(input);
+    authorization = new Headers(init?.headers).get("authorization") || "";
+    return new Response(JSON.stringify({ id: "mock-page" }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  };
+  await graphGet("mock/page", { fields: "id", access_token: token }, fakeFetch);
+  if (requestUrl.includes(token)) throw new Error("Access token leaked into Graph GET URL");
+  if (authorization !== `Bearer ${token}`) {
+    throw new Error("Graph GET did not send the Bearer authorization header");
+  }
+});
+
 Deno.test("Graph POST classifies transport failure as unknown", async () => {
   const fakeFetch: typeof fetch = async () => {
     throw new TypeError("simulated connection reset after request");
