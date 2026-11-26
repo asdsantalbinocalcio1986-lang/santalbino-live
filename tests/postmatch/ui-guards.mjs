@@ -43,7 +43,7 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 
 assert.ok(publicSource.includes("function resetMatch() {") && publicSource.includes("S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }"),
   'Starting a new match from the public/index control room must clear the previous published convocati, formations and pending publication.');
-assert.ok(['RIEPILOGO','CRONACA','FORMAZIONI','CONVOCATI'].every(label => previewSource.includes(label)) && previewSource.includes('data-archive-panel=') && previewSource.includes('SOLA CONSULTAZIONE'),
+assert.ok(['RIEPILOGO','CRONACA','FORMAZIONI','CONVOCATI'].every(label => previewSource.includes(label)) && previewSource.includes('data-archive-panel=') && previewSource.includes('SOLA CONSULTAZIONE') && !previewSource.includes('>SCHEDULE</button>'),
   'The archived match preview must use live-style sections and remain read-only.');
 assert.ok(previewSource.includes("const published=state.publication?.published;") && previewSource.includes("const publishedRosters=publicData.rosters"),
   'The public archive preview must read published content, not a pending editorial draft.');
