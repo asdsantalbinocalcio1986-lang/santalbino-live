@@ -3336,7 +3336,7 @@ function publicationControlsHtml() {
   return '<div class="card"><h2>Pubblicazione contenuti</h2><p class="small muted">Le modifiche salvate come bozza non compaiono nella pagina pubblica. Puoi pubblicarle subito oppure programmarle: il database esegue la pubblicazione anche se la regia è chiusa.</p><p class="small" aria-live="polite"><b>'+esc(status)+'</b></p><label class="f"><span>Data e ora di pubblicazione</span><input id="contentScheduleAt" type="datetime-local" value="'+esc(localDateTimeValue(pending?.scheduledAt))+'"></label><div class="row2 stack"><button class="btn" data-a="saveContentDraft">Salva bozza</button><button class="btn primary" data-a="scheduleContent">Programma pubblicazione</button></div><div class="row2 stack"><button class="btn primary" data-a="publishContentNow">Pubblica ora</button><button class="btn danger" data-a="cancelContentSchedule" '+(pending ? '' : 'disabled')+'>Annulla bozza/programmazione</button></div></div>';
 }
 function capturePublicationContent() {
-  $('[data-roster]').forEach(el => { S.rosters[el.dataset.roster] = el.value; });
+  document.querySelectorAll('[data-roster]').forEach(el => { S.rosters[el.dataset.roster] = el.value; });
   const convocati = $('[data-convocati]'); if (convocati) S.convocati = convocati.value;
   return { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
 }
