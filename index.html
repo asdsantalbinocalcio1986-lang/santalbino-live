@@ -1395,7 +1395,7 @@ let S = (() => {
   return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), events: raw.events || [] });
 })();
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
-if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
+// Non ricostruire contenuti pubblicati mancanti dai dati correnti: potrebbero appartenere alla partita precedente.
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
@@ -1741,7 +1741,7 @@ function archiveOurSide(row, state) {
   if (away.includes("sant'albino") || away.includes('sant albino')) return 'away';
   return '';
 }
-function scorersHtml() {
+function archiveScorersHtml() {
   if (!db) return '<div class="empty"><h3>Storico marcatori non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
   if (!archiveLoaded) return '<div class="empty">Caricamento storico marcatori…</div>';
   if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>I marcatori compariranno dopo l’archiviazione delle prime partite concluse.</p></div>';
@@ -2120,7 +2120,6 @@ function migrateBundledLogos(state) {
 function mergeState(raw) {
   const d = defaults();
   const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
-  if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
   return state;
 }
 async function verifyAdminAccess() {
@@ -2386,7 +2385,7 @@ async function addSponsorToGraphic(canvas, layout) {
   return canvas;
 }
 
-async function renderPhaseCard(ev) {
+async function renderPhaseCardLegacy(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif"; applyGraphicTypography(x,'phase',W,H);
   const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
@@ -3321,7 +3320,7 @@ function publicContent() {
   const published = S.publication?.published;
   return published && typeof published === 'object'
     ? { rosters: Object.assign({home:'',away:''}, published.rosters || {}), convocati: published.convocati || '' }
-    : { rosters: S.rosters, convocati: S.convocati || '' };
+    : { rosters: {home:'',away:''}, convocati: '' };
 }
 function localDateTimeValue(value) {
   if (!value) return '';
@@ -3742,7 +3741,7 @@ function publicHtml() {
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   const convocatiPanel = parseRoster(publicContent().convocati).length ? convocatiPublicHtml() : '';
   return convocatiPanel + `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? archiveScorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -4317,7 +4316,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { try { localStorage.removeItem(DK); } catch (e) {} S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 

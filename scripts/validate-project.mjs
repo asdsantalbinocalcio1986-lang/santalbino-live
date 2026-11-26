@@ -107,7 +107,7 @@ assert.match(html, /fontFamily:'Inter',fontScale:1/, 'L’editor pubblico deve a
 assert.match(html, /<option value="Inter"/, 'L’editor pubblico deve offrire Inter nella selezione dei caratteri');
 assert.match(html, /teamLabelFamily=\(\{Inter:/, 'Le intestazioni delle squadre devono supportare Inter');
 assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la modifica di un evento già registrato');
-assert.match(regia, /function resetMatch\(\) \{[^}]*S\.match\.chronicleDraft = '';[^}]*S\.match\.chroniclePublished = '';[^}]*S\.match\.chroniclePublishedAt = '';[^}]*S\.match\.chronicleNeedsReview = false;/, 'L’azzeramento della regia deve eliminare il resoconto della partita precedente');
+assert.match(regia, /function resetMatch\(\) \{[\s\S]*?S\.match\.chronicleDraft = '';[\s\S]*?S\.match\.chroniclePublished = '';[\s\S]*?S\.match\.chroniclePublishedAt = '';[\s\S]*?S\.match\.chronicleNeedsReview = false;/, 'L’azzeramento della regia deve eliminare il resoconto della partita precedente');
 assert.match(regia, /const scorerPhrase = player \? player \+ ' firma la rete per ' \+ team : 'la rete arriva per ' \+ team;/, 'Un gol senza marcatore non deve inventare un autore generico');
 assert.ok(regia.includes(".replace(/\\(([a-z])\\)/giu, (_, letter) => '(' + letter.toLocaleUpperCase('it') + ')')"), 'Le sigle tra parentesi nei nomi devono mantenere le maiuscole, ad esempio (C)');
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');
@@ -197,5 +197,32 @@ assert.match(socialMigration, /public\.is_santalbino_admin\(\)/i, 'Il registro s
 assert.match(socialMigration, /unique/i, 'Il registro social deve impedire duplicati per ID evento');
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PAGE_ACCESS_TOKEN/, 'La guida deve descrivere i segreti Meta richiesti');
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PUBLISH_ENABLED/, 'La guida deve descrivere il blocco server che impedisce pubblicazioni premature');
+
+// Marcatori: separa la classifica storica dai marcatori della partita corrente.
+assert.match(regia, /function archiveScorersHtml\(\)/, 'La classifica marcatori deve avere un renderer storico dedicato.');
+assert.match(regia, /function scorersHtml\(side\)/, 'I marcatori della partita corrente devono mantenere il renderer per squadra.');
+assert.match(regia, /t === 'scorers' \? archiveScorersHtml\(\)/, 'La scheda Marcatori deve richiamare la classifica storica e non il renderer della partita corrente.');
+assert.doesNotMatch(regia, /function scorersHtml\(\)/, 'La funzione storica non deve essere sovrascritta dalla funzione dei marcatori della partita.');
+assert.equal((regia.match(/async function renderPhaseCard\(ev\)/g) || []).length, 1, 'La grafica delle fasi deve avere una sola funzione renderPhaseCard attiva.');
+
+assert.match(regia, /const archiveView = controlRoom \? L\.rtab === 'archive' : \['archive','archiveForms'\]\.includes\(L\.tab\);[\s\S]*?if \(hero\) hero\.hidden = archiveView;/, 'Il tabellone della partita corrente deve sparire quando si consulta lo storico.');
+// La pagina pubblica deve separare anche lei i marcatori storici da quelli della gara corrente.
+assert.match(html, /function archiveScorersHtml\(\)/, 'La pagina pubblica deve avere un renderer dedicato alla classifica storica.');
+assert.match(html, /function scorersHtml\(side\)/, 'La pagina pubblica deve mantenere il renderer dei marcatori della gara corrente.');
+assert.match(html, /t === 'scorers' \? archiveScorersHtml\(\)/, 'La scheda Marcatori pubblica deve richiamare la classifica storica.');
+assert.doesNotMatch(html, /function scorersHtml\(\)/, 'La pagina pubblica non deve avere due renderer con lo stesso nome.');
+assert.equal((html.match(/async function renderPhaseCard\(ev\)/g) || []).length, 1, 'La pagina pubblica deve avere una sola funzione renderPhaseCard attiva.');
+
+// Sponsor: trasformazione conservativa, selezione coerente e fallback sicuro.
+assert.match(regia, /function sponsorGraphicSources\(\)/, 'La libreria sponsor deve filtrare i riferimenti in ingresso.');
+assert.match(regia, /function createWhiteEmbossedSponsor\(img\)/, 'I loghi trasparenti devono poter essere convertiti in bianco con rilievo.');
+assert.match(regia, /transparentPixels < totalPixels \* \.003/, 'La trasformazione bianca deve essere limitata ai loghi con trasparenza reale.');
+assert.match(regia, /context\.shadowColor = 'rgba\(0,0,0,\.72\)'/, 'Il logo bianco deve avere un rilievo leggibile.');
+assert.match(regia, /function sponsorImageIsCanvasSafe\(img\)/, 'I loghi non leggibili dal canvas devono essere esclusi prima del rendering.');
+assert.match(regia, /async function resolveSponsorGraphicImage\(\)[\s\S]*?for \(const url of \[preferred, \.\.\.remaining\]\)/, 'Il generatore deve provare gli sponsor disponibili se il riferimento selezionato non è valido.');
+assert.match(regia, /function beginSponsorGraphicForOutput\(\)[\s\S]*?reuseSponsorGraphicOnce = false/, 'La selezione sponsor deve essere riutilizzabile una sola volta tra anteprima e grafica finale.');
+assert.match(regia, /reuseSponsorGraphicOnce = true/, 'L’anteprima editor deve conservare la selezione per la generazione finale.');
+assert.doesNotMatch(regia, /if\(!activeSponsorGraphicUrl\)\{const list=.*Math\.random\(\).*\}/, 'Il renderer non deve effettuare una seconda estrazione casuale non controllata.');
+assert.match(regia, /if \(style\.sponsor === false\) return canvas;/, 'La disattivazione sponsor nell’editor deve essere rispettata.');
 
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');

@@ -1400,7 +1400,7 @@ let S = (() => {
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
 S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
 S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts || {});
-if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
+// Non ricostruire pubblicazioni mancanti dai contenuti correnti: potrebbero appartenere a una gara precedente.
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
@@ -1819,7 +1819,7 @@ function archiveOurSide(row, state) {
   if (away.includes("sant'albino") || away.includes('sant albino')) return 'away';
   return '';
 }
-function scorersHtml() {
+function archiveScorersHtml() {
   if (!db) return '<div class="empty"><h3>Storico marcatori non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
   if (!archiveLoaded) return '<div class="empty">Caricamento storico marcatori…</div>';
   if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>I marcatori compariranno dopo l’archiviazione delle prime partite concluse.</p></div>';
@@ -2228,7 +2228,6 @@ function migrateBundledLogos(state) {
 function mergeState(raw) {
   const d = defaults();
   const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
-  if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
   return state;
 }
 async function verifyAdminAccess() {
@@ -2435,6 +2434,7 @@ async function autoPublishSocialEvent(ev) {
   if (TEST_MODE || !CAN_EDIT || !dbReady || !db || !cfg.enabled || !cfg.ready || !cfg.publishingEnabled) return;
   if (!SOCIAL_AUTO_EVENT_TYPES.includes(ev?.type) || (!cfg.facebook && !cfg.instagram)) return;
   try {
+    beginSponsorGraphicForOutput();
     const blob = await cardBlob(ev);
     if (!blob) throw new Error('Grafica evento non disponibile');
     const matchKey = String(S.match.pollId || 'match').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -2575,48 +2575,156 @@ function evTemplate(ev) {
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
 let activeSponsorGraphicUrl = null;
-function beginSponsorGraphic() {
-  const list = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors.filter(Boolean) : [];
-  activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
+let reuseSponsorGraphicOnce = false;
+function sponsorGraphicSources() {
+  const values = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors : [];
+  return [...new Set(values.filter(value => typeof value === 'string' && /^(https?:\/\/|data:image\/|blob:|\/|\.\/)/i.test(value.trim())).map(value => value.trim()))];
+}
+function beginSponsorGraphic(force = false) {
+  const list = sponsorGraphicSources();
+  if (!list.length) { activeSponsorGraphicUrl = null; return null; }
+  if (!force && activeSponsorGraphicUrl && list.includes(activeSponsorGraphicUrl)) return activeSponsorGraphicUrl;
+  activeSponsorGraphicUrl = list[Math.floor(Math.random() * list.length)];
+  return activeSponsorGraphicUrl;
+}
+function beginSponsorGraphicForOutput() {
+  const reuse = reuseSponsorGraphicOnce && !!activeSponsorGraphicUrl;
+  reuseSponsorGraphicOnce = false;
+  beginSponsorGraphic(!reuse);
+}
+function sponsorImageIsCanvasSafe(img) {
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = probe.height = 1;
+    const ctx = probe.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 1, 1);
+    ctx.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+function createWhiteEmbossedSponsor(img) {
+  try {
+    const originalWidth = img.naturalWidth || img.width;
+    const originalHeight = img.naturalHeight || img.height;
+    if (!originalWidth || !originalHeight) return null;
+    const scale = Math.min(1, 1200 / Math.max(originalWidth, originalHeight));
+    const width = Math.max(1, Math.round(originalWidth * scale));
+    const height = Math.max(1, Math.round(originalHeight * scale));
+    const mask = document.createElement('canvas');
+    mask.width = width; mask.height = height;
+    const maskContext = mask.getContext('2d', { willReadFrequently: true });
+    maskContext.drawImage(img, 0, 0, width, height);
+    const pixels = maskContext.getImageData(0, 0, width, height).data;
+    let transparentPixels = 0;
+    const totalPixels = width * height;
+    for (let i = 3; i < pixels.length; i += 4) if (pixels[i] < 245) transparentPixels++;
+    // Non si rimuovono sfondi opachi: in quel caso si conserva il logo originale.
+    if (transparentPixels < totalPixels * .003) return null;
+    maskContext.globalCompositeOperation = 'source-in';
+    maskContext.fillStyle = '#fff';
+    maskContext.fillRect(0, 0, width, height);
+    maskContext.globalCompositeOperation = 'source-over';
+    const embossed = document.createElement('canvas');
+    embossed.width = width; embossed.height = height;
+    const context = embossed.getContext('2d');
+    context.save();
+    context.shadowColor = 'rgba(0,0,0,.72)';
+    context.shadowBlur = 3;
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 3;
+    context.drawImage(mask, 0, 0);
+    context.shadowColor = 'rgba(255,255,255,.88)';
+    context.shadowBlur = 1;
+    context.shadowOffsetX = -1;
+    context.shadowOffsetY = -1;
+    context.drawImage(mask, 0, 0);
+    context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.drawImage(mask, 0, 0);
+    context.restore();
+    return embossed;
+  } catch (error) {
+    // Se il formato o il browser non consentono la lettura del canale alpha, usa l'originale.
+    return null;
+  }
+}
+async function resolveSponsorGraphicImage() {
+  const list = sponsorGraphicSources();
+  if (!list.length) { activeSponsorGraphicUrl = null; return null; }
+  if (!activeSponsorGraphicUrl || !list.includes(activeSponsorGraphicUrl)) beginSponsorGraphic(true);
+  const preferred = activeSponsorGraphicUrl;
+  const remaining = list.filter(url => url !== preferred);
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+  for (const url of [preferred, ...remaining]) {
+    const img = await loadGraphicImage(url);
+    if (img && sponsorImageIsCanvasSafe(img)) {
+      activeSponsorGraphicUrl = url;
+      return img;
+    }
+  }
+  activeSponsorGraphicUrl = null;
+  return null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  // Eventi e fasi condividono una fascia sponsor integrata nel footer, sempre centrata.
-  const sizes={event:{w:520,h:78,bottom:104,center:true},phase:{w:520,h:78,bottom:104,center:true},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const slot=sizes[layout]||sizes.event,p={x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
-  const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
-  p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
-  const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
-  p.x=Math.max(8,Math.min(canvas.width-p.w-8,p.x));p.y=Math.max(8,Math.min(canvas.height-p.h-8,p.y));
-  if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
-  if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
-  if(style.sponsor===false)return canvas;
-  if(!activeSponsorGraphicUrl){const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];}
-  if(!activeSponsorGraphicUrl)return canvas;
-  const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
-  if(layout==='event'||layout==='phase'){
-    x.save();
-    x.fillStyle='rgba(2,13,7,.78)';rrect(x,p.x,p.y,p.w,p.h,15);x.fill();
-    x.strokeStyle='rgba(183,243,107,.42)';x.lineWidth=1.5;rrect(x,p.x+.75,p.y+.75,p.w-1.5,p.h-1.5,14);x.stroke();
-    x.fillStyle='rgba(200,239,120,.86)';x.textAlign='center';x.textBaseline='middle';
-    x.font='700 '+Math.max(9,Math.round(p.h*.145))+'px Inter,sans-serif';
-    x.fillText('CON IL SUPPORTO DI',p.x+p.w/2,p.y+p.h*.19);
-    const padX=p.w*.08,padTop=p.h*.31,padBottom=p.h*.07;
-    const scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
-    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
-    x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
-    x.restore();return canvas;
+  const sizes = {
+    event:{w:520,h:78,bottom:104,center:true},
+    phase:{w:520,h:78,bottom:104,center:true},
+    formation:{w:470,h:130,right:42,bottom:12},
+    matchday:{w:430,h:100,right:42,bottom:8},
+    convocati:{w:430,h:140,right:42,bottom:1015}
+  };
+  const slot = sizes[layout] || sizes.event;
+  const p = {x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const x = canvas.getContext('2d');
+  const style = graphicEditorStyle(layout), pos = style.sponsorPos || {};
+  p.x += Number(pos.x || 0) * canvas.width;
+  p.y += Number(pos.y || 0) * canvas.height;
+  const boxScale = Math.max(.5, Math.min(2.5, Number(pos.scale) || 1));
+  p.w *= boxScale; p.h *= boxScale;
+  p.x = Math.max(8, Math.min(canvas.width-p.w-8,p.x));
+  p.y = Math.max(8, Math.min(canvas.height-p.h-8,p.y));
+  if (Number(style.overlay) > 0) {
+    x.save(); x.fillStyle = 'rgba(0,0,0,' + (Math.min(35,Number(style.overlay))/100) + ')';
+    x.fillRect(0,0,canvas.width,canvas.height); x.restore();
   }
-  x.save();x.shadowColor='rgba(0,0,0,.24)';x.shadowBlur=14;x.shadowOffsetY=4;
-  x.fillStyle='#fff';rrect(x,p.x,p.y,p.w,p.h,16);x.fill();x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
-  x.strokeStyle='rgba(10,35,23,.34)';x.lineWidth=2.5;rrect(x,p.x,p.y,p.w,p.h,16);x.stroke();
-  x.fillStyle='#17482a';x.textAlign='center';x.textBaseline='middle';x.font='900 '+Math.max(13,Math.round(p.h*.105))+'px Arial,sans-serif';
-  x.fillText('SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*.16);
-  const padX=p.w*.07,padTop=p.h*.29,padBottom=p.h*.08,scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
-  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);x.restore();
+  if (Number(style.border) > 0) {
+    x.save(); x.strokeStyle = style.accent || '#e3c66d'; x.lineWidth = Math.min(24,Number(style.border));
+    x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth); x.restore();
+  }
+  if (style.sponsor === false) return canvas;
+  const img = await resolveSponsorGraphicImage();
+  if (!img) return canvas;
+  const embossed = createWhiteEmbossedSponsor(img);
+  const artwork = embossed || img;
+  const darkPanel = !!embossed;
+  const isEvent = layout === 'event' || layout === 'phase';
+  x.save();
+  x.shadowColor = 'rgba(0,0,0,.24)'; x.shadowBlur = 14; x.shadowOffsetY = 4;
+  x.fillStyle = darkPanel ? 'rgba(2,13,7,.9)' : '#fff';
+  rrect(x,p.x,p.y,p.w,p.h,16); x.fill();
+  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+  x.strokeStyle = darkPanel ? 'rgba(183,243,107,.5)' : 'rgba(10,35,23,.34)';
+  x.lineWidth = 2; rrect(x,p.x+1,p.y+1,p.w-2,p.h-2,15); x.stroke();
+  x.fillStyle = darkPanel ? 'rgba(214,246,201,.92)' : '#17482a';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = (isEvent ? '700 ' : '900 ') + Math.max(isEvent ? 9 : 13, Math.round(p.h*(isEvent ? .145 : .105))) + 'px Inter,sans-serif';
+  x.fillText(isEvent ? 'CON IL SUPPORTO DI' : 'SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*(isEvent ? .19 : .16));
+  const padX = p.w*.08, padTop = p.h*(isEvent ? .31 : .29), padBottom = p.h*.08;
+  const scale = Math.min((p.w-padX*2)/artwork.width,(p.h-padTop-padBottom)/artwork.height);
+  const w = artwork.width*scale, h = artwork.height*scale;
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  x.drawImage(artwork,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
+  x.restore();
   return canvas;
 }
-
-async function renderPhaseCard(ev) {
+async function renderPhaseCardLegacy(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif"; applyGraphicTypography(x,'phase',W,H);
   const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
@@ -3326,7 +3434,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
 let lineupGraphicSide = 'both';
 let lineupGraphicFormat = 'standard';
 async function openLineupGraphic(side = 'both', format = 'standard') {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   lineupGraphicSide = side;
   lineupGraphicFormat = format;
   const dlg = $('#graphicDlg');
@@ -3564,7 +3672,7 @@ async function renderConvocatiGraphic() {
   return TEST_MODE ? renderConvocatiGraphicPremium() : renderConvocatiGraphicLegacy();
 }
 async function openConvocatiGraphic() {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open)dlg.showModal();
@@ -3577,7 +3685,7 @@ async function openConvocatiGraphic() {
   }
 }
 async function openMatchDayGraphic() {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open) dlg.showModal();
@@ -3694,7 +3802,7 @@ function publicContent() {
   const published = S.publication?.published;
   return published && typeof published === 'object'
     ? { rosters: Object.assign({home:'',away:''}, published.rosters || {}), convocati: published.convocati || '' }
-    : { rosters: S.rosters, convocati: S.convocati || '' };
+    : { rosters: {home:'',away:''}, convocati: '' };
 }
 function localDateTimeValue(value) {
   if (!value) return '';
@@ -3834,10 +3942,10 @@ function mvpPublicHtml() {
 }
 
 
-async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) el.src = await cardUrl(vi.mv); }
+async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) { beginSponsorGraphicForOutput(); el.src = await cardUrl(vi.mv); } }
 let graphicId = null;
 async function openGraphic(id) {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const ev = S.events.find(e => e.id === id); if (!ev || !CARD_TYPES.includes(ev.type)) return;
   L.editorEventId=id;
   graphicId = id;
@@ -4427,6 +4535,7 @@ async function approveMatchResultRevision() {
   toast('Revisione ' + edition.revision + ' approvata. Nessuna pubblicazione social è stata avviata.');
 }
 async function openMatchResult() {
+  beginSponsorGraphicForOutput();
   const dlg = $('#graphicDlg');
   releaseMatchResultPreviewUrl();
   if (!dlg.dataset.postmatchCleanupBound) {
@@ -4532,7 +4641,7 @@ function publicHtml() {
   if (S.clock?.phase === 'ft' || voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? archiveScorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -4982,7 +5091,8 @@ async function openGraphicEditorPreview() {
   const layout=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'event';
   host.innerHTML='<p class="small muted">Genero l’anteprima…</p>';
   try{
-    beginSponsorGraphic();
+    beginSponsorGraphic(true);
+    reuseSponsorGraphicOnce = true;
     const canvas=await renderEditorCanvas(layout),url=canvas.toDataURL('image/jpeg',.9),slot=editorSponsorSlot(layout,canvas.width,canvas.height);
     const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',style=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{}),pos=Object.assign({x:0,y:0,scale:1},style.sponsorPos||{});
     const ev=layout==='event'?L.editorEventTemplate:null,items=lastGraphicTextItems||[];
@@ -5235,7 +5345,21 @@ function topHtml() {
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
   return `${banner}<div class="top">${brandHtml}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
-function renderMain() { if (CAN_EDIT && L.mode === 'regia') captureEditorialDraftForm(); const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); if (CAN_EDIT && L.mode === 'regia' && L.rtab === 'editorial') restoreEditorialDraftForm(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
+function renderMain() {
+  const controlRoom = CAN_EDIT && L.mode === 'regia';
+  if (controlRoom) captureEditorialDraftForm();
+  const hero = $('#hero');
+  const archiveView = controlRoom ? L.rtab === 'archive' : ['archive','archiveForms'].includes(L.tab);
+  if (hero) hero.hidden = archiveView;
+  const el = $('#main');
+  if (el) {
+    el.innerHTML = controlRoom ? regiaHtml() : publicHtml();
+    if (controlRoom && L.rtab === 'editorial') restoreEditorialDraftForm();
+    lastVote = voteInfo().state;
+    tickClock();
+    fillMvpImg();
+  }
+}
 let lastVote = 'none';
 function renderAll() {
   if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
@@ -5402,6 +5526,7 @@ document.addEventListener('click', async e => {
       const ev2 = S.events.find(x => x.id === postId); if (!ev2) break;
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
       try {
+        beginSponsorGraphicForOutput();
         const blob = await cardBlob(ev2);
         const file = new File([blob], 'santalbino-evento.jpg', { type: 'image/jpeg' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -5418,7 +5543,7 @@ document.addEventListener('click', async e => {
       }
       break;
     }
-    case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
+    case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); beginSponsorGraphicForOutput(); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'markdone': { const so = socialOf(postId); so.status = so.status === 'pubblicato' ? 'bozza' : 'pubblicato'; saveL(); $('#postDlg').close(); renderMain(); break; }
     case 'copyall': if (S.events.length) copyText(S.events.map(x => evText(x).replace(/\n\n#\S+$/, '')).join('\n\n')); break;
     case 'export': saveBlob(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `cronaca-${S.match.date || 'partita'}.json`); break;
@@ -5518,7 +5643,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.socialDrafts = { matchDay: '', convocati: '' }; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { try { localStorage.removeItem(DK); } catch (e) {} S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.socialDrafts = { matchDay: '', convocati: '' }; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
