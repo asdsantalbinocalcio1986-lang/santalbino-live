@@ -2577,7 +2577,7 @@ let activeSponsorGraphicUrl = null;
 let reuseSponsorGraphicOnce = false;
 function sponsorGraphicSources() {
   const values = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors : [];
-  return [...new Set(values.filter(value => typeof value === 'string' && /^(https?:\\/\\/|data:image\\/|blob:|\\/|\\.\\/)/i.test(value.trim())).map(value => value.trim()))];
+  return [...new Set(values.filter(value => typeof value === 'string' && /^(https?:\/\/|data:image\/|blob:|\/|\.\/)/i.test(value.trim())).map(value => value.trim()))];
 }
 function beginSponsorGraphic(force = false) {
   const list = sponsorGraphicSources();
