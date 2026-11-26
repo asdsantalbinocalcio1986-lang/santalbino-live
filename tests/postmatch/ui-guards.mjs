@@ -41,6 +41,7 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 
 
 
+assert.match(publicSource, /function capturePublicationContent\(\) \{\s*document\.querySelectorAll\('\[data-roster\]'\)\.forEach\(/, 'The public content editor must capture every roster field using a collection selector, not call forEach on the single-element helper.');
 assert.ok(publicSource.includes("function resetMatch() {") && publicSource.includes("S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }"),
   'Starting a new match from the public/index control room must clear the previous published convocati, formations and pending publication.');
 assert.ok(['RIEPILOGO','CRONACA','FORMAZIONI','CONVOCATI'].every(label => previewSource.includes(label)) && previewSource.includes('data-archive-panel=') && previewSource.includes('SOLA CONSULTAZIONE') && !previewSource.includes('>SCHEDULE</button>'),
