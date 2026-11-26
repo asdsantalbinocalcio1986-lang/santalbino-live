@@ -205,6 +205,7 @@ assert.match(regia, /t === 'scorers' \? archiveScorersHtml\(\)/, 'La scheda Marc
 assert.doesNotMatch(regia, /function scorersHtml\(\)/, 'La funzione storica non deve essere sovrascritta dalla funzione dei marcatori della partita.');
 assert.equal((regia.match(/async function renderPhaseCard\(ev\)/g) || []).length, 1, 'La grafica delle fasi deve avere una sola funzione renderPhaseCard attiva.');
 
+assert.match(regia, /const archiveView = controlRoom \? L\.rtab === 'archive' : \['archive','archiveForms'\]\.includes\(L\.tab\);[\s\S]*?if \(hero\) hero\.hidden = archiveView;/, 'Il tabellone della partita corrente deve sparire quando si consulta lo storico.');
 // La pagina pubblica deve separare anche lei i marcatori storici da quelli della gara corrente.
 assert.match(html, /function archiveScorersHtml\(\)/, 'La pagina pubblica deve avere un renderer dedicato alla classifica storica.');
 assert.match(html, /function scorersHtml\(side\)/, 'La pagina pubblica deve mantenere il renderer dei marcatori della gara corrente.');
