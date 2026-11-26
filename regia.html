@@ -1819,7 +1819,7 @@ function archiveOurSide(row, state) {
   if (away.includes("sant'albino") || away.includes('sant albino')) return 'away';
   return '';
 }
-function scorersHtml() {
+function archiveScorersHtml() {
   if (!db) return '<div class="empty"><h3>Storico marcatori non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
   if (!archiveLoaded) return '<div class="empty">Caricamento storico marcatori…</div>';
   if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>I marcatori compariranno dopo l’archiviazione delle prime partite concluse.</p></div>';
@@ -2724,7 +2724,7 @@ async function addSponsorToGraphic(canvas, layout) {
   x.restore();
   return canvas;
 }
-async function renderPhaseCard(ev) {
+async function renderPhaseCardLegacy(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif"; applyGraphicTypography(x,'phase',W,H);
   const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
@@ -4641,7 +4641,7 @@ function publicHtml() {
   if (S.clock?.phase === 'ft' || voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? archiveScorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
