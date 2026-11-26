@@ -198,6 +198,13 @@ assert.match(socialMigration, /unique/i, 'Il registro social deve impedire dupli
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PAGE_ACCESS_TOKEN/, 'La guida deve descrivere i segreti Meta richiesti');
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PUBLISH_ENABLED/, 'La guida deve descrivere il blocco server che impedisce pubblicazioni premature');
 
+// Marcatori: separa la classifica storica dai marcatori della partita corrente.
+assert.match(regia, /function archiveScorersHtml\(\)/, 'La classifica marcatori deve avere un renderer storico dedicato.');
+assert.match(regia, /function scorersHtml\(side\)/, 'I marcatori della partita corrente devono mantenere il renderer per squadra.');
+assert.match(regia, /t === 'scorers' \? archiveScorersHtml\(\)/, 'La scheda Marcatori deve richiamare la classifica storica e non il renderer della partita corrente.');
+assert.doesNotMatch(regia, /function scorersHtml\(\)/, 'La funzione storica non deve essere sovrascritta dalla funzione dei marcatori della partita.');
+assert.equal((regia.match(/async function renderPhaseCard\(ev\)/g) || []).length, 1, 'La grafica delle fasi deve avere una sola funzione renderPhaseCard attiva.');
+
 // Sponsor: trasformazione conservativa, selezione coerente e fallback sicuro.
 assert.match(regia, /function sponsorGraphicSources\(\)/, 'La libreria sponsor deve filtrare i riferimenti in ingresso.');
 assert.match(regia, /function createWhiteEmbossedSponsor\(img\)/, 'I loghi trasparenti devono poter essere convertiti in bianco con rilievo.');
