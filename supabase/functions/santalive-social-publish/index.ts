@@ -65,12 +65,26 @@ export function classifyMetaFailure(error: unknown): MetaFailureOutcome {
   return error instanceof MetaRequestError ? error.outcome : "unknown";
 }
 
+function graphAuth(params: Record<string, string>) {
+  const safeParams = { ...params };
+  const token = safeParams.access_token || "";
+  delete safeParams.access_token;
+  return {
+    params: safeParams,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  };
+}
+
 export async function graphGet(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
+  const auth = graphAuth(params);
   const url = new URL(`${graphBase}/${path}`);
-  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries(auth.params)) url.searchParams.set(key, value);
   let response: Response;
   try {
-    response = await fetcher(url, { signal: AbortSignal.timeout(15000) });
+    response = await fetcher(url, {
+      headers: auth.headers,
+      signal: AbortSignal.timeout(15000),
+    });
   } catch {
     throw new MetaRequestError("Lettura Meta temporaneamente non disponibile", "failed_retryable");
   }
@@ -86,12 +100,16 @@ export async function graphGet(path: string, params: Record<string, string>, fet
 }
 
 export async function graphPost(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
+  const auth = graphAuth(params);
   let response: Response;
   try {
     response = await fetcher(`${graphBase}/${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(params),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...auth.headers,
+      },
+      body: new URLSearchParams(auth.params),
       signal: AbortSignal.timeout(20000),
     });
   } catch {
