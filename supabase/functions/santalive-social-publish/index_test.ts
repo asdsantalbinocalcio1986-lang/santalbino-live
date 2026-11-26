@@ -1,4 +1,4 @@
-import { classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
+import { classifyInstagramContainerStatus, classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
 
 Deno.test("explicit Meta rejection is retryable", () => {
   const error = new MetaRequestError("Meta HTTP 400: rejected", "failed_retryable");
@@ -20,6 +20,24 @@ Deno.test("an ambiguous Meta outcome is never automatically retryable", () => {
   const error = new MetaRequestError("request outcome unknown", "unknown");
   if (classifyMetaFailure(error) !== "unknown") {
     throw new Error("Ambiguous Meta outcome must require reconciliation");
+  }
+});
+
+Deno.test("Instagram container must be FINISHED before media_publish", () => {
+  if (classifyInstagramContainerStatus("FINISHED") !== "ready") {
+    throw new Error("FINISHED container should be publishable");
+  }
+  if (classifyInstagramContainerStatus(undefined) !== "pending") {
+    throw new Error("Missing status must never be treated as ready");
+  }
+  if (classifyInstagramContainerStatus("IN_PROGRESS") !== "pending") {
+    throw new Error("IN_PROGRESS container must continue polling");
+  }
+  if (classifyInstagramContainerStatus("ERROR") !== "retry_new") {
+    throw new Error("ERROR container should be replaced on retry");
+  }
+  if (classifyInstagramContainerStatus("EXPIRED") !== "retry_new") {
+    throw new Error("EXPIRED container should be replaced on retry");
   }
 });
 
