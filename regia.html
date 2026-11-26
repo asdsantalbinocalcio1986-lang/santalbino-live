@@ -5345,7 +5345,21 @@ function topHtml() {
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
   return `${banner}<div class="top">${brandHtml}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
-function renderMain() { if (CAN_EDIT && L.mode === 'regia') captureEditorialDraftForm(); const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); if (CAN_EDIT && L.mode === 'regia' && L.rtab === 'editorial') restoreEditorialDraftForm(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
+function renderMain() {
+  const controlRoom = CAN_EDIT && L.mode === 'regia';
+  if (controlRoom) captureEditorialDraftForm();
+  const hero = $('#hero');
+  const archiveView = controlRoom ? L.rtab === 'archive' : ['archive','archiveForms'].includes(L.tab);
+  if (hero) hero.hidden = archiveView;
+  const el = $('#main');
+  if (el) {
+    el.innerHTML = controlRoom ? regiaHtml() : publicHtml();
+    if (controlRoom && L.rtab === 'editorial') restoreEditorialDraftForm();
+    lastVote = voteInfo().state;
+    tickClock();
+    fillMvpImg();
+  }
+}
 let lastVote = 'none';
 function renderAll() {
   if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
