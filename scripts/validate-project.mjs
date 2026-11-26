@@ -198,4 +198,16 @@ assert.match(socialMigration, /unique/i, 'Il registro social deve impedire dupli
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PAGE_ACCESS_TOKEN/, 'La guida deve descrivere i segreti Meta richiesti');
 assert.match(fs.readFileSync('README-SOCIAL-META.md', 'utf8'), /META_PUBLISH_ENABLED/, 'La guida deve descrivere il blocco server che impedisce pubblicazioni premature');
 
+// Sponsor: trasformazione conservativa, selezione coerente e fallback sicuro.
+assert.match(regia, /function sponsorGraphicSources\(\)/, 'La libreria sponsor deve filtrare i riferimenti in ingresso.');
+assert.match(regia, /function createWhiteEmbossedSponsor\(img\)/, 'I loghi trasparenti devono poter essere convertiti in bianco con rilievo.');
+assert.match(regia, /transparentPixels < totalPixels \* \.003/, 'La trasformazione bianca deve essere limitata ai loghi con trasparenza reale.');
+assert.match(regia, /context\.shadowColor = 'rgba\(0,0,0,\.72\)'/, 'Il logo bianco deve avere un rilievo leggibile.');
+assert.match(regia, /function sponsorImageIsCanvasSafe\(img\)/, 'I loghi non leggibili dal canvas devono essere esclusi prima del rendering.');
+assert.match(regia, /async function resolveSponsorGraphicImage\(\)[\s\S]*?for \(const url of \[preferred, \.\.\.remaining\]\)/, 'Il generatore deve provare gli sponsor disponibili se il riferimento selezionato non è valido.');
+assert.match(regia, /function beginSponsorGraphicForOutput\(\)[\s\S]*?reuseSponsorGraphicOnce = false/, 'La selezione sponsor deve essere riutilizzabile una sola volta tra anteprima e grafica finale.');
+assert.match(regia, /reuseSponsorGraphicOnce = true/, 'L’anteprima editor deve conservare la selezione per la generazione finale.');
+assert.doesNotMatch(regia, /if\(!activeSponsorGraphicUrl\)\{const list=.*Math\.random\(\).*\}/, 'Il renderer non deve effettuare una seconda estrazione casuale non controllata.');
+assert.match(regia, /if \(style\.sponsor === false\) return canvas;/, 'La disattivazione sponsor nell’editor deve essere rispettata.');
+
 console.log('Validazione Sant’Albino Live superata: ' + checked + ' script inline, JSON iniziale, RPC MVP/salvataggio e migrazione SQL.');
