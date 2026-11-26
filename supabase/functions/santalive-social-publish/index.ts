@@ -65,12 +65,26 @@ export function classifyMetaFailure(error: unknown): MetaFailureOutcome {
   return error instanceof MetaRequestError ? error.outcome : "unknown";
 }
 
+function graphAuth(params: Record<string, string>) {
+  const safeParams = { ...params };
+  const token = safeParams.access_token || "";
+  delete safeParams.access_token;
+  return {
+    params: safeParams,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  };
+}
+
 export async function graphGet(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
+  const auth = graphAuth(params);
   const url = new URL(`${graphBase}/${path}`);
-  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries(auth.params)) url.searchParams.set(key, value);
   let response: Response;
   try {
-    response = await fetcher(url, { signal: AbortSignal.timeout(15000) });
+    response = await fetcher(url, {
+      headers: auth.headers,
+      signal: AbortSignal.timeout(15000),
+    });
   } catch {
     throw new MetaRequestError("Lettura Meta temporaneamente non disponibile", "failed_retryable");
   }
@@ -86,12 +100,16 @@ export async function graphGet(path: string, params: Record<string, string>, fet
 }
 
 export async function graphPost(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
+  const auth = graphAuth(params);
   let response: Response;
   try {
     response = await fetcher(`${graphBase}/${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(params),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...auth.headers,
+      },
+      body: new URLSearchParams(auth.params),
       signal: AbortSignal.timeout(20000),
     });
   } catch {
@@ -114,6 +132,12 @@ export async function graphPost(path: string, params: Record<string, string>, fe
     );
   }
   return data;
+}
+
+export function classifyInstagramContainerStatus(status: unknown): "ready" | "retry_new" | "pending" {
+  if (status === "FINISHED") return "ready";
+  if (status === "ERROR" || status === "EXPIRED") return "retry_new";
+  return "pending";
 }
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -329,13 +353,14 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
         let ready = false;
         for (let attempt = 0; attempt < 8; attempt++) {
           const state = await graphGet(instagramContainerId, { fields: "status_code", access_token: pageToken });
-          if (state.status_code === "ERROR") {
-            // Il container è fallito prima della pubblicazione: un nuovo tentativo
-            // può crearne uno nuovo senza ripetere un post già pubblicato.
+          const containerStatus = classifyInstagramContainerStatus(state.status_code);
+          if (containerStatus === "retry_new") {
+            // ERROR/EXPIRED: il container non è pubblicabile. Un nuovo tentativo
+            // crea un container nuovo, senza ripetere un post già pubblicato.
             instagramContainerId = null;
-            throw new MetaRequestError("Meta non ha elaborato il container Instagram", "failed_retryable");
+            throw new MetaRequestError("Container Instagram non pubblicabile: " + String(state.status_code), "failed_retryable");
           }
-          if (!state.status_code || state.status_code === "FINISHED") { ready = true; break; }
+          if (containerStatus === "ready") { ready = true; break; }
           await wait(1500);
         }
         if (!ready) {
