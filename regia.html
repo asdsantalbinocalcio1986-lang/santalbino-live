@@ -2434,6 +2434,7 @@ async function autoPublishSocialEvent(ev) {
   if (TEST_MODE || !CAN_EDIT || !dbReady || !db || !cfg.enabled || !cfg.ready || !cfg.publishingEnabled) return;
   if (!SOCIAL_AUTO_EVENT_TYPES.includes(ev?.type) || (!cfg.facebook && !cfg.instagram)) return;
   try {
+    beginSponsorGraphicForOutput();
     const blob = await cardBlob(ev);
     if (!blob) throw new Error('Grafica evento non disponibile');
     const matchKey = String(S.match.pollId || 'match').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -5510,6 +5511,7 @@ document.addEventListener('click', async e => {
       const ev2 = S.events.find(x => x.id === postId); if (!ev2) break;
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
       try {
+        beginSponsorGraphicForOutput();
         const blob = await cardBlob(ev2);
         const file = new File([blob], 'santalbino-evento.jpg', { type: 'image/jpeg' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -5526,7 +5528,7 @@ document.addEventListener('click', async e => {
       }
       break;
     }
-    case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
+    case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); beginSponsorGraphicForOutput(); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'markdone': { const so = socialOf(postId); so.status = so.status === 'pubblicato' ? 'bozza' : 'pubblicato'; saveL(); $('#postDlg').close(); renderMain(); break; }
     case 'copyall': if (S.events.length) copyText(S.events.map(x => evText(x).replace(/\n\n#\S+$/, '')).join('\n\n')); break;
     case 'export': saveBlob(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `cronaca-${S.match.date || 'partita'}.json`); break;
