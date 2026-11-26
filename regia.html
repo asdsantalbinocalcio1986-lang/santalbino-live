@@ -2574,47 +2574,155 @@ function evTemplate(ev) {
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
 let activeSponsorGraphicUrl = null;
-function beginSponsorGraphic() {
-  const list = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors.filter(Boolean) : [];
-  activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
+let reuseSponsorGraphicOnce = false;
+function sponsorGraphicSources() {
+  const values = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors : [];
+  return [...new Set(values.filter(value => typeof value === 'string' && /^(https?:\\/\\/|data:image\\/|blob:|\\/|\\.\\/)/i.test(value.trim())).map(value => value.trim()))];
+}
+function beginSponsorGraphic(force = false) {
+  const list = sponsorGraphicSources();
+  if (!list.length) { activeSponsorGraphicUrl = null; return null; }
+  if (!force && activeSponsorGraphicUrl && list.includes(activeSponsorGraphicUrl)) return activeSponsorGraphicUrl;
+  activeSponsorGraphicUrl = list[Math.floor(Math.random() * list.length)];
+  return activeSponsorGraphicUrl;
+}
+function beginSponsorGraphicForOutput() {
+  const reuse = reuseSponsorGraphicOnce && !!activeSponsorGraphicUrl;
+  reuseSponsorGraphicOnce = false;
+  beginSponsorGraphic(!reuse);
+}
+function sponsorImageIsCanvasSafe(img) {
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = probe.height = 1;
+    const ctx = probe.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 1, 1);
+    ctx.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+function createWhiteEmbossedSponsor(img) {
+  try {
+    const originalWidth = img.naturalWidth || img.width;
+    const originalHeight = img.naturalHeight || img.height;
+    if (!originalWidth || !originalHeight) return null;
+    const scale = Math.min(1, 1200 / Math.max(originalWidth, originalHeight));
+    const width = Math.max(1, Math.round(originalWidth * scale));
+    const height = Math.max(1, Math.round(originalHeight * scale));
+    const mask = document.createElement('canvas');
+    mask.width = width; mask.height = height;
+    const maskContext = mask.getContext('2d', { willReadFrequently: true });
+    maskContext.drawImage(img, 0, 0, width, height);
+    const pixels = maskContext.getImageData(0, 0, width, height).data;
+    let transparentPixels = 0;
+    const totalPixels = width * height;
+    for (let i = 3; i < pixels.length; i += 4) if (pixels[i] < 245) transparentPixels++;
+    // Non si rimuovono sfondi opachi: in quel caso si conserva il logo originale.
+    if (transparentPixels < totalPixels * .003) return null;
+    maskContext.globalCompositeOperation = 'source-in';
+    maskContext.fillStyle = '#fff';
+    maskContext.fillRect(0, 0, width, height);
+    maskContext.globalCompositeOperation = 'source-over';
+    const embossed = document.createElement('canvas');
+    embossed.width = width; embossed.height = height;
+    const context = embossed.getContext('2d');
+    context.save();
+    context.shadowColor = 'rgba(0,0,0,.72)';
+    context.shadowBlur = 3;
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 3;
+    context.drawImage(mask, 0, 0);
+    context.shadowColor = 'rgba(255,255,255,.88)';
+    context.shadowBlur = 1;
+    context.shadowOffsetX = -1;
+    context.shadowOffsetY = -1;
+    context.drawImage(mask, 0, 0);
+    context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.drawImage(mask, 0, 0);
+    context.restore();
+    return embossed;
+  } catch (error) {
+    // Se il formato o il browser non consentono la lettura del canale alpha, usa l'originale.
+    return null;
+  }
+}
+async function resolveSponsorGraphicImage() {
+  const list = sponsorGraphicSources();
+  if (!list.length) { activeSponsorGraphicUrl = null; return null; }
+  if (!activeSponsorGraphicUrl || !list.includes(activeSponsorGraphicUrl)) beginSponsorGraphic(true);
+  const preferred = activeSponsorGraphicUrl;
+  const remaining = list.filter(url => url !== preferred);
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+  for (const url of [preferred, ...remaining]) {
+    const img = await loadGraphicImage(url);
+    if (img && sponsorImageIsCanvasSafe(img)) {
+      activeSponsorGraphicUrl = url;
+      return img;
+    }
+  }
+  activeSponsorGraphicUrl = null;
+  return null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  // Eventi e fasi condividono una fascia sponsor integrata nel footer, sempre centrata.
-  const sizes={event:{w:520,h:78,bottom:104,center:true},phase:{w:520,h:78,bottom:104,center:true},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const slot=sizes[layout]||sizes.event,p={x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
-  const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
-  p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
-  const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
-  p.x=Math.max(8,Math.min(canvas.width-p.w-8,p.x));p.y=Math.max(8,Math.min(canvas.height-p.h-8,p.y));
-  if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
-  if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
-  if(style.sponsor===false)return canvas;
-  if(!activeSponsorGraphicUrl){const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];}
-  if(!activeSponsorGraphicUrl)return canvas;
-  const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
-  if(layout==='event'||layout==='phase'){
-    x.save();
-    x.fillStyle='rgba(2,13,7,.78)';rrect(x,p.x,p.y,p.w,p.h,15);x.fill();
-    x.strokeStyle='rgba(183,243,107,.42)';x.lineWidth=1.5;rrect(x,p.x+.75,p.y+.75,p.w-1.5,p.h-1.5,14);x.stroke();
-    x.fillStyle='rgba(200,239,120,.86)';x.textAlign='center';x.textBaseline='middle';
-    x.font='700 '+Math.max(9,Math.round(p.h*.145))+'px Inter,sans-serif';
-    x.fillText('CON IL SUPPORTO DI',p.x+p.w/2,p.y+p.h*.19);
-    const padX=p.w*.08,padTop=p.h*.31,padBottom=p.h*.07;
-    const scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
-    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
-    x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
-    x.restore();return canvas;
+  const sizes = {
+    event:{w:520,h:78,bottom:104,center:true},
+    phase:{w:520,h:78,bottom:104,center:true},
+    formation:{w:470,h:130,right:42,bottom:12},
+    matchday:{w:430,h:100,right:42,bottom:8},
+    convocati:{w:430,h:140,right:42,bottom:1015}
+  };
+  const slot = sizes[layout] || sizes.event;
+  const p = {x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const x = canvas.getContext('2d');
+  const style = graphicEditorStyle(layout), pos = style.sponsorPos || {};
+  p.x += Number(pos.x || 0) * canvas.width;
+  p.y += Number(pos.y || 0) * canvas.height;
+  const boxScale = Math.max(.5, Math.min(2.5, Number(pos.scale) || 1));
+  p.w *= boxScale; p.h *= boxScale;
+  p.x = Math.max(8, Math.min(canvas.width-p.w-8,p.x));
+  p.y = Math.max(8, Math.min(canvas.height-p.h-8,p.y));
+  if (Number(style.overlay) > 0) {
+    x.save(); x.fillStyle = 'rgba(0,0,0,' + (Math.min(35,Number(style.overlay))/100) + ')';
+    x.fillRect(0,0,canvas.width,canvas.height); x.restore();
   }
-  x.save();x.shadowColor='rgba(0,0,0,.24)';x.shadowBlur=14;x.shadowOffsetY=4;
-  x.fillStyle='#fff';rrect(x,p.x,p.y,p.w,p.h,16);x.fill();x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
-  x.strokeStyle='rgba(10,35,23,.34)';x.lineWidth=2.5;rrect(x,p.x,p.y,p.w,p.h,16);x.stroke();
-  x.fillStyle='#17482a';x.textAlign='center';x.textBaseline='middle';x.font='900 '+Math.max(13,Math.round(p.h*.105))+'px Arial,sans-serif';
-  x.fillText('SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*.16);
-  const padX=p.w*.07,padTop=p.h*.29,padBottom=p.h*.08,scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
-  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);x.restore();
+  if (Number(style.border) > 0) {
+    x.save(); x.strokeStyle = style.accent || '#e3c66d'; x.lineWidth = Math.min(24,Number(style.border));
+    x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth); x.restore();
+  }
+  if (style.sponsor === false) return canvas;
+  const img = await resolveSponsorGraphicImage();
+  if (!img) return canvas;
+  const embossed = createWhiteEmbossedSponsor(img);
+  const artwork = embossed || img;
+  const darkPanel = !!embossed;
+  const isEvent = layout === 'event' || layout === 'phase';
+  x.save();
+  x.shadowColor = 'rgba(0,0,0,.24)'; x.shadowBlur = 14; x.shadowOffsetY = 4;
+  x.fillStyle = darkPanel ? 'rgba(2,13,7,.9)' : '#fff';
+  rrect(x,p.x,p.y,p.w,p.h,16); x.fill();
+  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+  x.strokeStyle = darkPanel ? 'rgba(183,243,107,.5)' : 'rgba(10,35,23,.34)';
+  x.lineWidth = 2; rrect(x,p.x+1,p.y+1,p.w-2,p.h-2,15); x.stroke();
+  x.fillStyle = darkPanel ? 'rgba(214,246,201,.92)' : '#17482a';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = (isEvent ? '700 ' : '900 ') + Math.max(isEvent ? 9 : 13, Math.round(p.h*(isEvent ? .145 : .105))) + 'px Inter,sans-serif';
+  x.fillText(isEvent ? 'CON IL SUPPORTO DI' : 'SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*(isEvent ? .19 : .16));
+  const padX = p.w*.08, padTop = p.h*(isEvent ? .31 : .29), padBottom = p.h*.08;
+  const scale = Math.min((p.w-padX*2)/artwork.width,(p.h-padTop-padBottom)/artwork.height);
+  const w = artwork.width*scale, h = artwork.height*scale;
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  x.drawImage(artwork,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
+  x.restore();
   return canvas;
 }
-
 async function renderPhaseCard(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif"; applyGraphicTypography(x,'phase',W,H);
@@ -3325,7 +3433,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
 let lineupGraphicSide = 'both';
 let lineupGraphicFormat = 'standard';
 async function openLineupGraphic(side = 'both', format = 'standard') {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   lineupGraphicSide = side;
   lineupGraphicFormat = format;
   const dlg = $('#graphicDlg');
@@ -3563,7 +3671,7 @@ async function renderConvocatiGraphic() {
   return TEST_MODE ? renderConvocatiGraphicPremium() : renderConvocatiGraphicLegacy();
 }
 async function openConvocatiGraphic() {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open)dlg.showModal();
@@ -3576,7 +3684,7 @@ async function openConvocatiGraphic() {
   }
 }
 async function openMatchDayGraphic() {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open) dlg.showModal();
@@ -3833,10 +3941,10 @@ function mvpPublicHtml() {
 }
 
 
-async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) el.src = await cardUrl(vi.mv); }
+async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) { beginSponsorGraphicForOutput(); el.src = await cardUrl(vi.mv); } }
 let graphicId = null;
 async function openGraphic(id) {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const ev = S.events.find(e => e.id === id); if (!ev || !CARD_TYPES.includes(ev.type)) return;
   L.editorEventId=id;
   graphicId = id;
@@ -4981,7 +5089,8 @@ async function openGraphicEditorPreview() {
   const layout=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'event';
   host.innerHTML='<p class="small muted">Genero l’anteprima…</p>';
   try{
-    beginSponsorGraphic();
+    beginSponsorGraphic(true);
+    reuseSponsorGraphicOnce = true;
     const canvas=await renderEditorCanvas(layout),url=canvas.toDataURL('image/jpeg',.9),slot=editorSponsorSlot(layout,canvas.width,canvas.height);
     const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',style=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{}),pos=Object.assign({x:0,y:0,scale:1},style.sponsorPos||{});
     const ev=layout==='event'?L.editorEventTemplate:null,items=lastGraphicTextItems||[];
