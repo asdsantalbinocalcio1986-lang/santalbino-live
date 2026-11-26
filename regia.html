@@ -4535,6 +4535,7 @@ async function approveMatchResultRevision() {
   toast('Revisione ' + edition.revision + ' approvata. Nessuna pubblicazione social è stata avviata.');
 }
 async function openMatchResult() {
+  beginSponsorGraphicForOutput();
   const dlg = $('#graphicDlg');
   releaseMatchResultPreviewUrl();
   if (!dlg.dataset.postmatchCleanupBound) {
