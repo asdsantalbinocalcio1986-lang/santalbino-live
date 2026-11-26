@@ -205,6 +205,13 @@ assert.match(regia, /t === 'scorers' \? archiveScorersHtml\(\)/, 'La scheda Marc
 assert.doesNotMatch(regia, /function scorersHtml\(\)/, 'La funzione storica non deve essere sovrascritta dalla funzione dei marcatori della partita.');
 assert.equal((regia.match(/async function renderPhaseCard\(ev\)/g) || []).length, 1, 'La grafica delle fasi deve avere una sola funzione renderPhaseCard attiva.');
 
+// La pagina pubblica deve separare anche lei i marcatori storici da quelli della gara corrente.
+assert.match(html, /function archiveScorersHtml\(\)/, 'La pagina pubblica deve avere un renderer dedicato alla classifica storica.');
+assert.match(html, /function scorersHtml\(side\)/, 'La pagina pubblica deve mantenere il renderer dei marcatori della gara corrente.');
+assert.match(html, /t === 'scorers' \? archiveScorersHtml\(\)/, 'La scheda Marcatori pubblica deve richiamare la classifica storica.');
+assert.doesNotMatch(html, /function scorersHtml\(\)/, 'La pagina pubblica non deve avere due renderer con lo stesso nome.');
+assert.equal((html.match(/async function renderPhaseCard\(ev\)/g) || []).length, 1, 'La pagina pubblica deve avere una sola funzione renderPhaseCard attiva.');
+
 // Sponsor: trasformazione conservativa, selezione coerente e fallback sicuro.
 assert.match(regia, /function sponsorGraphicSources\(\)/, 'La libreria sponsor deve filtrare i riferimenti in ingresso.');
 assert.match(regia, /function createWhiteEmbossedSponsor\(img\)/, 'I loghi trasparenti devono poter essere convertiti in bianco con rilievo.');
