@@ -5777,7 +5777,7 @@ function resetMatch() {
   // Una nuova gara riparte dai valori predefiniti: nessun dato della precedente viene riutilizzato.
   // Si conserva soltanto il logo del Sant'Albino, anche se nella gara precedente era sul lato ospiti.
   const clubSide = S.match?.ourSide === 'away' ? 'away' : 'home';
-  const clubLogo = S.logos?.[clubSide] || S.logos?.home || '';
+  const clubLogo = S.logos?.[clubSide] || '';
   const previousRev = Number(S.rev || 0);
   try { localStorage.removeItem(DK); } catch (e) {}
   S = defaults();
