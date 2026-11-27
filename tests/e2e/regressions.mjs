@@ -84,7 +84,7 @@ test('creare una partita in trasferta inverte squadre e loghi senza doppi scambi
       saveMatch();
       return { home: S.match.home, away: S.match.away, ourSide: S.match.ourSide, logos: { ...S.logos }, teamLogos: { ...S.teamLogos } };
     };
-    const away = fill("ASD Sant'Albino Terme", 'AC Avversaria', 'away');
+    const away = fill("ASD Sant'Albino Terme · TEST", 'AC Avversaria', 'away');
     const repeated = fill(away.home, away.away, 'away');
     // Anche caricamento/rimozione dei loghi deve seguire l'identità, non lo slot home/away.
     setLogoForSide('away', 'logo-santalbino-aggiornato');
@@ -94,10 +94,10 @@ test('creare una partita in trasferta inverte squadre e loghi senza doppi scambi
     form.remove();
     return { away, repeated, changedWhileAway, backHome };
   });
-  assert.deepEqual(result.away, { home: 'AC Avversaria', away: "ASD Sant'Albino Terme", ourSide: 'away', logos: { home: 'logo-avversari', away: 'logo-santalbino' }, teamLogos: { club: 'logo-santalbino', opponent: 'logo-avversari' } });
+  assert.deepEqual(result.away, { home: 'AC Avversaria', away: "ASD Sant'Albino Terme · TEST", ourSide: 'away', logos: { home: 'logo-avversari', away: 'logo-santalbino' }, teamLogos: { club: 'logo-santalbino', opponent: 'logo-avversari' } });
   assert.deepEqual(result.repeated, result.away, 'un salvataggio ripetuto non deve invertire di nuovo le squadre');
   assert.deepEqual(result.changedWhileAway, { logos: { home: 'logo-avversari-aggiornato', away: 'logo-santalbino-aggiornato' }, teamLogos: { club: 'logo-santalbino-aggiornato', opponent: 'logo-avversari-aggiornato' } });
-  assert.deepEqual(result.backHome, { home: "ASD Sant'Albino Terme", away: 'AC Avversaria', ourSide: 'home', logos: { home: 'logo-santalbino-aggiornato', away: 'logo-avversari-aggiornato' }, teamLogos: { club: 'logo-santalbino-aggiornato', opponent: 'logo-avversari-aggiornato' } });
+  assert.deepEqual(result.backHome, { home: "ASD Sant'Albino Terme · TEST", away: 'AC Avversaria', ourSide: 'home', logos: { home: 'logo-santalbino-aggiornato', away: 'logo-avversari-aggiornato' }, teamLogos: { club: 'logo-santalbino-aggiornato', opponent: 'logo-avversari-aggiornato' } });
 });
 
 test('la nuova partita non eredita dati dalla precedente e conserva solo il logo del Sant\'Albino', async ({ open }) => {
