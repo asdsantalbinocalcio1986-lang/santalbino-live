@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'santa-live-shell-';
-const CACHE = `${CACHE_PREFIX}v35`;
+const CACHE = `${CACHE_PREFIX}v36`;
 const SHELL = [
   './home.html',
   './index.html',
