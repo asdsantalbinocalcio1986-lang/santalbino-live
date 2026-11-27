@@ -122,8 +122,7 @@ test('nuova partita: convocati e formazioni si inseriscono, salvano e si ricaric
   assert.equal(saved.publication.pending.status, 'draft');
   assert.equal(saved.publication.pending.content.convocati, saved.convocati);
   assert.equal(saved.publication.pending.content.rosters.home, saved.rosters.home);
-  assert.equal(saved.publication.published.convocati, '');
-  assert.equal(saved.publication.published.rosters.home, '');
+  assert.equal(saved.publication.published, null, 'salvare una bozza non deve pubblicare i nuovi convocati o le formazioni');
   await page.reload(); await admin(page); await tab(page, 'lineup');
   assert.equal(await page.inputValue('[data-roster="home"]'), saved.rosters.home);
   assert.equal(await page.inputValue('[data-roster="away"]'), saved.rosters.away);
