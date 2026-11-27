@@ -5832,20 +5832,13 @@ function saveMatch() {
   }
 
   if (!S.match.pollId) S.match.pollId = uid();
-  const clubName = defaults().match.home;
-  let homeName = g('#s-home') || clubName;
-  let awayName = g('#s-away');
+  const homeName = g('#s-home') || defaults().match.home;
+  const awayName = g('#s-away');
+  // ourSide is the persistent identity anchor for the club in this match.
+  // The delegated change handler swaps the two UI fields only when the user
+  // deliberately changes home/away; saving must never infer identity from a
+  // display name (which may contain labels such as "· TEST").
   const ourSide = $('#s-our').value;
-  const isClub = value => String(value || '').trim().toLocaleLowerCase('it') === String(clubName).trim().toLocaleLowerCase('it');
-  // Keep the Sant'Albino name and crest on the side selected for this match.
-  // Swap only when the club is currently on the opposite side, so repeated saves are idempotent.
-  if (ourSide === 'away' && isClub(homeName) && !isClub(awayName)) {
-    [homeName, awayName] = [awayName, homeName];
-
-  } else if (ourSide === 'home' && isClub(awayName) && !isClub(homeName)) {
-    [homeName, awayName] = [awayName, homeName];
-
-  }
   S.match.home = homeName;
   S.match.away = awayName;
   S.match.ourSide = ourSide;
