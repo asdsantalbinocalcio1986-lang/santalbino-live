@@ -238,3 +238,9 @@ Deno.test("Graph GET server error is retryable and does not become an unknown pu
     }
   }
 });
+
+Deno.test("an already PUBLISHED Instagram container is never republished", () => {
+  if (classifyInstagramContainerStatus("PUBLISHED") !== "reconcile") {
+    throw new Error("PUBLISHED container must require reconciliation");
+  }
+});

@@ -69,10 +69,8 @@ function graphAuth(params: Record<string, string>) {
   const safeParams = { ...params };
   const token = safeParams.access_token || "";
   delete safeParams.access_token;
-  return {
-    params: safeParams,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  };
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  return { params: safeParams, headers };
 }
 
 export async function graphGet(path: string, params: Record<string, string>, fetcher: typeof fetch = fetch) {
@@ -134,8 +132,12 @@ export async function graphPost(path: string, params: Record<string, string>, fe
   return data;
 }
 
-export function classifyInstagramContainerStatus(status: unknown): "ready" | "retry_new" | "pending" {
+export function classifyInstagramContainerStatus(
+  status: unknown,
+): "ready" | "retry_new" | "pending" | "reconcile" {
   if (status === "FINISHED") return "ready";
+  // Il container risulta già pubblicato: un altro invio rischierebbe un duplicato.
+  if (status === "PUBLISHED") return "reconcile";
   if (status === "ERROR" || status === "EXPIRED") return "retry_new";
   return "pending";
 }
@@ -277,6 +279,15 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
       return json({ error: "Acquisizione pubblicazione non riuscita" }, 500);
     }
     if (claim.result !== "claimed") {
+      const row = claim.row || {};
+      const states = [row.facebook_status, row.instagram_status];
+      if (claim.result === "reconciliation_required" && states.includes("failed") && !states.includes("unknown")) {
+        return json({
+          status: "failed",
+          duplicate: true,
+          message: "Meta ha rifiutato in modo permanente il tentativo precedente: nessun nuovo invio.",
+        });
+      }
       const status = claim.result === "already_published" ? "published"
         : claim.result === "reconciliation_required" ? "reconciliation_required"
         : "processing";
@@ -360,6 +371,9 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
             instagramContainerId = null;
             throw new MetaRequestError("Container Instagram non pubblicabile: " + String(state.status_code), "failed_retryable");
           }
+          if (containerStatus === "reconcile") {
+            throw new MetaRequestError("Container Instagram già pubblicato: verificare su Meta", "unknown");
+          }
           if (containerStatus === "ready") { ready = true; break; }
           await wait(1500);
         }
@@ -396,7 +410,7 @@ if (import.meta.main) Deno.serve(async (req: Request) => {
       lease_expires_at: null,
       updated_at: new Date().toISOString(),
     }).eq("id", row.id).eq("claim_token", claimToken).select("id").maybeSingle();
-    if (finalError || !finalized) return json({ error: "Pubblicazione completata ma registro finale non aggiornato; riconciliazione necessaria" }, 500);
+    if (finalError || !finalized) return json({ error: "Registro finale non aggiornato: esito da riconciliare su Meta prima di riprovare" }, 500);
 
     return json({
       status: overallStatus,
