@@ -64,8 +64,10 @@ test('la verifica archivio di una partita precedente non marca archiviata quella
   assert.equal(await page.evaluate(() => currentArchived), false);
 });
 
-test('la nuova partita non eredita dati dalla precedente', async ({ open }) => {
+test('la nuova partita non eredita dati dalla precedente e conserva solo il logo del Sant\'Albino', async ({ open }) => {
   const state = matchState({
+    match: { ...matchState().match, ourSide: 'away' },
+    logos: { home: 'logo-avversari', away: 'logo-santalbino' },
     clock: { phase: 'ft', t0: 0, finishedAt: Date.now() },
     mvp: { votes: { x: 1 }, link: 'x', candidateKeys: ['home|Rossi'], candidatePlayers: [{ key: 'home|Rossi', side: 'home', name: 'Rossi' }] },
     socialDrafts: { matchDay: 'vecchio', convocati: 'vecchio' }
@@ -74,14 +76,23 @@ test('la nuova partita non eredita dati dalla precedente', async ({ open }) => {
   const out = await page.evaluate(() => {
     photos.home = { url: 'data:,', blob: new Blob() };
     resetMatch();
-    return { S: JSON.parse(JSON.stringify(S)), photo: photos.home };
+    const draft = JSON.parse(localStorage.getItem(DK) || 'null');
+    return { S: JSON.parse(JSON.stringify(S)), photo: photos.home, draft };
   });
   assert.deepEqual(out.S.events, []);
   assert.deepEqual(out.S.mvp.candidateKeys, []);
   assert.deepEqual(out.S.mvp.candidatePlayers, []);
   assert.equal(out.photo, null, 'foto della distinta precedente ancora presente');
-  assert.ok(!out.S.socialDrafts?.matchDay && !out.S.socialDrafts?.convocati);
+  assert.equal(out.S.logos.home, 'logo-santalbino', 'il logo del Sant\'Albino deve restare associato alla squadra');
+  assert.equal(out.S.logos.away, '', 'il logo degli avversari non deve passare alla nuova partita');
+  assert.deepEqual(out.S.rosters, { home: '', away: '' });
   assert.equal(out.S.convocati, '');
+  assert.equal(out.S.match.away, '');
+  assert.equal(out.S.match.date, '');
+  assert.equal(out.S.clock.phase, 'pre');
+  assert.deepEqual(out.S.publication, { published: null, pending: null, publishedAt: '' });
+  assert.equal(out.draft.state.match.pollId, out.S.match.pollId, 'la bozza deve appartenere alla nuova partita');
+  assert.equal(out.draft.basePollId, out.S.match.pollId, 'la bozza non deve essere etichettata con l\'ID remoto della partita precedente');
 });
 
 test('nuova partita: convocati e formazioni si inseriscono, salvano e si ricaricano senza residui precedenti', async ({ open }) => {
