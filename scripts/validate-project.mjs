@@ -107,7 +107,7 @@ assert.match(html, /fontFamily:'Inter',fontScale:1/, 'L’editor pubblico deve a
 assert.match(html, /<option value="Inter"/, 'L’editor pubblico deve offrire Inter nella selezione dei caratteri');
 assert.match(html, /teamLabelFamily=\(\{Inter:/, 'Le intestazioni delle squadre devono supportare Inter');
 assert.match(regia, /function editEvent\(id\)/, 'La regia deve consentire la modifica di un evento già registrato');
-assert.match(regia, /function resetMatch\(\) \{[\s\S]*?S\.match\.chronicleDraft = '';[\s\S]*?S\.match\.chroniclePublished = '';[\s\S]*?S\.match\.chroniclePublishedAt = '';[\s\S]*?S\.match\.chronicleNeedsReview = false;/, 'L’azzeramento della regia deve eliminare il resoconto della partita precedente');
+assert.match(regia, /function resetMatch\(\) \{[\s\S]*?S = defaults\(\);[\s\S]*?S\.logos\.home = clubLogo;[\s\S]*?S\.logos\.away = '';[\s\S]*?clearMatchLocalState\(\);/, 'L’azzeramento della regia deve ricreare lo stato predefinito, conservando soltanto il logo del Sant’Albino e cancellando i dati locali della gara precedente');
 assert.match(regia, /const scorerPhrase = player \? player \+ ' firma la rete per ' \+ team : 'la rete arriva per ' \+ team;/, 'Un gol senza marcatore non deve inventare un autore generico');
 assert.ok(regia.includes(".replace(/\\(([a-z])\\)/giu, (_, letter) => '(' + letter.toLocaleUpperCase('it') + ')')"), 'Le sigle tra parentesi nei nomi devono mantenere le maiuscole, ad esempio (C)');
 assert.match(regia, /possibleSubs: String\(d\.possibleSubs \|\| ''\)\.trim\(\)/, 'Le sostituzioni devono conservare le possibili alternative');

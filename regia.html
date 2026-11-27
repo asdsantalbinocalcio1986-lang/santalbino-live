@@ -2330,7 +2330,7 @@ function syncHtml() {
 }
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
 function saveDraft(synced = false) {
-  try { localStorage.setItem(DK, JSON.stringify({ __santalbinoDraft: 1, savedAt: Date.now(), synced, basePollId: remotePollId, state: S })); }
+  try { localStorage.setItem(DK, JSON.stringify({ __santalbinoDraft: 1, savedAt: Date.now(), synced, basePollId: String(S.match?.pollId || ''), state: S })); }
   catch (e) { toast('Bozza locale non salvata: memoria del browser esaurita'); }
 }
 function readDraft() {
@@ -5773,7 +5773,27 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { try { localStorage.removeItem(DK); } catch (e) {} S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.mvp.candidateKeys = []; S.mvp.candidatePlayers = []; S.socialDrafts = { matchDay: '', convocati: '' }; L.evOne = {}; L.evOneOrder = []; if (S.media) S.media.evOne = {}; clearMatchLocalState(); renderedMatchId = null; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() {
+  // Una nuova gara riparte dai valori predefiniti: nessun dato della precedente viene riutilizzato.
+  // Si conserva soltanto il logo del Sant'Albino, anche se nella gara precedente era sul lato ospiti.
+  const clubSide = S.match?.ourSide === 'away' ? 'away' : 'home';
+  const clubLogo = S.logos?.[clubSide] || '';
+  const previousRev = Number(S.rev || 0);
+  try { localStorage.removeItem(DK); } catch (e) {}
+  S = defaults();
+  S.rev = previousRev;
+  S.match.pollId = uid();
+  S.logos.home = clubLogo;
+  S.logos.away = '';
+  S.socialDrafts = { matchDay: '', convocati: '' };
+  L.evOne = {}; L.evOneOrder = []; L.evImg = {}; L.evImgRaw = {}; L.social = {};
+  clearMatchLocalState();
+  renderedMatchId = null;
+  currentArchived = false;
+  saveL();
+  commit(true);
+  renderMain();
+}
 function saveMatch() {
   const g = id => $(id).value.trim();
 
