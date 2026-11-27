@@ -64,6 +64,34 @@ test('la verifica archivio di una partita precedente non marca archiviata quella
   assert.equal(await page.evaluate(() => currentArchived), false);
 });
 
+test('creare una partita in trasferta inverte squadre e loghi senza doppi scambi', async ({ open }) => {
+  const state = matchState({ logos: { home: 'logo-santalbino', away: 'logo-avversari' } });
+  const { page } = await open(createBackend(state)); await admin(page);
+  const result = await page.evaluate(() => {
+    const form = document.createElement('div');
+    form.innerHTML = `
+      <input id="s-home"><input id="s-away"><select id="s-our"><option value="home">home</option><option value="away">away</option></select>
+      <input id="s-standings"><input id="s-comp"><input id="s-venue"><input id="s-date"><input id="s-time"><input id="s-tag">
+    `;
+    document.body.append(form);
+    const fill = (home, away, side) => {
+      document.querySelector('#s-home').value = home;
+      document.querySelector('#s-away').value = away;
+      document.querySelector('#s-our').value = side;
+      saveMatch();
+      return { home: S.match.home, away: S.match.away, ourSide: S.match.ourSide, logos: { ...S.logos } };
+    };
+    const away = fill("ASD Sant'Albino Terme", 'AC Avversaria', 'away');
+    const repeated = fill(away.home, away.away, 'away');
+    const backHome = fill(repeated.home, repeated.away, 'home');
+    form.remove();
+    return { away, repeated, backHome };
+  });
+  assert.deepEqual(result.away, { home: 'AC Avversaria', away: "ASD Sant'Albino Terme", ourSide: 'away', logos: { home: 'logo-avversari', away: 'logo-santalbino' } });
+  assert.deepEqual(result.repeated, result.away, 'un salvataggio ripetuto non deve invertire di nuovo le squadre');
+  assert.deepEqual(result.backHome, { home: "ASD Sant'Albino Terme", away: 'AC Avversaria', ourSide: 'home', logos: { home: 'logo-santalbino', away: 'logo-avversari' } });
+});
+
 test('la nuova partita non eredita dati dalla precedente e conserva solo il logo del Sant\'Albino', async ({ open }) => {
   const state = matchState({
     match: { ...matchState().match, ourSide: 'away' },
