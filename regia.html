@@ -1401,6 +1401,34 @@ let S = (() => {
   return Object.assign(d, raw, { match: Object.assign(d.match, raw.match), logos: Object.assign(d.logos, raw.logos), rosters: Object.assign(d.rosters, raw.rosters), convocati: raw.convocati || '', clock: Object.assign(d.clock, raw.clock), mvp: Object.assign(d.mvp, raw.mvp), publication: Object.assign(d.publication, raw.publication || {}), socialPublishing: Object.assign(d.socialPublishing, raw.socialPublishing || {}), events: raw.events || [] });
 })();
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
+
+function normalizeTeamLogoBindings(state) {
+  const side = state.match?.ourSide === 'away' ? 'away' : 'home';
+  const otherSide = side === 'home' ? 'away' : 'home';
+  if (!state.teamLogos || typeof state.teamLogos !== 'object') {
+    state.teamLogos = { club: state.logos?.[side] || '', opponent: state.logos?.[otherSide] || '' };
+  } else {
+    state.teamLogos = Object.assign({ club: '', opponent: '' }, state.teamLogos);
+  }
+  state.logos = Object.assign({ home: '', away: '' }, state.logos || {});
+  state.logos[side] = state.teamLogos.club || '';
+  state.logos[otherSide] = state.teamLogos.opponent || '';
+  return state;
+}
+function syncTeamLogoPositions() {
+  normalizeTeamLogoBindings(S);
+  const clubSide = S.match?.ourSide === 'away' ? 'away' : 'home';
+  const opponentSide = clubSide === 'home' ? 'away' : 'home';
+  S.logos[clubSide] = S.teamLogos.club || '';
+  S.logos[opponentSide] = S.teamLogos.opponent || '';
+}
+function setLogoForSide(side, url) {
+  syncTeamLogoPositions();
+  const clubSide = S.match?.ourSide === 'away' ? 'away' : 'home';
+  S.teamLogos[side === clubSide ? 'club' : 'opponent'] = url || '';
+  syncTeamLogoPositions();
+}
+syncTeamLogoPositions();
 S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
 S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts || {});
 // Non ricostruire pubblicazioni mancanti dai contenuti correnti: potrebbero appartenere a una gara precedente.
@@ -2237,7 +2265,7 @@ function migrateBundledLogos(state) {
 function mergeState(raw) {
   const d = defaults();
   const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
-  return state;
+  return normalizeTeamLogoBindings(state);
 }
 async function verifyAdminAccess() {
   if (!db || !authUser) { CAN_EDIT = false; return false; }
@@ -5695,7 +5723,7 @@ document.addEventListener('click', async e => {
     case 'libraryRemove': { const k = a.dataset.k; if (S.media?.library) S.media.library[k] = ''; commit(true); renderMain(); toast('Riferimento rimosso dalla libreria'); break; }
     case 'librarySponsorRemove': { const i = Number(a.dataset.i); if (Array.isArray(S.media?.library?.sponsors)) S.media.library.sponsors.splice(i,1); commit(true); renderMain(); toast('Logo sponsor rimosso dalla libreria'); break; }
     case 'libraryImportGoal': { const url = L.evImg.goal || ''; if (!url) { toast('Non è presente un modello GOAL nelle Impostazioni'); break; } S.media = S.media || {}; S.media.library = Object.assign({goal:'',formation:''}, S.media.library || {}, {goal:url}); commit(true); renderMain(); toast('Modello GOAL aggiunto alla libreria'); break; }
-    case 'rmlogo': S.logos[a.dataset.s] = ''; commit(true); renderMain(); break;
+    case 'rmlogo': setLogoForSide(a.dataset.s, ''); commit(true); renderMain(); break;
     case 'rmevimg': L.evImg[a.dataset.k] = ''; L.evImgRaw[a.dataset.k] = false; saveL(); commit(true); renderMain(); break;
     case 'savemvp': {
       const keys = $$('[data-mvp-candidate]:checked').map(input => input.value);
@@ -5776,15 +5804,15 @@ function validateImportedState(payload) {
 function resetMatch() {
   // Una nuova gara riparte dai valori predefiniti: nessun dato della precedente viene riutilizzato.
   // Si conserva soltanto il logo del Sant'Albino, anche se nella gara precedente era sul lato ospiti.
-  const clubSide = S.match?.ourSide === 'away' ? 'away' : 'home';
-  const clubLogo = S.logos?.[clubSide] || '';
+  syncTeamLogoPositions();
+  const clubLogo = S.teamLogos?.club || '';
   const previousRev = Number(S.rev || 0);
   try { localStorage.removeItem(DK); } catch (e) {}
   S = defaults();
   S.rev = previousRev;
   S.match.pollId = uid();
-  S.logos.home = clubLogo;
-  S.logos.away = '';
+  S.teamLogos = { club: clubLogo, opponent: '' };
+  syncTeamLogoPositions();
   S.socialDrafts = { matchDay: '', convocati: '' };
   L.evOne = {}; L.evOneOrder = []; L.evImg = {}; L.evImgRaw = {}; L.social = {};
   clearMatchLocalState();
@@ -5813,14 +5841,15 @@ function saveMatch() {
   // Swap only when the club is currently on the opposite side, so repeated saves are idempotent.
   if (ourSide === 'away' && isClub(homeName) && !isClub(awayName)) {
     [homeName, awayName] = [awayName, homeName];
-    [S.logos.home, S.logos.away] = [S.logos.away, S.logos.home];
+
   } else if (ourSide === 'home' && isClub(awayName) && !isClub(homeName)) {
     [homeName, awayName] = [awayName, homeName];
-    [S.logos.home, S.logos.away] = [S.logos.away, S.logos.home];
+
   }
   S.match.home = homeName;
   S.match.away = awayName;
   S.match.ourSide = ourSide;
+  syncTeamLogoPositions();
   S.match.comp = g('#s-comp');
   S.match.venue = g('#s-venue');
   S.match.date = $('#s-date').value;
@@ -5870,7 +5899,7 @@ document.addEventListener('change', async e => {
       renderMain();
       if (isPdf) toast('Prima pagina del PDF pronta per il riconoscimento');
     }
-    else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); S.logos[ds.logo] = await uploadSharedImage(t.files[0], 'loghi', 512, 'image/png', resizeLogo); commit(true); renderMain(); toast('Logo salvato e condiviso'); }
+    else if (ds.logo && t.files[0]) { toast('Caricamento logo…'); const logoUrl = await uploadSharedImage(t.files[0], 'loghi', 512, 'image/png', resizeLogo); setLogoForSide(ds.logo, logoUrl); commit(true); renderMain(); toast('Logo salvato e associato alla squadra'); }
     else if (ds.evimg && t.files[0]) { toast('Caricamento immagine evento…'); L.evImg[ds.evimg] = await uploadSharedImage(t.files[0], 'eventi', 1080); commit(true); renderMain(); toast('Immagine salvata e condivisa'); }
     else if (ds.library && t.files.length) {
       const k = ds.library;
