@@ -4654,6 +4654,17 @@ function saveMatch() {
   commit(true);
   toast('Salvato: aggiorno la pagina live');
 }
+/* Cambiando casa/trasferta, aggiorna subito i due slot squadra nel modulo.
+   Il salvataggio successivo mantiene l'ordine già aggiornato e resta idempotente. */
+document.addEventListener('change', e => {
+  if (!e.target.matches('#s-our')) return;
+  const home = $('#s-home');
+  const away = $('#s-away');
+  if (!home || !away) return;
+  const value = home.value;
+  home.value = away.value;
+  away.value = value;
+});
 /* campi e file */
 document.addEventListener('input', e => {
   if(e.target.matches('[data-editor]')){const cfg=graphicEditorConfig(),scope=L.editorTemplate||'global',key=scope==='event'?'event_'+(L.editorEventTemplate||'goal'):scope,target=key==='global'?cfg.global:(cfg.templates[key]=Object.assign({},cfg.global,cfg.templates[key]||{})),k=e.target.dataset.editor;target[k]=k==='sponsor'?e.target.checked:(['accent','fontFamily'].includes(k)?e.target.value:(k==='fontScale'?Number(e.target.value)/100:Number(e.target.value)));const lab=e.target.closest('label')?.querySelector('span');if(lab&&k==='overlay')lab.textContent='Velatura scura · '+target[k]+'%';if(lab&&k==='border')lab.textContent='Spessore bordo · '+target[k]+'px';return;}
