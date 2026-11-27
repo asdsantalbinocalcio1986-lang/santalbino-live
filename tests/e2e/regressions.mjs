@@ -77,7 +77,10 @@ test('creare una partita in trasferta inverte squadre e loghi senza doppi scambi
     const fill = (home, away, side) => {
       document.querySelector('#s-home').value = home;
       document.querySelector('#s-away').value = away;
-      document.querySelector('#s-our').value = side;
+      const selector = document.querySelector('#s-our');
+      const changed = selector.value !== side;
+      selector.value = side;
+      if (changed) selector.dispatchEvent(new Event('change', { bubbles: true }));
       saveMatch();
       return { home: S.match.home, away: S.match.away, ourSide: S.match.ourSide, logos: { ...S.logos }, teamLogos: { ...S.teamLogos } };
     };

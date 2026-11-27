@@ -5860,6 +5860,17 @@ function saveMatch() {
   commit(true);
   toast('Salvato: aggiorno la pagina live');
 }
+/* Cambiando casa/trasferta, aggiorna subito i due slot squadra nel modulo.
+   Il salvataggio successivo mantiene l'ordine già aggiornato e resta idempotente. */
+document.addEventListener('change', e => {
+  if (!e.target.matches('#s-our')) return;
+  const home = $('#s-home');
+  const away = $('#s-away');
+  if (!home || !away) return;
+  const value = home.value;
+  home.value = away.value;
+  away.value = value;
+});
 /* campi e file */
 document.addEventListener('input', e => {
   if (e.target.matches('#editorialLogicalKey, #editorialCaption')) captureEditorialDraftForm(e.target);
