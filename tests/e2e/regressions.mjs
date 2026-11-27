@@ -84,6 +84,43 @@ test('la nuova partita non eredita dati dalla precedente', async ({ open }) => {
   assert.equal(out.S.convocati, '');
 });
 
+test('nuova partita: convocati e formazioni si inseriscono, salvano e si ricaricano senza residui precedenti', async ({ open }) => {
+  const old = matchState({
+    convocati: 'VecchioConvocato',
+    rosters: { home: '1 VecchioTitolare', away: '1 VecchioAvversario' },
+    publication: { published: { convocati: 'VecchioConvocato', rosters: { home: '1 VecchioTitolare', away: '1 VecchioAvversario' } }, pending: null, publishedAt: '2026-11-20T12:00:00Z' }
+  });
+  const backend = createBackend(old);
+  const { page, ctx } = await open(backend); await admin(page);
+  await page.evaluate(() => resetMatch());
+  await tab(page, 'convocati');
+  assert.equal(await page.inputValue('[data-convocati]'), '');
+  await page.fill('[data-convocati]', 'NuovoConvocato Uno\\nNuovoConvocato Due');
+  await page.click('[data-a="saveconvocati"]'); await sleep(900);
+  await tab(page, 'lineup');
+  assert.equal(await page.inputValue('[data-roster="home"]'), '');
+  assert.equal(await page.inputValue('[data-roster="away"]'), '');
+  await page.fill('[data-roster="home"]', '1 NuovoPortiere\\n2 NuovoDifensore\\n---\\n12 NuovaRiserva');
+  await page.click('[data-a="savelineup"][data-s="home"]'); await sleep(700);
+  await page.fill('[data-roster="away"]', '1 PortiereOspite\\n2 DifensoreOspite');
+  await page.click('[data-a="savelineup"][data-s="away"]'); await sleep(900);
+  const saved = backend.state;
+  assert.equal(saved.convocati, 'NuovoConvocato Uno\\nNuovoConvocato Due');
+  assert.equal(saved.rosters.home, '1 NuovoPortiere\\n2 NuovoDifensore\\n---\\n12 NuovaRiserva');
+  assert.equal(saved.rosters.away, '1 PortiereOspite\\n2 DifensoreOspite');
+  assert.equal(saved.publication.pending.status, 'draft');
+  assert.equal(saved.publication.pending.content.convocati, saved.convocati);
+  assert.equal(saved.publication.pending.content.rosters.home, saved.rosters.home);
+  assert.equal(saved.publication.published.convocati, '');
+  assert.equal(saved.publication.published.rosters.home, '');
+  await page.reload(); await admin(page); await tab(page, 'lineup');
+  assert.equal(await page.inputValue('[data-roster="home"]'), saved.rosters.home);
+  assert.equal(await page.inputValue('[data-roster="away"]'), saved.rosters.away);
+  await tab(page, 'convocati');
+  assert.equal(await page.inputValue('[data-convocati]'), saved.convocati);
+  assert.deepEqual(page.errors, []);
+});
+ 
 test('una bozza già sincronizzata non viene riproposta al riavvio', async ({ open }) => {
   const backend = createBackend(matchState());
   const { page, ctx } = await open(backend); await admin(page);
