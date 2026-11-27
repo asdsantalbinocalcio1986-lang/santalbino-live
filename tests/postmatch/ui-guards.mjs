@@ -42,7 +42,7 @@ assert.match(source, /caricamento temporaneo non è stato eliminato/,
 
 
 assert.match(publicSource, /function capturePublicationContent\(\) \{\s*document\.querySelectorAll\('\[data-roster\]'\)\.forEach\(/, 'The public content editor must capture every roster field using a collection selector, not call forEach on the single-element helper.');
-assert.ok(publicSource.includes("function resetMatch() {") && /function resetMatch\(\) \{[\s\S]*?S = defaults\(\);[\s\S]*?S\.logos\.home = clubLogo;[\s\S]*?S\.logos\.away = '';/.test(publicSource) && /publication: \{ published: null, pending: null, publishedAt: '' \}/.test(publicSource),
+assert.ok(publicSource.includes("function resetMatch() {") && /function resetMatch\(\) \{[\s\S]*?S = defaults\(\);[\s\S]*?S\.teamLogos = \{ club: clubLogo, opponent: '' \};[\s\S]*?syncTeamLogoPositions\(\);/.test(publicSource) && /publication: \{ published: null, pending: null, publishedAt: '' \}/.test(publicSource),
   'Starting a new match from the public/index control room must create a clean default state with no published convocati, formations or pending publication.');
 assert.ok(['RIEPILOGO','CRONACA','FORMAZIONI','CONVOCATI'].every(label => previewSource.includes(label)) && previewSource.includes('data-archive-panel=') && previewSource.includes('SOLA CONSULTAZIONE') && !previewSource.includes('>SCHEDULE</button>'),
   'The archived match preview must use live-style sections and remain read-only.');
@@ -54,7 +54,7 @@ assert.ok(publicSource.includes(": { rosters: {home:'',away:''}, convocati: '' }
   'The live public view must show no convocati or lineups when the current match has no published snapshot.');
 assert.ok(publicSource.includes('localStorage.removeItem(DK)'),
   'Resetting a match must discard any stale local draft before saving the new empty match.');
-assert.ok(source.includes('localStorage.removeItem(DK)') && /function resetMatch\(\) \{[\s\S]*?S = defaults\(\);[\s\S]*?S\.logos\.home = clubLogo;[\s\S]*?S\.logos\.away = '';/.test(source) && /publication: \{ published: null, pending: null, publishedAt: '' \}/.test(source),
+assert.ok(source.includes('localStorage.removeItem(DK)') && /function resetMatch\(\) \{[\s\S]*?S = defaults\(\);[\s\S]*?S\.teamLogos = \{ club: clubLogo, opponent: '' \};[\s\S]*?syncTeamLogoPositions\(\);/.test(source) && /publication: \{ published: null, pending: null, publishedAt: '' \}/.test(source),
   'The actual control-room page must clear the old draft and reset published convocati/formations for a new match.');
 assert.doesNotMatch(source, /if \(!S\.publication\.published\) S\.publication\.published\s*=|if \(!state\.publication\.published\) state\.publication\.published\s*=/,
   'The control room must not recreate a missing publication snapshot from the previous mutable roster/convocati fields.');
