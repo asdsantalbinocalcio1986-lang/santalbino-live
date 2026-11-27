@@ -130,6 +130,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify post-match editor in the control-room browser
         run: node tests/postmatch/browser-e2e.mjs
+      - name: Verify match isolation, sync, archive and publication regressions
+        run: node tests/e2e/regressions.mjs
       - name: Stop disposable local Supabase services
         if: always()
         run: supabase stop --no-backup

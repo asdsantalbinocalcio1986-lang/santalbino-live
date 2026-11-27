@@ -220,6 +220,7 @@ h2{font:700 24px/1.1 var(--fd);letter-spacing:.03em;text-transform:uppercase;mar
 /* statistiche */
 .stat{margin-bottom:16px}
 .stat-h{display:grid;grid-template-columns:44px 1fr 44px;align-items:baseline;gap:8px}
+.stat-h>span{min-width:0;overflow-wrap:anywhere;word-break:normal}
 .stat-h b{font:800 26px/1 var(--fd);font-variant-numeric:tabular-nums}
 .stat-h b:last-child{text-align:right}
 .stat-h span{text-align:center;font:600 13px var(--fb);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -1329,6 +1330,8 @@ input:focus,select:focus,textarea:focus {
 html.santa-test-mode .test-banner{margin:0 0 12px;padding:10px 12px;border:1px solid #b7791f;border-radius:12px;background:#fff4d6;color:#713f12;font:900 12px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-align:center}
 html.santa-test-mode [data-tab="archive"],html.santa-test-mode [data-tab="season"],html.santa-test-mode [data-tab="scorers"],html.santa-test-mode [data-tab="archiveForms"],html.santa-test-mode [data-tab="mvp"],html.santa-test-mode [data-rtab="archive"],html.santa-test-mode [data-rtab="analytics"]{display:none!important}
 html.santa-test-mode [data-a="archiveCurrentMatch"],html.santa-test-mode [data-a="deleteArchivedMatch"]{display:none!important}
+@media (max-width:420px){.quick{gap:8px}.qb{gap:6px;padding:8px 6px;font-size:14px;letter-spacing:0}.qb>span{width:34px;height:34px}.qb svg{width:24px;height:24px}}
+@media (max-width:420px){.match-timeline{grid-template-columns:66px minmax(0,1fr)}.match-tl-lane{font-size:10px;letter-spacing:0}}
 </style>
 </head><body><div id="root" role="main" aria-label="Contenuto SANTA Live"></div>
 <footer id="copyright-footer" style="max-width:720px;margin:22px auto 0;padding:14px 10px 8px;text-align:center;color:#69766e;font:12px/1.6 system-ui,sans-serif;border-top:1px solid #d3dcd1">
@@ -1400,7 +1403,7 @@ let S = (() => {
 S.publication = Object.assign({ published: null, pending: null, publishedAt: '' }, S.publication || {});
 S.socialPublishing = Object.assign({ enabled: false, facebook: true, instagram: true, ready: false, publishingEnabled: false }, S.socialPublishing || {});
 S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts || {});
-if (!S.publication.published) S.publication.published = { rosters: Object.assign({}, S.rosters), convocati: S.convocati || '' };
+// Non ricostruire pubblicazioni mancanti dai contenuti correnti: potrebbero appartenere a una gara precedente.
 
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
@@ -1819,7 +1822,7 @@ function archiveOurSide(row, state) {
   if (away.includes("sant'albino") || away.includes('sant albino')) return 'away';
   return '';
 }
-function scorersHtml() {
+function archiveScorersHtml() {
   if (!db) return '<div class="empty"><h3>Storico marcatori non disponibile</h3><p>La connessione al database non è attiva.</p></div>';
   if (!archiveLoaded) return '<div class="empty">Caricamento storico marcatori…</div>';
   if (!archiveRows.length) return '<div class="empty"><h3>Nessuna partita archiviata</h3><p>I marcatori compariranno dopo l’archiviazione delle prime partite concluse.</p></div>';
@@ -1919,10 +1922,12 @@ function archiveHtml() {
   const rows = canDelete ? regiaArchiveRows : archiveRows;
   const intro = canDelete ? '<div class="card"><h2>Gestione archivio</h2><p class="small muted">Da questa scheda puoi consultare ed eliminare le gare archiviate. L’eliminazione è definitiva e richiede conferma.</p></div>' : '';
   if (!rows.length) return intro + '<div class="empty"><h3>Nessuna partita archiviata</h3><p>Le partite concluse compariranno qui dopo l’archiviazione dalla regia.</p></div>';
-  const typeLabels = { foul:'Fallo', kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
+  const typeLabels = { foul:'Fallo', kickoff:'Calcio d’inizio', halftime:'Fine primo tempo', secondhalf:'Inizio secondo tempo', fulltime:'Fine partita', goal:'Gol', yellow:'Ammonizione', red:'Espulsione', sub:'Sostituzione', save:'Parata', miss:'Occasione', shot:'Tiro', crossbar:'Traversa', corner:'Calcio d’angolo', freekick:'Calcio di punizione', offside:'Fuorigioco', injury:'Infortunio', note:'Aggiornamento', mvp:'Migliore in campo' };
   return intro + rows.map(row => {
     const state = row.state || {}, events = Array.isArray(state.events) ? state.events : [];
-    const match = state.match || {}, rosters = state.rosters || {};
+    // La regia consulta lo snapshot completo; il pubblico solo quanto è stato pubblicato.
+    const match = state.match || {}, published = state.publication?.published || {};
+    const rosters = (canDelete ? state.rosters : published.rosters) || {};
     const date = row.match_date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'Data non indicata');
     const eventHtml = events.map(ev => {
       const label = ev.type === 'foul' ? (ev.kind === 'rigore' && ev.foulInArea !== false ? 'Fallo da rigore' : ev.handball ? 'Fallo di mano' : 'Fallo') : (typeLabels[ev.type] || 'Evento');
@@ -1937,7 +1942,7 @@ function archiveHtml() {
       return text ? `<section><h4>${esc(side === 'home' ? row.home_team : row.away_team)}</h4><pre style="white-space:pre-wrap;font:inherit;font-size:13px">${esc(text)}</pre></section>` : '';
     }).join('');
     const matchDate = match.date || row.match_date || '';
-    const convocati = String(state.convocati || state.publication?.published?.convocati || '').trim();
+    const convocati = String((canDelete ? state.convocati || state.publication?.published?.convocati : state.publication?.published?.convocati) || '').trim();
     const publishedRosters = state.publication?.published?.rosters || {};
     const publishedLineups = ['home','away'].map(side => {
       const raw = typeof publishedRosters[side] === 'string' ? publishedRosters[side].trim() : '';
@@ -1957,6 +1962,7 @@ async function deleteArchivedMatch(id) {
   const date = row.match_date && /^\d{4}-\d{2}-\d{2}$/.test(row.match_date) ? row.match_date.split('-').reverse().join('/') : (row.match_date || 'data non indicata');
   const description = `${date}: ${row.home_team || 'Casa'} ${Number(row.home_score || 0)}–${Number(row.away_score || 0)} ${row.away_team || 'Ospiti'}`;
   if (!confirm(`Vuoi eliminare definitivamente questa gara dall’archivio?\n\n${description}\n\nL’operazione non è reversibile. Le altre gare resteranno invariate.`)) return;
+  if (String(prompt('Seconda conferma: per eliminare definitivamente scrivi ELIMINA') || '').trim() !== 'ELIMINA') { toast('Eliminazione annullata: la gara è stata conservata'); return; }
   try {
     const { data, error } = await db.from('match_archive').delete().eq('id', id).select('id');
     if (error) throw error;
@@ -1993,12 +1999,13 @@ function archivedFormationsHtml() {
   }).join('');
   if (!selectedRow) return '<div class="empty"><h3>Nessuna partita per questa stagione</h3></div>';
 
+  // Scheda pubblica: mai ricostruire distinte dallo stato di lavoro non pubblicato.
   const state = selectedRow.state || {};
-  const rosters = state.rosters || {};
+  const rosters = state.publication?.published?.rosters || {};
   const hasLineups = ['home','away'].some(side => typeof rosters[side] === 'string' && rosters[side].trim());
   const lineupCards = ['home','away'].map(side => {
     const raw = typeof rosters[side] === 'string' ? rosters[side].trim() : '';
-    if (!raw) return '<section class="lu"><div class="lu-h"><div><h3>' + esc(side === 'home' ? selectedRow.home_team : selectedRow.away_team) + '</h3></div></div><p class="small muted">Formazione non presente nello snapshot archiviato.</p></section>';
+    if (!raw) return '<section class="lu"><div class="lu-h"><div><h3>' + esc(side === 'home' ? selectedRow.home_team : selectedRow.away_team) + '</h3></div></div><p class="small muted">Formazione non pubblicata per questa partita.</p></section>';
     const players = parseRoster(raw);
     const starters = players.filter(p => p.starter), bench = players.filter(p => !p.starter);
     const playerRows = list => list.map(p => '<div class="pl"><b>' + esc(p.num || '–') + '</b><span>' + esc(p.name) + '</span></div>').join('');
@@ -2010,12 +2017,14 @@ function archivedFormationsHtml() {
   return '<div class="card"><h2>Archivio formazioni</h2><p class="small muted">Consultazione delle distinte conservate negli snapshot delle partite archiviate. I dati storici non sono modificabili da questa scheda.</p><div style="display:flex;flex-wrap:wrap;gap:7px;margin:12px 0">' + seasonButtons + '</div></div>' +
     '<div class="card"><h3>Partite · ' + esc(seasonLabel(selectedSeason)) + '</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px">' + matchButtons + '</div></div>' +
     '<div class="card"><div class="small muted">' + esc(date) + ' · ' + esc(selectedRow.competition || 'Partita') + (selectedRow.venue ? ' · ' + esc(selectedRow.venue) : '') + '</div><div class="stat-h" style="grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);margin:12px 0"><span style="text-align:left">' + esc(selectedRow.home_team || 'Casa') + '</span><b style="white-space:nowrap">' + Number(selectedRow.home_score || 0) + ' – ' + Number(selectedRow.away_score || 0) + '</b><span style="text-align:right">' + esc(selectedRow.away_team || 'Ospiti') + '</span></div>' +
-    (hasLineups ? lineupCards : '<div class="empty"><h3>Formazioni non disponibili</h3><p>Questa partita è stata archiviata senza distinte compilate.</p></div>') + '</div>';
+    (hasLineups ? lineupCards : '<div class="empty"><h3>Formazioni non disponibili</h3><p>Per questa partita non sono state pubblicate le formazioni.</p></div>') + '</div>';
 }
 
 async function refreshCurrentArchiveStatus() {
   if (TEST_MODE || !db || !S.match?.pollId) { currentArchived = false; return false; }
-  const { data, error } = await db.from('match_archive').select('id').eq('poll_id', S.match.pollId).maybeSingle();
+  const matchId = currentMatchId();
+  const { data, error } = await db.from('match_archive').select('id').eq('poll_id', matchId).maybeSingle();
+  if (matchId !== currentMatchId()) return currentArchived;
   if (error) { currentArchived = false; console.warn('Verifica archiviazione partita:', error.message); return false; }
   currentArchived = !!data;
   return currentArchived;
@@ -2028,9 +2037,10 @@ async function archiveCurrentMatch() {
   if (syncState !== 'ok') { toast('Attendi la conferma “Pagina live aggiornata” prima di archiviare'); return; }
   if (!S.match.pollId) { toast('Identificativo partita mancante: salva la partita e riprova'); return; }
   try {
+    const matchId = currentMatchId();
     const { data, error } = await db.rpc('archive_santalbino_match');
     if (error) throw error;
-    currentArchived = true;
+    if (matchId === currentMatchId()) currentArchived = true;
     if (L.mode === 'regia' && L.rtab === 'archive') await loadRegiaArchivePage(0);
     else if (L.mode !== 'regia' && ['archive','season','scorers','archiveForms'].includes(L.tab)) await loadMatchArchive(true);
     toast(data ? 'Partita archiviata e conservata nello storico' : 'Partita già presente nello storico');
@@ -2061,7 +2071,9 @@ async function discardCurrentMatch() {
 
 async function refreshMvpVotes() {
   if (TEST_MODE || !db || !CAN_EDIT) return;
-  const { data, error } = await db.rpc('get_santalbino_mvp_vote_counts', { p_match_key: mvpPollKey() });
+  const pollKey = mvpPollKey();
+  const { data, error } = await db.rpc('get_santalbino_mvp_vote_counts', { p_match_key: pollKey });
+  if (pollKey !== mvpPollKey()) return;
   if (error) { console.warn('Lettura conteggi MVP:', error.message); return; }
   mvpVoteCounts = {};
   (data || []).forEach(row => { mvpVoteCounts[row.candidate_key] = Number(row.votes || 0); });
@@ -2129,14 +2141,19 @@ async function initCaps() {
   db.auth.onAuthStateChange((event, session) => {
     authUser = session?.user || null;
     if (!authUser) {
-      CAN_EDIT = false; L.mode = 'public';
+      CAN_EDIT = false; L.mode = 'public'; lastAuthId = null;
       if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
     } else if (event !== 'PASSWORD_RECOVERY') {
       // Defer Supabase queries until the auth callback has returned.
+      const newLogin = authUser.id !== lastAuthId;
+      lastAuthId = authUser.id;
       setTimeout(async () => {
+        const couldEdit = CAN_EDIT;
         await verifyAdminAccess();
-        L.mode = CAN_EDIT && !FORCE_PUBLIC_TEST ? 'regia' : 'public';
-        if ($('#top')) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
+        // Il rinnovo del token o il ritorno sulla scheda non devono spostare l'operatore.
+        if (newLogin) L.mode = CAN_EDIT && !FORCE_PUBLIC_TEST ? 'regia' : 'public';
+        else if (!CAN_EDIT) L.mode = 'public';
+        if ($('#top') && (newLogin || couldEdit !== CAN_EDIT)) { saveL(); $('#top').innerHTML = topHtml(); renderMain(); }
       }, 0);
     }
     if (event === 'PASSWORD_RECOVERY') {
@@ -2146,12 +2163,14 @@ async function initCaps() {
   });
   const { data: { session } } = await db.auth.getSession();
   authUser = session?.user || null;
+  lastAuthId = authUser?.id || null;
   await verifyAdminAccess();
   const { data, error } = await db.from(STATE_TABLE).select('state').eq('id', 1).maybeSingle();
   let legacyLogoMigration = false;
   if (!error && data?.state) {
     S = mergeState(data.state);
     remoteRev = Number(S.rev || 0);
+    remotePollId = currentMatchId();
     legacyLogoMigration = migrateBundledLogos(S);
     L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
     L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
@@ -2166,10 +2185,10 @@ async function initCaps() {
   if (!TEST_MODE) await refreshCurrentArchiveStatus();
   offerDraftRecovery();
   remoteChannel = db.channel(TEST_MODE ? 'santalbino-test-state' : 'santalbino-live-state').on('postgres_changes', {event:'UPDATE',schema:'public',table:STATE_TABLE,filter:'id=eq.1'}, payload => {
-    if (payload.new?.state && !publishing && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { remoteRev = Number(payload.new.state.rev || 0); S = mergeState(payload.new.state); L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {}); L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {}); L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {}); updDatalists(); renderHero(); renderMain(); void refreshCurrentArchiveStatus().then(() => renderMain()); if (CAN_EDIT) refreshMvpVotes(); }
+    if (payload.new?.state && !publishing && !pendingSync && syncState === 'ok' && Number(payload.new.state.rev || 0) > Number(S.rev || 0)) { applyRemoteState(payload.new.state); updDatalists(); renderHero(); renderMain(); void refreshCurrentArchiveStatus().then(() => renderMain()); if (CAN_EDIT) refreshMvpVotes(); }
    }).subscribe((status, err) => {
     if (status === 'SUBSCRIBED') {
-      if (realtimeNeedsResync) void refreshRemoteState('realtime-reconnected');
+      if (realtimeNeedsResync) handleReconnect('realtime-reconnected');
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
       realtimeNeedsResync = true;
       console.warn('Connessione Realtime Sant\'Albino Live:', status, err || '');
@@ -2178,24 +2197,14 @@ async function initCaps() {
   window.addEventListener('offline', () => {
     setSync('error', 'dispositivo offline: la bozza locale resta conservata');
   });
-  window.addEventListener('online', () => {
-    setSync('ok');
-    realtimeNeedsResync = true;
-    void refreshRemoteState('network-online');
-  });
+  window.addEventListener('online', () => handleReconnect('network-online'));
   if (!window.__santalbinoConnectionWatch) {
     window.__santalbinoConnectionWatch = setInterval(() => {
-      if (!document.hidden && navigator.onLine) {
-        realtimeNeedsResync = true;
-        void refreshRemoteState('periodic-connection-check');
-      }
+      if (!document.hidden && navigator.onLine) handleReconnect('periodic-connection-check');
     }, 30000);
   }
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      realtimeNeedsResync = true;
-      void refreshRemoteState('page-visible');
-    }
+    if (!document.hidden && navigator.onLine) handleReconnect('page-visible');
   });
   if (!TEST_MODE) db.channel('santalbino-mvp-votes').on('postgres_changes', {event:'INSERT',schema:'public',table:'mvp_votes'}, payload => {
     if (payload.new?.match_key === mvpPollKey()) refreshMvpVotes();
@@ -2228,7 +2237,6 @@ function migrateBundledLogos(state) {
 function mergeState(raw) {
   const d = defaults();
   const state = Object.assign(d, raw, {match:Object.assign(d.match,raw.match),logos:Object.assign(d.logos,raw.logos),rosters:Object.assign(d.rosters,raw.rosters),convocati:raw.convocati||'',clock:Object.assign(d.clock,raw.clock),mvp:Object.assign(d.mvp,raw.mvp),publication:Object.assign(d.publication,raw.publication||{}),events:raw.events||[],media:Object.assign(d.media,raw.media||{}),});
-  if (!state.publication.published) state.publication.published = { rosters: Object.assign({}, state.rosters), convocati: state.convocati || '' };
   return state;
 }
 async function verifyAdminAccess() {
@@ -2275,6 +2283,43 @@ async function signOutAdmin() { if (db) await db.auth.signOut(); CAN_EDIT = fals
 /* ================= sincronizzazione online ================= */
 let syncState = 'ok', syncDetail = '', pubTimer = null, publishing = false, publishPending = false, remoteRev = 0;
 let realtimeNeedsResync = false, remoteRefreshBusy = false;
+// pendingSync: esistono modifiche locali non ancora confermate dal server.
+// remotePollId: partita presente online all'ultima lettura/scrittura confermata.
+let pendingSync = false, remotePollId = '', renderedMatchId = null, lastAuthId = null;
+const currentMatchId = () => String(S.match?.pollId || '');
+// Svuota tutto ciò che vive solo sul dispositivo ed è legato a una singola partita.
+function clearMatchLocalState() {
+  photos.home = null; photos.away = null;
+  mvpVoteCounts = {}; currentArchived = false;
+  editId = null; armedDel = null; editingEventId = null;
+  stash.del('open-post');
+  closeSheet();
+  ['#postDlg', '#graphicDlg'].forEach(sel => { const d = $(sel); if (d?.open) d.close(); });
+}
+// Unico punto in cui lo stato ricevuto dal server sostituisce quello locale.
+function applyRemoteState(raw) {
+  const previous = currentMatchId();
+  S = mergeState(raw);
+  remoteRev = Number(S.rev || 0);
+  remotePollId = currentMatchId();
+  if (previous !== remotePollId) { clearMatchLocalState(); L.evOne = {}; L.evImg = {}; L.evImgRaw = {}; }
+  L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
+  L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
+  L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+}
+function handleReconnect(reason) {
+  realtimeNeedsResync = true;
+  const conflict = syncState === 'error' && syncDetail.startsWith('conflitto:');
+  if (pendingSync) {
+    // Mai dichiarare "aggiornata" una pagina con modifiche in attesa: prima si inviano.
+    // In caso di conflitto decide l'operatore (nessuna sovrascrittura automatica).
+    if (conflict || !CAN_EDIT || !dbReady || publishing) return;
+    setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, 80);
+    return;
+  }
+  if (syncState === 'error' && !conflict) setSync('ok');
+  void refreshRemoteState(reason);
+}
 function setSync(st, detail = '') { syncState = st; syncDetail = detail; const el = $('#sync'); if (el) el.outerHTML = syncHtml(); }
 function syncHtml() {
   const txt = { ok: 'Pagina live aggiornata', dirty: 'Modifiche da sincronizzare…', sending: 'Sincronizzazione in corso…', error: 'Sincronizzazione non disponibile' + (syncDetail ? ` (${esc(syncDetail)})` : ''), local: 'Modalità locale: configura il database' }[LOCAL_ONLY ? 'local' : syncState];
@@ -2284,15 +2329,15 @@ function syncHtml() {
   return `<div class="sync ${LOCAL_ONLY ? 'local' : syncState}" id="sync"><b>${txt}</b>${recovery}</div>`;
 }
 function updDatalists() { ['home', 'away'].forEach(s => { const dl = $('#dl-' + s); if (dl) dl.innerHTML = parseRoster(S.rosters[s]).map(p => `<option value="${esc(p.name)}" label="${esc(p.num)}"></option>`).join(''); }); }
-function saveDraft() {
-  try { localStorage.setItem(DK, JSON.stringify({ __santalbinoDraft: 1, savedAt: Date.now(), state: S })); }
+function saveDraft(synced = false) {
+  try { localStorage.setItem(DK, JSON.stringify({ __santalbinoDraft: 1, savedAt: Date.now(), synced, basePollId: remotePollId, state: S })); }
   catch (e) { toast('Bozza locale non salvata: memoria del browser esaurita'); }
 }
 function readDraft() {
   try {
     const raw = JSON.parse(localStorage.getItem(DK) || 'null');
     if (!raw) return null;
-    return raw.__santalbinoDraft === 1 && raw.state ? { state: raw.state, savedAt: Number(raw.savedAt || 0) } : { state: raw, savedAt: 0 };
+    return raw.__santalbinoDraft === 1 && raw.state ? { state: raw.state, savedAt: Number(raw.savedAt || 0), synced: raw.synced === true, basePollId: raw.basePollId } : { state: raw, savedAt: 0 };
   } catch (e) { return null; }
 }
 function offerDraftRecovery() {
@@ -2300,7 +2345,11 @@ function offerDraftRecovery() {
   const draft = readDraft();
   if (!draft || !draft.state || !Number.isFinite(Number(draft.state.rev))) return;
   const draftRev = Number(draft.state.rev || 0);
-  if (draftRev <= remoteRev) return;
+  if (draft.synced) return;
+  // La bozza nasce da una partita che online non c'è più: mai proporla in automatico.
+  const baseId = draft.basePollId ?? String(draft.state.match?.pollId || '');
+  if (baseId && remotePollId && baseId !== remotePollId) { toast('Sul dispositivo c’è una bozza di un’altra partita: non viene applicata in automatico.', 6000); return; }
+  if (draftRev <= remoteRev) { toast('Bozza locale non sincronizzata disponibile: usa “Bozza locale” per controllarla.', 6000); return; }
   const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('it-IT') : 'data non disponibile';
   if (confirm('È stata trovata una bozza locale più recente dello stato online (revisione '+draftRev+' contro '+remoteRev+', salvata: '+when+'). Vuoi recuperarla?')) {
     S = mergeState(draft.state);
@@ -2324,7 +2373,10 @@ function recoverDraftManually() {
   const warning = draftRev < remoteRev
     ? '\n\nATTENZIONE: la bozza è più vecchia dello stato online. Recuperandola potresti sostituire dati più recenti.'
     : '';
-  const message = 'Bozza locale trovata.\nSalvata: '+when+'\nRevisione locale: '+draftRev+'\nRevisione online: '+remoteRev+'\nLa bozza è '+relation+'.'+warning+'\n\nVuoi confrontare e ripristinare la bozza? L’operazione aggiornerà lo stato online.';
+  const otherMatch = String(draft.state.match?.pollId || '') !== currentMatchId()
+    ? '\n\nATTENZIONE: la bozza appartiene a UN’ALTRA PARTITA (' + (draft.state.match?.away || 'avversario non indicato') + '). Recuperandola sostituirai la partita attuale.'
+    : '';
+  const message = 'Bozza locale trovata.\nSalvata: '+when+'\nRevisione locale: '+draftRev+'\nRevisione online: '+remoteRev+'\nLa bozza è '+relation+'.'+warning+otherMatch+'\n\nVuoi confrontare e ripristinare la bozza? L’operazione aggiornerà lo stato online.';
   if (!confirm(message)) return;
   S = mergeState(draft.state);
   S.rev = remoteRev;
@@ -2336,7 +2388,7 @@ function recoverDraftManually() {
 }
 function commit(now) {
   S.media = {evOne:Object.assign({}, S.media?.evOne || {}, L.evOne || {}), evImg:L.evImg||{}, evImgRaw:L.evImgRaw||{}, library:Object.assign({goal:'',formation:'',sponsors:[]}, S.media?.library || {}), graphicEditor:Object.assign({global:{accent:'#e3c66d',overlay:0,border:3,sponsor:true},templates:{}},S.media?.graphicEditor||{})};
-  S.rev = (S.rev || 0) + 1; saveDraft(); renderHero(); updDatalists();
+  S.rev = (S.rev || 0) + 1; pendingSync = true; saveDraft(); renderHero(); updDatalists();
   if (!CAN_EDIT || LOCAL_ONLY || !dbReady) { setSync('error', 'accesso amministratore necessario'); return; }
   setSync('dirty'); clearTimeout(pubTimer); pubTimer = setTimeout(publishNow, now ? 80 : 700);
 }
@@ -2357,7 +2409,7 @@ async function publishNow() {
       p_state: snapshot
     });
     error = result.error;
-    if (!error) remoteRev = snapshotRev;
+    if (!error) { remoteRev = snapshotRev; remotePollId = String(snapshot.match?.pollId || ''); }
   } catch (err) { error = err; }
   window.__santalbinoSaving = false; publishing = false;
   if (error) {
@@ -2373,26 +2425,26 @@ async function publishNow() {
     pubTimer = setTimeout(publishNow, 80);
     return;
   }
+  pendingSync = false; saveDraft(true);
   setSync('ok'); flushStash();
   if (realtimeNeedsResync) void refreshRemoteState('post-save');
 }
 function flushStash() { const id = stash.get('open-post'); if (id) { stash.del('open-post'); openPost(id); } }
 async function refreshRemoteState(reason = 'reconnect') {
-  if (!db || !dbReady || remoteRefreshBusy || publishing || syncState !== 'ok') return false;
+  if (!db || !dbReady || remoteRefreshBusy || publishing || pendingSync || syncState !== 'ok') return false;
   remoteRefreshBusy = true;
+  const revAtStart = remoteRev;
   try {
     const { data, error } = await db.from(STATE_TABLE).select('state').eq('id', 1).maybeSingle();
     if (error) throw error;
     if (!data?.state) return false;
+    // Durante l'attesa possono essere arrivate modifiche locali o un aggiornamento più recente.
+    if (publishing || pendingSync || remoteRev !== revAtStart) return false;
     const nextRev = Number(data.state.rev || 0);
     if (nextRev > Number(S.rev || 0)) {
-      remoteRev = nextRev;
-      S = mergeState(data.state);
-      await refreshCurrentArchiveStatus();
-      L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
-      L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
-      L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+      applyRemoteState(data.state);
       updDatalists(); renderHero(); renderMain();
+      await refreshCurrentArchiveStatus(); renderMain();
       if (CAN_EDIT) await refreshMvpVotes();
     }
     realtimeNeedsResync = false;
@@ -2435,9 +2487,12 @@ async function autoPublishSocialEvent(ev) {
   if (TEST_MODE || !CAN_EDIT || !dbReady || !db || !cfg.enabled || !cfg.ready || !cfg.publishingEnabled) return;
   if (!SOCIAL_AUTO_EVENT_TYPES.includes(ev?.type) || (!cfg.facebook && !cfg.instagram)) return;
   try {
+    const matchId = currentMatchId(), caption = evText(ev);
+    beginSponsorGraphicForOutput();
     const blob = await cardBlob(ev);
+    if (matchId !== currentMatchId() || !S.events.some(x => x.id === ev.id)) return;
     if (!blob) throw new Error('Grafica evento non disponibile');
-    const matchKey = String(S.match.pollId || 'match').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const matchKey = String(matchId || 'match').replace(/[^a-zA-Z0-9_-]/g, '_');
     const eventKey = String(ev.id || uid()).replace(/[^a-zA-Z0-9_-]/g, '_');
     const storagePath = 'social/' + matchKey + '/' + eventKey + '.jpg';
     const storage = db.storage.from(MEDIA_BUCKET);
@@ -2449,9 +2504,9 @@ async function autoPublishSocialEvent(ev) {
       body: {
         action: 'publish',
         eventId: String(ev.id),
-        matchId: String(S.match.pollId || ''),
+        matchId,
         eventType: ev.type,
-        caption: evText(ev),
+        caption,
         imageUrl: publicImage,
         platforms: { facebook: !!cfg.facebook, instagram: !!cfg.instagram }
       }
@@ -2523,7 +2578,10 @@ async function loadSocialPublicationLog() {
       ['unknown'].includes(item.instagram_status);
     const isProcessing = item.overall_status === 'processing' ||
       item.facebook_status === 'processing' || item.instagram_status === 'processing';
-    const retry = item.overall_status === 'published' || needsReconciliation || isProcessing ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
+    // Un rifiuto permanente non è ritentabile: il server lo bloccherebbe comunque.
+    const statuses = [item.facebook_status, item.instagram_status];
+    const retryable = !statuses.includes('failed') && statuses.some(x => x === 'failed_retryable' || x === 'pending');
+    const retry = !retryable || item.overall_status === 'published' || needsReconciliation || isProcessing ? '' : '<button class="btn sm" data-a="retrySocialPublication" data-id="' + esc(item.event_id) + '">Riprova invio</button>';
     const statusNote = needsReconciliation
       ? '<div class="small" style="margin-top:6px;color:var(--muted)">Esito da verificare: il sistema blocca nuovi invii automatici per evitare duplicati.</div>'
       : isProcessing
@@ -2575,48 +2633,171 @@ function evTemplate(ev) {
   return { src: L.evImg[ev.type] || '', raw: !!L.evImgRaw[ev.type] };
 }
 let activeSponsorGraphicUrl = null;
-function beginSponsorGraphic() {
-  const list = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors.filter(Boolean) : [];
-  activeSponsorGraphicUrl = list.length ? list[Math.floor(Math.random() * list.length)] : null;
+let reuseSponsorGraphicOnce = false;
+function sponsorGraphicSources() {
+  const values = Array.isArray(S.media?.library?.sponsors) ? S.media.library.sponsors : [];
+  return [...new Set(values.filter(value => typeof value === 'string' && /^(https?:\/\/|data:image\/|blob:|\/|\.\/)/i.test(value.trim())).map(value => value.trim()))];
+}
+function beginSponsorGraphic(force = false) {
+  const list = sponsorGraphicSources();
+  if (!list.length) { activeSponsorGraphicUrl = null; return null; }
+  if (!force && activeSponsorGraphicUrl && list.includes(activeSponsorGraphicUrl)) return activeSponsorGraphicUrl;
+  activeSponsorGraphicUrl = list[Math.floor(Math.random() * list.length)];
+  return activeSponsorGraphicUrl;
+}
+function beginSponsorGraphicForOutput() {
+  const reuse = reuseSponsorGraphicOnce && !!activeSponsorGraphicUrl;
+  reuseSponsorGraphicOnce = false;
+  beginSponsorGraphic(!reuse);
+}
+function sponsorImageIsCanvasSafe(img) {
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = probe.height = 1;
+    const ctx = probe.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 1, 1);
+    ctx.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+function createWhiteEmbossedSponsor(img) {
+  try {
+    const originalWidth = img.naturalWidth || img.width;
+    const originalHeight = img.naturalHeight || img.height;
+    if (!originalWidth || !originalHeight) return null;
+    const scale = Math.min(1, 1200 / Math.max(originalWidth, originalHeight));
+    const width = Math.max(1, Math.round(originalWidth * scale));
+    const height = Math.max(1, Math.round(originalHeight * scale));
+    const mask = document.createElement('canvas');
+    mask.width = width; mask.height = height;
+    const maskContext = mask.getContext('2d', { willReadFrequently: true });
+    maskContext.drawImage(img, 0, 0, width, height);
+    const pixels = maskContext.getImageData(0, 0, width, height).data;
+    let transparentPixels = 0;
+    const totalPixels = width * height;
+    for (let i = 3; i < pixels.length; i += 4) if (pixels[i] < 245) transparentPixels++;
+    // Non si rimuovono sfondi opachi: in quel caso si conserva il logo originale.
+    if (transparentPixels < totalPixels * .003) return null;
+    // Trasforma in bianco solo un marchio "a tinta" su sfondo realmente trasparente.
+    // Riquadri, stemmi pieni (anche con angoli arrotondati) e loghi con dettagli a forte
+    // contrasto diventerebbero macchie bianche irriconoscibili: si conserva l'originale.
+    let opaque = 0, sum = 0, sumSquares = 0, minX = width, minY = height, maxX = -1, maxY = -1;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] < 128) continue;
+      const x = (i / 4) % width, y = Math.floor(i / 4 / width);
+      const luma = .2126 * pixels[i] + .7152 * pixels[i + 1] + .0722 * pixels[i + 2];
+      opaque++; sum += luma; sumSquares += luma * luma;
+      if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    if (!opaque) return null;
+    const coverage = opaque / ((maxX - minX + 1) * (maxY - minY + 1));
+    const tonalSpread = Math.sqrt(Math.max(0, sumSquares / opaque - (sum / opaque) ** 2));
+    if (coverage > .7 || tonalSpread > 60) return null;
+    maskContext.globalCompositeOperation = 'source-in';
+    maskContext.fillStyle = '#fff';
+    maskContext.fillRect(0, 0, width, height);
+    maskContext.globalCompositeOperation = 'source-over';
+    const embossed = document.createElement('canvas');
+    embossed.width = width; embossed.height = height;
+    const context = embossed.getContext('2d');
+    context.save();
+    context.shadowColor = 'rgba(0,0,0,.72)';
+    context.shadowBlur = 3;
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 3;
+    context.drawImage(mask, 0, 0);
+    context.shadowColor = 'rgba(255,255,255,.88)';
+    context.shadowBlur = 1;
+    context.shadowOffsetX = -1;
+    context.shadowOffsetY = -1;
+    context.drawImage(mask, 0, 0);
+    context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.drawImage(mask, 0, 0);
+    context.restore();
+    return embossed;
+  } catch (error) {
+    // Se il formato o il browser non consentono la lettura del canale alpha, usa l'originale.
+    return null;
+  }
+}
+async function resolveSponsorGraphicImage() {
+  const list = sponsorGraphicSources();
+  if (!list.length) { activeSponsorGraphicUrl = null; return null; }
+  if (!activeSponsorGraphicUrl || !list.includes(activeSponsorGraphicUrl)) beginSponsorGraphic(true);
+  const preferred = activeSponsorGraphicUrl;
+  const remaining = list.filter(url => url !== preferred);
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+  for (const url of [preferred, ...remaining]) {
+    const img = await loadGraphicImage(url);
+    if (img && sponsorImageIsCanvasSafe(img)) {
+      activeSponsorGraphicUrl = url;
+      return img;
+    }
+  }
+  activeSponsorGraphicUrl = null;
+  return null;
 }
 async function addSponsorToGraphic(canvas, layout) {
-  // Eventi e fasi condividono una fascia sponsor integrata nel footer, sempre centrata.
-  const sizes={event:{w:520,h:78,bottom:104,center:true},phase:{w:520,h:78,bottom:104,center:true},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const slot=sizes[layout]||sizes.event,p={x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
-  const x=canvas.getContext('2d'),style=graphicEditorStyle(layout),pos=style.sponsorPos||{};
-  p.x+=Number(pos.x||0)*canvas.width;p.y+=Number(pos.y||0)*canvas.height;
-  const boxScale=Math.max(.5,Math.min(2.5,Number(pos.scale)||1));p.w*=boxScale;p.h*=boxScale;
-  p.x=Math.max(8,Math.min(canvas.width-p.w-8,p.x));p.y=Math.max(8,Math.min(canvas.height-p.h-8,p.y));
-  if(Number(style.overlay)>0){x.save();x.fillStyle='rgba(0,0,0,'+(Math.min(35,Number(style.overlay))/100)+')';x.fillRect(0,0,canvas.width,canvas.height);x.restore();}
-  if(Number(style.border)>0){x.save();x.strokeStyle=style.accent||'#e3c66d';x.lineWidth=Math.min(24,Number(style.border));x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth);x.restore();}
-  if(style.sponsor===false)return canvas;
-  if(!activeSponsorGraphicUrl){const list=Array.isArray(S.media?.library?.sponsors)?S.media.library.sponsors.filter(Boolean):[];if(list.length)activeSponsorGraphicUrl=list[Math.floor(Math.random()*list.length)];}
-  if(!activeSponsorGraphicUrl)return canvas;
-  const img=await loadGraphicImage(activeSponsorGraphicUrl);if(!img)return canvas;
-  if(layout==='event'||layout==='phase'){
-    x.save();
-    x.fillStyle='rgba(2,13,7,.78)';rrect(x,p.x,p.y,p.w,p.h,15);x.fill();
-    x.strokeStyle='rgba(183,243,107,.42)';x.lineWidth=1.5;rrect(x,p.x+.75,p.y+.75,p.w-1.5,p.h-1.5,14);x.stroke();
-    x.fillStyle='rgba(200,239,120,.86)';x.textAlign='center';x.textBaseline='middle';
-    x.font='700 '+Math.max(9,Math.round(p.h*.145))+'px Inter,sans-serif';
-    x.fillText('CON IL SUPPORTO DI',p.x+p.w/2,p.y+p.h*.19);
-    const padX=p.w*.08,padTop=p.h*.31,padBottom=p.h*.07;
-    const scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
-    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
-    x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
-    x.restore();return canvas;
+  const sizes = {
+    event:{w:520,h:78,bottom:104,center:true},
+    phase:{w:520,h:78,bottom:104,center:true},
+    formation:{w:470,h:130,right:42,bottom:12},
+    matchday:{w:430,h:100,right:42,bottom:8},
+    convocati:{w:430,h:140,right:42,bottom:1015}
+  };
+  const slot = sizes[layout] || sizes.event;
+  const p = {x:slot.center?(canvas.width-slot.w)/2:canvas.width-slot.w-slot.right,y:canvas.height-slot.h-slot.bottom,w:slot.w,h:slot.h};
+  const x = canvas.getContext('2d');
+  const style = graphicEditorStyle(layout), pos = style.sponsorPos || {};
+  p.x += Number(pos.x || 0) * canvas.width;
+  p.y += Number(pos.y || 0) * canvas.height;
+  const boxScale = Math.max(.5, Math.min(2.5, Number(pos.scale) || 1));
+  p.w *= boxScale; p.h *= boxScale;
+  p.x = Math.max(8, Math.min(canvas.width-p.w-8,p.x));
+  p.y = Math.max(8, Math.min(canvas.height-p.h-8,p.y));
+  if (Number(style.overlay) > 0) {
+    x.save(); x.fillStyle = 'rgba(0,0,0,' + (Math.min(35,Number(style.overlay))/100) + ')';
+    x.fillRect(0,0,canvas.width,canvas.height); x.restore();
   }
-  x.save();x.shadowColor='rgba(0,0,0,.24)';x.shadowBlur=14;x.shadowOffsetY=4;
-  x.fillStyle='#fff';rrect(x,p.x,p.y,p.w,p.h,16);x.fill();x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
-  x.strokeStyle='rgba(10,35,23,.34)';x.lineWidth=2.5;rrect(x,p.x,p.y,p.w,p.h,16);x.stroke();
-  x.fillStyle='#17482a';x.textAlign='center';x.textBaseline='middle';x.font='900 '+Math.max(13,Math.round(p.h*.105))+'px Arial,sans-serif';
-  x.fillText('SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*.16);
-  const padX=p.w*.07,padTop=p.h*.29,padBottom=p.h*.08,scale=Math.min((p.w-padX*2)/img.width,(p.h-padTop-padBottom)/img.height),w=img.width*scale,h=img.height*scale;
-  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);x.restore();
+  if (Number(style.border) > 0) {
+    x.save(); x.strokeStyle = style.accent || '#e3c66d'; x.lineWidth = Math.min(24,Number(style.border));
+    x.strokeRect(x.lineWidth/2,x.lineWidth/2,canvas.width-x.lineWidth,canvas.height-x.lineWidth); x.restore();
+  }
+  if (style.sponsor === false) return canvas;
+  const img = await resolveSponsorGraphicImage();
+  if (!img) return canvas;
+  const embossed = createWhiteEmbossedSponsor(img);
+  const artwork = embossed || img;
+  const darkPanel = !!embossed;
+  const isEvent = layout === 'event' || layout === 'phase';
+  x.save();
+  x.shadowColor = 'rgba(0,0,0,.24)'; x.shadowBlur = 14; x.shadowOffsetY = 4;
+  x.fillStyle = darkPanel ? 'rgba(2,13,7,.9)' : '#fff';
+  rrect(x,p.x,p.y,p.w,p.h,16); x.fill();
+  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+  x.strokeStyle = darkPanel ? 'rgba(183,243,107,.5)' : 'rgba(10,35,23,.34)';
+  x.lineWidth = 2; rrect(x,p.x+1,p.y+1,p.w-2,p.h-2,15); x.stroke();
+  x.fillStyle = darkPanel ? 'rgba(214,246,201,.92)' : '#17482a';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = (isEvent ? '700 ' : '900 ') + Math.max(isEvent ? 9 : 13, Math.round(p.h*(isEvent ? .145 : .105))) + 'px Inter,sans-serif';
+  x.fillText(isEvent ? 'CON IL SUPPORTO DI' : 'SPONSOR UFFICIALE',p.x+p.w/2,p.y+p.h*(isEvent ? .19 : .16));
+  const padX = p.w*.08, padTop = p.h*(isEvent ? .31 : .29), padBottom = p.h*.08;
+  const scale = Math.min((p.w-padX*2)/artwork.width,(p.h-padTop-padBottom)/artwork.height);
+  const w = artwork.width*scale, h = artwork.height*scale;
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  x.drawImage(artwork,p.x+(p.w-w)/2,p.y+padTop+(p.h-padTop-padBottom-h)/2,w,h);
+  x.restore();
   return canvas;
 }
-
-async function renderPhaseCard(ev) {
+async function renderPhaseCardLegacy(ev) {
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d'), FB = 'Arial,sans-serif', FD = "'Arial Narrow',Arial,sans-serif"; applyGraphicTypography(x,'phase',W,H);
   const idx = S.events.findIndex(e => e.id === ev.id), prior = idx >= 0 ? S.events.slice(0, idx + 1) : S.events;
@@ -3326,7 +3507,7 @@ async function renderFormationGraphic(side = 'both', format = 'standard') {
 let lineupGraphicSide = 'both';
 let lineupGraphicFormat = 'standard';
 async function openLineupGraphic(side = 'both', format = 'standard') {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   lineupGraphicSide = side;
   lineupGraphicFormat = format;
   const dlg = $('#graphicDlg');
@@ -3564,7 +3745,7 @@ async function renderConvocatiGraphic() {
   return TEST_MODE ? renderConvocatiGraphicPremium() : renderConvocatiGraphicLegacy();
 }
 async function openConvocatiGraphic() {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>Grafica convocati</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open)dlg.showModal();
@@ -3577,7 +3758,7 @@ async function openConvocatiGraphic() {
   }
 }
 async function openMatchDayGraphic() {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const dlg=$('#graphicDlg');
   dlg.innerHTML='<div class="sheethead"><h2>MATCH DAY</h2><button type="button" class="btn sm" data-a="graphicclose">Chiudi</button></div><p class="muted">Preparazione grafica…</p>';
   if(!dlg.open) dlg.showModal();
@@ -3660,6 +3841,16 @@ function heroHtml() {
     <div class="scorers"><div>${scorersHtml('home')}</div><div>${scorersHtml('away')}</div></div>
   </div>`;
 }
+const KEEP_FIELDS = '[data-roster], [data-convocati], #contentScheduleAt';
+const fieldKey = el => el.id || (el.dataset.roster ? 'roster:' + el.dataset.roster : 'convocati');
+// Ridisegna senza cancellare ciò che l'operatore ha digitato e non ancora salvato (solo stessa partita).
+function setMainHtml(el, html) {
+  const typed = new Map();
+  if (renderedMatchId === currentMatchId()) el.querySelectorAll(KEEP_FIELDS).forEach(f => { if (f.value !== f.defaultValue) typed.set(fieldKey(f), f.value); });
+  el.innerHTML = html;
+  el.querySelectorAll(KEEP_FIELDS).forEach(f => { if (typed.has(fieldKey(f))) f.value = typed.get(fieldKey(f)); });
+  renderedMatchId = currentMatchId();
+}
 function renderHero() { const el = $('#hero'); if (el) el.innerHTML = heroHtml(); }
 
 function timelineHtml() {
@@ -3694,7 +3885,7 @@ function publicContent() {
   const published = S.publication?.published;
   return published && typeof published === 'object'
     ? { rosters: Object.assign({home:'',away:''}, published.rosters || {}), convocati: published.convocati || '' }
-    : { rosters: S.rosters, convocati: S.convocati || '' };
+    : { rosters: {home:'',away:''}, convocati: '' };
 }
 function localDateTimeValue(value) {
   if (!value) return '';
@@ -3717,8 +3908,10 @@ function capturePublicationContent() {
 function saveContentDraft() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
   const content = capturePublicationContent();
-  S.publication.pending = { status: 'draft', scheduledAt: null, content, savedAt: new Date().toISOString() };
-  commit(true); renderMain(); toast('Bozza salvata: non è ancora visibile al pubblico');
+  // Salvare una modifica non annulla una programmazione: per quello c'è il pulsante di annullamento.
+  const scheduled = S.publication.pending?.status === 'scheduled' ? S.publication.pending : null;
+  S.publication.pending = { status: scheduled ? 'scheduled' : 'draft', scheduledAt: scheduled ? scheduled.scheduledAt : null, content, savedAt: new Date().toISOString() };
+  commit(true); renderMain(); toast(scheduled ? 'Contenuto programmato aggiornato: l’orario di pubblicazione resta invariato' : 'Bozza salvata: non è ancora visibile al pubblico');
 }
 function scheduleContentPublication() {
   if (!CAN_EDIT) { toast('Accesso amministratore necessario'); return; }
@@ -3834,10 +4027,10 @@ function mvpPublicHtml() {
 }
 
 
-async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) el.src = await cardUrl(vi.mv); }
+async function fillMvpImg() { const el = $('#mvpImg'), vi = voteInfo(); if (el && vi.mv) { beginSponsorGraphicForOutput(); el.src = await cardUrl(vi.mv); } }
 let graphicId = null;
 async function openGraphic(id) {
-  beginSponsorGraphic();
+  beginSponsorGraphicForOutput();
   const ev = S.events.find(e => e.id === id); if (!ev || !CARD_TYPES.includes(ev.type)) return;
   L.editorEventId=id;
   graphicId = id;
@@ -4427,6 +4620,7 @@ async function approveMatchResultRevision() {
   toast('Revisione ' + edition.revision + ' approvata. Nessuna pubblicazione social è stata avviata.');
 }
 async function openMatchResult() {
+  beginSponsorGraphicForOutput();
   const dlg = $('#graphicDlg');
   releaseMatchResultPreviewUrl();
   if (!dlg.dataset.postmatchCleanupBound) {
@@ -4532,7 +4726,7 @@ function publicHtml() {
   if (S.clock?.phase === 'ft' || voteInfo().state !== 'none') tabs.push(['mvp', 'MVP']);
   const t = tabs.some(x => x[0] === L.tab) ? L.tab : 'cron';
   return `<nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${t === k}">${l}</button>`).join('')}</nav>` +
-    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? scorersHtml() : statsHtml());
+    (t === 'cron' ? timelineHtml() : t === 'form' ? lineupsHtml() : t === 'convocati' ? convocatiPublicHtml() : t === 'mvp' ? mvpPublicHtml() : t === 'standings' ? standingsHtml() : t === 'archive' ? archiveHtml() : t === 'archiveForms' ? archivedFormationsHtml() : t === 'season' ? seasonalStatsHtml() : t === 'scorers' ? archiveScorersHtml() : statsHtml());
 }
 
 /* ================= regia ================= */
@@ -4549,6 +4743,8 @@ function feedHtml(list) {
   }).join('');
 }
 let editId = null, armedDel = null, editingEventId = null;
+// Solo gli eventi decisivi hanno un simbolo: la linea resta leggibile anche su smartphone.
+const TIMELINE_MARK = { goal: '⚽', yellow: '🟨', red: '🟥', sub: '🔄' };
 function matchTimelineHtml() {
   const actions = S.events
     .filter(e => !PHASE_EV[e.type] && e.type !== 'mvp' && ['home', 'away'].includes(e.team) && e.min !== '' && e.min != null)
@@ -4572,7 +4768,7 @@ function matchTimelineHtml() {
     const stack = stacks.get(key) || 0;
     stacks.set(key, stack + 1);
     const position = Math.max(0, Math.min(100, minute / maxMinute * 100));
-    return `<span class="match-tl-marker ${side}" style="--x:${position}%;--stack:${stack}" title="${esc(String(e.min))}′"><i></i><b>${esc(String(e.min))}′</b></span>`;
+    return `<span class="match-tl-marker ${side}" style="--x:${position}%;--stack:${stack}" title="${esc(String(e.min))}′ · ${esc(describe(e, scoreAt(S.events.indexOf(e))).title)}"><i></i><b>${TIMELINE_MARK[e.type] || ''}${esc(String(e.min))}′</b></span>`;
   }).join('');
   const scale = ticks.map(minute => `<span class="match-tl-tick ${minute === 45 ? 'half' : ''}" style="--x:${minute / maxMinute * 100}%"><i></i><b>${minute}′</b></span>`).join('');
   return `<div class="match-timeline" role="img" aria-label="Timeline delle azioni: Sant'Albino sopra la linea, avversari sotto">
@@ -4963,9 +5159,11 @@ function graphicEditorHtml() {
     <p class="small muted">Le modifiche al testo e alla posizione vengono salvate nel template della tipologia selezionata e non nel singolo evento.</p></div>`;
 }
 function editorSponsorSlot(layout,w,h) {
-  const sizes={event:{w:360,h:150,right:34,bottom:190},phase:{w:360,h:150,right:34,bottom:185},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
-  const s=sizes[layout]||sizes.event;return{x:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
-}async function renderEditorCanvas(layout) {
+  // Stesse misure di addSponsorToGraphic: il riquadro dell'Editor coincide con l'immagine finale.
+  const sizes={event:{w:520,h:78,bottom:104,center:true},phase:{w:520,h:78,bottom:104,center:true},formation:{w:470,h:130,right:42,bottom:12},matchday:{w:430,h:100,right:42,bottom:8},convocati:{w:430,h:140,right:42,bottom:1015}};
+  const s=sizes[layout]||sizes.event;return{x:s.center?(w-s.w)/2:w-s.w-s.right,y:h-s.h-s.bottom,w:s.w,h:s.h};
+}
+async function renderEditorCanvas(layout) {
   if(layout==='matchday')return renderMatchDayGraphic();
   if(layout==='convocati')return renderConvocatiGraphic();
   if(layout==='formation')return renderFormationGraphic();
@@ -4982,7 +5180,8 @@ async function openGraphicEditorPreview() {
   const layout=['event','phase','formation','matchday','convocati'].includes(L.editorTemplate)?L.editorTemplate:'event';
   host.innerHTML='<p class="small muted">Genero l’anteprima…</p>';
   try{
-    beginSponsorGraphic();
+    beginSponsorGraphic(true);
+    reuseSponsorGraphicOnce = true;
     const canvas=await renderEditorCanvas(layout),url=canvas.toDataURL('image/jpeg',.9),slot=editorSponsorSlot(layout,canvas.width,canvas.height);
     const cfg=graphicEditorConfig(),key=L.editorTemplate||'global',style=key==='global'?cfg.global:Object.assign({},cfg.global,cfg.templates[key]||{}),pos=Object.assign({x:0,y:0,scale:1},style.sponsorPos||{});
     const ev=layout==='event'?L.editorEventTemplate:null,items=lastGraphicTextItems||[];
@@ -5114,11 +5313,29 @@ function closeSheet() {
     if (history.state?.santaliveSheet) history.back();
   }
 }
-window.addEventListener('popstate', () => {
-  if (!sheetHistoryEntry) return;
-  sheetHistoryEntry = false;
-  const sh = $('#sheet');
-  if (sh?.open) sh.close();
+// Indietro del browser/Android: prima chiude la finestra evento, poi torna alla sezione precedente.
+let restoringSection = false;
+function recordSection(key, value) {
+  if (restoringSection || L[key] === value) return;
+  const current = { tab: L.tab, rtab: L.rtab };
+  history.replaceState({ santaliveSection: current }, '', location.href);
+  history.pushState({ santaliveSection: { ...current, [key]: value } }, '', location.href);
+}
+window.addEventListener('popstate', e => {
+  if (sheetHistoryEntry) {
+    sheetHistoryEntry = false;
+    const sh = $('#sheet');
+    if (sh?.open) sh.close();
+    return;
+  }
+  const section = e.state?.santaliveSection;
+  if (!section) return;
+  restoringSection = true;
+  // Il click sul pulsante riusa i caricamenti propri della sezione.
+  for (const [key, attr] of [['tab', 'data-tab'], ['rtab', 'data-rtab']]) {
+    if (section[key] && L[key] !== section[key]) document.querySelector(`[${attr}="${section[key]}"]`)?.click();
+  }
+  restoringSection = false;
 });
 function openSheet(type) {
   editingEventId = null;
@@ -5132,6 +5349,27 @@ function editEvent(id) {
   draft = Object.assign({img: one.img || '', raw: !!one.raw, assist:'', out:'', inn:'', possibleSubs:'', note:'', shotZone:'', freeKickZone:'', cornerSide:'', foulInArea:false, handball:false}, ev);
   draft.img = one.img || ''; draft.raw = !!one.raw; draft.min = String(ev.min ?? '');
   textManual = false; renderSheet(); $('#sheet').showModal(); pushSheetHistory();
+}
+const sameName = (a, b) => String(a || '').trim().toLocaleLowerCase('it') === String(b || '').trim().toLocaleLowerCase('it');
+// Chi è in campo e chi è uscito, ricavato da distinta e cambi già registrati.
+function substitutionState(side, excludeId) {
+  const roster = parseRoster(S.rosters[side]);
+  let onPitch = roster.filter(p => p.starter).map(p => p.name), bench = roster.filter(p => !p.starter).map(p => p.name);
+  const gone = [];
+  const limit = excludeId ? S.events.findIndex(e => e.id === excludeId) : -1;
+  (limit >= 0 ? S.events.slice(0, limit) : S.events).forEach(e => {
+    if (e.type !== 'sub' || e.team !== side) return;
+    if (e.out) { onPitch = onPitch.filter(n => !sameName(n, e.out)); gone.push(e.out); }
+    if (e.inn) { bench = bench.filter(n => !sameName(n, e.inn)); onPitch.push(e.inn); }
+  });
+  return { onPitch, bench, gone };
+}
+function substitutionError(ev, excludeId) {
+  const { onPitch, gone } = substitutionState(ev.team, excludeId);
+  if (ev.out && ev.inn && sameName(ev.out, ev.inn)) return 'Chi esce e chi entra devono essere due giocatori diversi';
+  if (ev.inn && onPitch.some(n => sameName(n, ev.inn))) return ev.inn + ' risulta già in campo';
+  if (ev.out && gone.some(n => sameName(n, ev.out)) && !onPitch.some(n => sameName(n, ev.out))) return ev.out + ' risulta già sostituito';
+  return '';
 }
 function draftEvent() {
   const d = draft, t = d.team;
@@ -5155,7 +5393,12 @@ function renderSheet() {
     case 'offside': fields = P('player', 'Giocatore (facoltativo)'); break;
     case 'red': fields = P('player', 'Giocatore') + SEL('kind', 'Motivo', [['diretto', 'Rosso diretto'], ['doppio', 'Doppio giallo']]); break;
     case 'miss': fields = P('player', 'Giocatore') + SEL('kind', 'Cosa è successo', MISS_KINDS); break;
-    case 'sub': fields = P('out', 'Esce') + P('inn', 'Entra') + P('possibleSubs', 'Altre possibili sostituzioni (facoltativo)', 'Nomi separati da virgola'); break;
+    case 'sub': {
+      const st = substitutionState(d.team, editingEventId);
+      const list = (id, names) => `<datalist id="${id}">${names.map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist>`;
+      fields = P('out', 'Esce').replace(`list="${dl}"`, 'list="dl-sub-out"') + P('inn', 'Entra').replace(`list="${dl}"`, 'list="dl-sub-in"') + P('possibleSubs', 'Altre possibili sostituzioni (facoltativo)', 'Nomi separati da virgola') + list('dl-sub-out', st.onPitch) + list('dl-sub-in', st.bench);
+      break;
+    }
     case 'note': fields = `<label class="f"><span>Testo</span><textarea data-d="note" rows="3" placeholder="Es. Recupero di 3 minuti">${esc(d.note)}</textarea></label>`; break;
   }
   const teamHint = d.type === 'freekick' ? '<p class="small muted">Seleziona la squadra che ha subito il fallo.</p>' : d.type === 'corner' ? '<p class="small muted">Seleziona la squadra che ha guadagnato il calcio d’angolo.</p>' : '';
@@ -5235,7 +5478,21 @@ function topHtml() {
   const banner = TEST_MODE ? '<div class="test-banner" role="status">🧪 MODALITÀ PROVA · DATI SIMULATI · NON UFFICIALI</div>' : '';
   return `${banner}<div class="top">${brandHtml}<div class="top-actions-desktop">${controls}</div>${mobileControls}</div>`;
 }
-function renderMain() { if (CAN_EDIT && L.mode === 'regia') captureEditorialDraftForm(); const el = $('#main'); if (el) { el.innerHTML = CAN_EDIT && L.mode === 'regia' ? regiaHtml() : publicHtml(); if (CAN_EDIT && L.mode === 'regia' && L.rtab === 'editorial') restoreEditorialDraftForm(); lastVote = voteInfo().state; tickClock(); fillMvpImg(); } }
+function renderMain() {
+  const controlRoom = CAN_EDIT && L.mode === 'regia';
+  if (controlRoom) captureEditorialDraftForm();
+  const hero = $('#hero');
+  const archiveView = controlRoom ? L.rtab === 'archive' : ['archive','archiveForms'].includes(L.tab);
+  if (hero) hero.hidden = archiveView;
+  const el = $('#main');
+  if (el) {
+    setMainHtml(el, controlRoom ? regiaHtml() : publicHtml());
+    if (controlRoom && L.rtab === 'editorial') restoreEditorialDraftForm();
+    lastVote = voteInfo().state;
+    tickClock();
+    fillMvpImg();
+  }
+}
 let lastVote = 'none';
 function renderAll() {
   if (TEST_MODE) { L.tab = 'cron'; L.rtab = 'live'; }
@@ -5259,11 +5516,11 @@ document.addEventListener('click', async e => {
     return;
   }
   const voteBtn = t.closest('[data-vote-candidate]'); if (voteBtn) { await castMvpVote(voteBtn.dataset.voteCandidate); return; }
-  const tab = t.closest('[data-tab]'); if (tab) { L.tab = tab.dataset.tab; saveL(); renderMain(); if (['archive','season','scorers','archiveForms'].includes(L.tab)) void loadMatchArchive(true); return; }
+  const tab = t.closest('[data-tab]'); if (tab) { recordSection('tab', tab.dataset.tab); L.tab = tab.dataset.tab; saveL(); renderMain(); if (['archive','season','scorers','archiveForms'].includes(L.tab)) void loadMatchArchive(true); return; }
   const seasonBtn = t.closest('[data-season]'); if (seasonBtn) { L.season = seasonBtn.dataset.season; saveL(); renderMain(); return; }
   const archiveSeasonBtn = t.closest('[data-archive-season]'); if (archiveSeasonBtn) { L.archiveFormationSeason = archiveSeasonBtn.dataset.archiveSeason; L.archiveFormationId = ''; saveL(); renderMain(); return; }
   const archiveMatchBtn = t.closest('[data-archive-match]'); if (archiveMatchBtn) { L.archiveFormationId = archiveMatchBtn.dataset.archiveMatch; saveL(); renderMain(); return; }
-  const rtab = t.closest('[data-rtab]'); if (rtab) { L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); if (L.rtab === 'editorial') { editorialQueueState.loading = true; renderMain(); void loadEditorialQueue().then(() => { if (L.rtab === 'editorial') renderMain(); }); } return; }
+  const rtab = t.closest('[data-rtab]'); if (rtab) { recordSection('rtab', rtab.dataset.rtab); L.rtab = rtab.dataset.rtab; saveL(); renderMain(); if (L.rtab === 'archive') void loadRegiaArchivePage(0); if (L.rtab === 'analytics') void loadAnalytics(); if (L.rtab === 'editorial') { editorialQueueState.loading = true; renderMain(); void loadEditorialQueue().then(() => { if (L.rtab === 'editorial') renderMain(); }); } return; }
   const q = t.closest('[data-q]'); if (q) { openSheet(q.dataset.q); return; }
   const a = t.closest('[data-a]'); if (!a) return;
   const act = a.dataset.a, row = a.closest('.ev'), ev = row ? S.events.find(x => x.id === row.dataset.id) : null;
@@ -5402,6 +5659,7 @@ document.addEventListener('click', async e => {
       const ev2 = S.events.find(x => x.id === postId); if (!ev2) break;
       const so = socialOf(postId); so.text = $('#postText').value; saveL();
       try {
+        beginSponsorGraphicForOutput();
         const blob = await cardBlob(ev2);
         const file = new File([blob], 'santalbino-evento.jpg', { type: 'image/jpeg' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -5418,7 +5676,7 @@ document.addEventListener('click', async e => {
       }
       break;
     }
-    case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
+    case 'saveimg': { const ev2 = S.events.find(x => x.id === postId); beginSponsorGraphicForOutput(); saveBlob(await cardBlob(ev2), `evento-${(ev2.min || 'x').replace('+', 'p')}-${ev2.type}.jpg`); break; }
     case 'markdone': { const so = socialOf(postId); so.status = so.status === 'pubblicato' ? 'bozza' : 'pubblicato'; saveL(); $('#postDlg').close(); renderMain(); break; }
     case 'copyall': if (S.events.length) copyText(S.events.map(x => evText(x).replace(/\n\n#\S+$/, '')).join('\n\n')); break;
     case 'export': saveBlob(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `cronaca-${S.match.date || 'partita'}.json`); break;
@@ -5500,11 +5758,8 @@ async function discardDraftAndReloadRemote() {
   try { localStorage.removeItem(DK); } catch (e) {}
   const { data, error } = await db.from(STATE_TABLE).select('state').eq('id',1).maybeSingle();
   if (error || !data?.state) { setSync('error','impossibile ricaricare lo stato online'); return; }
-  S = mergeState(data.state);
-  remoteRev = Number(S.rev || 0);
-  L.evOne = Object.assign({}, L.evOne, S.media?.evOne || {});
-  L.evImg = Object.assign({}, L.evImg, S.media?.evImg || {});
-  L.evImgRaw = Object.assign({}, L.evImgRaw, S.media?.evImgRaw || {});
+  clearTimeout(pubTimer); pendingSync = false; publishPending = false;
+  applyRemoteState(data.state);
   setSync('ok'); renderHero(); updDatalists(); renderMain();
 }
 function validateImportedState(payload) {
@@ -5518,7 +5773,7 @@ function validateImportedState(payload) {
   if ((d.events || []).length > 1000) throw new Error('Il file contiene troppi eventi.');
   return d;
 }
-function resetMatch() { S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.socialDrafts = { matchDay: '', convocati: '' }; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
+function resetMatch() { try { localStorage.removeItem(DK); } catch (e) {} S.events = []; S.match.chronicleDraft = ''; S.match.chroniclePublished = ''; S.match.chroniclePublishedAt = ''; S.match.chronicleNeedsReview = false; S.match.pollId = uid(); S.clock = { phase: 'pre', t0: 0, finishedAt: 0 }; S.match.attackDirectionFirst = ''; S.match.attackDirectionCurrent = ''; S.rosters = { home: '', away: '' }; S.convocati = ''; S.match.date = ''; S.match.time = ''; S.mvp.votes = {}; S.mvp.link = ''; S.mvp.candidateKeys = []; S.mvp.candidatePlayers = []; S.socialDrafts = { matchDay: '', convocati: '' }; L.evOne = {}; L.evOneOrder = []; if (S.media) S.media.evOne = {}; clearMatchLocalState(); renderedMatchId = null; S.publication = { published: { rosters: { home: '', away: '' }, convocati: '' }, pending: null, publishedAt: '' }; L.social = {}; currentArchived = false; saveL(); commit(true); renderMain(); }
 function saveMatch() {
   const g = id => $(id).value.trim();
 
@@ -5644,6 +5899,7 @@ function wireSheet() {
       if (draft?.type === 'shot' && !draft.shotZone) { toast('Seleziona prima il punto del tiro sulla porta'); return; }
       if (draft?.type === 'freekick' && !draft.freeKickZone) { toast('Seleziona prima la posizione del calcio di punizione'); return; }
       if (draft?.type === 'corner' && !draft.cornerSide) { toast('Seleziona prima il lato del calcio d’angolo'); return; }
+      if (draft?.type === 'sub') { const problem = substitutionError(draftEvent(), editingEventId); if (problem) { toast(problem); return; } }
       const ev = draftEvent(), txt = $('#fText')?.value.trim() || '';
       if (editingEventId) {
         const index = S.events.findIndex(item => item.id === editingEventId);
@@ -5651,6 +5907,8 @@ function wireSheet() {
         const original = S.events[index], updated = Object.assign({}, original, ev, {id: original.id, ts: original.ts});
         if (ev._img) setEvOne(original.id, ev._img, ev._raw);
         delete updated._img; delete updated._raw;
+        const changed = ['team','kind','min','player','assist','out','inn','possibleSubs','note','shotZone','freeKickZone','cornerSide','foulInArea','handball'].some(k => String(original[k] || '') !== String(updated[k] || ''));
+        if (changed && L.social[original.id]?.text) { L.social[original.id].text = ''; saveL(); }
         S.events[index] = updated; S.match.chronicleDraft = ''; if (S.match.chroniclePublished) S.match.chronicleNeedsReview = true;
         editingEventId = null; closeSheet(); commit(true); renderMain(); toast('Evento aggiornato: risultato, timeline e cronaca saranno ricalcolati');
       } else {
@@ -5893,6 +6151,7 @@ async function resetOcrWorker() {
 
 async function readLineup(side, stat) {
   if (!photos[side]) { toast('Prima scegli la foto'); return; }
+  const matchId = currentMatchId(), photo = photos[side];
   const button = document.querySelector('[data-a="readlist"][data-s="' + side + '"]');
   if (button) { button.disabled = true; button.textContent = 'Lettura in corso…'; }
   let releaseQueue;
@@ -5957,6 +6216,7 @@ async function readLineup(side, stat) {
     const format = p => (p.num ? p.num + ' ' : '') + p.name;
     const output = starters.map(format);
     if (bench.length) { output.push('---'); bench.forEach(p => output.push(format(p))); }
+    if (matchId !== currentMatchId() || photos[side] !== photo) { toast('Lettura distinta scartata: partita o foto cambiata nel frattempo.'); return; }
     const field = document.querySelector('[data-roster="' + side + '"]');
     if (!field) throw new Error('Campo formazione non trovato.');
     field.value = output.join('\n');

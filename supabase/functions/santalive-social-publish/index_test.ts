@@ -1,4 +1,4 @@
-import { classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
+import { classifyInstagramContainerStatus, classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
 
 Deno.test("explicit Meta rejection is retryable", () => {
   const error = new MetaRequestError("Meta HTTP 400: rejected", "failed_retryable");
@@ -23,6 +23,24 @@ Deno.test("an ambiguous Meta outcome is never automatically retryable", () => {
   }
 });
 
+Deno.test("Instagram container must be FINISHED before media_publish", () => {
+  if (classifyInstagramContainerStatus("FINISHED") !== "ready") {
+    throw new Error("FINISHED container should be publishable");
+  }
+  if (classifyInstagramContainerStatus(undefined) !== "pending") {
+    throw new Error("Missing status must never be treated as ready");
+  }
+  if (classifyInstagramContainerStatus("IN_PROGRESS") !== "pending") {
+    throw new Error("IN_PROGRESS container must continue polling");
+  }
+  if (classifyInstagramContainerStatus("ERROR") !== "retry_new") {
+    throw new Error("ERROR container should be replaced on retry");
+  }
+  if (classifyInstagramContainerStatus("EXPIRED") !== "retry_new") {
+    throw new Error("EXPIRED container should be replaced on retry");
+  }
+});
+
 Deno.test("Graph POST uses injected transport and never needs a Facebook test page", async () => {
   let calls = 0;
   const fakeFetch: typeof fetch = async (_input, init) => {
@@ -36,6 +54,46 @@ Deno.test("Graph POST uses injected transport and never needs a Facebook test pa
   const result = await graphPost("mock/photos", { caption: "test" }, fakeFetch);
   if (result.id !== "mock-post-123" || calls !== 1) {
     throw new Error("Injected Meta transport was not used exactly once");
+  }
+});
+
+Deno.test("Graph POST sends access token only in Authorization header", async () => {
+  const token = "mock-secret-token";
+  let requestUrl = "";
+  let requestBody = "";
+  let authorization = "";
+  const fakeFetch: typeof fetch = async (input, init) => {
+    requestUrl = String(input);
+    requestBody = String(init?.body || "");
+    authorization = new Headers(init?.headers).get("authorization") || "";
+    return new Response(JSON.stringify({ id: "mock-post" }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  };
+  await graphPost("mock/photos", { caption: "test", access_token: token }, fakeFetch);
+  if (requestUrl.includes(token) || requestBody.includes(token)) {
+    throw new Error("Access token leaked into Graph POST URL or body");
+  }
+  if (authorization !== `Bearer ${token}`) {
+    throw new Error("Graph POST did not send the Bearer authorization header");
+  }
+});
+
+Deno.test("Graph GET sends access token only in Authorization header", async () => {
+  const token = "mock-secret-token";
+  let requestUrl = "";
+  let authorization = "";
+  const fakeFetch: typeof fetch = async (input, init) => {
+    requestUrl = String(input);
+    authorization = new Headers(init?.headers).get("authorization") || "";
+    return new Response(JSON.stringify({ id: "mock-page" }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  };
+  await graphGet("mock/page", { fields: "id", access_token: token }, fakeFetch);
+  if (requestUrl.includes(token)) throw new Error("Access token leaked into Graph GET URL");
+  if (authorization !== `Bearer ${token}`) {
+    throw new Error("Graph GET did not send the Bearer authorization header");
   }
 });
 
@@ -178,5 +236,11 @@ Deno.test("Graph GET server error is retryable and does not become an unknown pu
     if (classifyMetaFailure(error) !== "failed_retryable") {
       throw new Error("A read-only 5xx must remain safely retryable");
     }
+  }
+});
+
+Deno.test("an already PUBLISHED Instagram container is never republished", () => {
+  if (classifyInstagramContainerStatus("PUBLISHED") !== "reconcile") {
+    throw new Error("PUBLISHED container must require reconciliation");
   }
 });
