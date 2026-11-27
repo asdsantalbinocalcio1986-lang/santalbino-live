@@ -47,8 +47,10 @@ assert.match(source, /editorialDefaultLogicalKey\(t\.value\)/,
   'Changing the editorial content type must update the revision key.');
 assert.match(source, /Per Instagram è necessario un file JPEG/,
   'Instagram uploads must be restricted to JPEG images.');
-assert.match(source, /function resetMatch\(\)[\s\S]*?S\.publication = \{ published: \{ rosters: \{ home: '', away: '' \}, convocati: '' \}, pending: null, publishedAt: '' \}/,
-  'Starting a new match must clear previously published convocati/formations and cancel any pending publication.');
+assert.match(source, /function resetMatch\(\)[\s\S]*?S = defaults\(\);[\s\S]*?S\.logos\.home = clubLogo;[\s\S]*?S\.logos\.away = ''[\s\S]*?S\.socialDrafts = \{ matchDay: '', convocati: '' \}/,
+  'Starting a new match must reset all match data and social drafts while preserving only the club logo.');
+assert.match(source, /publication: \{ published: null, pending: null, publishedAt: '' \}/,
+  'A new match must start with no published content and no pending publication.');
 assert.match(source, /Apri scheda completa · cronaca, convocati e formazioni/);
 assert.match(source, /state\.publication\?\.published\?\.convocati/);
 assert.match(source, /state\.publication\?\.published\?\.rosters/);
