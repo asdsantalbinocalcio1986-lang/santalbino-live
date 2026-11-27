@@ -4598,9 +4598,23 @@ function saveMatch() {
   }
 
   if (!S.match.pollId) S.match.pollId = uid();
-  S.match.home = g('#s-home') || defaults().match.home;
-  S.match.away = g('#s-away');
-  S.match.ourSide = $('#s-our').value;
+  const clubName = defaults().match.home;
+  let homeName = g('#s-home') || clubName;
+  let awayName = g('#s-away');
+  const ourSide = $('#s-our').value;
+  const isClub = value => String(value || '').trim().toLocaleLowerCase('it') === String(clubName).trim().toLocaleLowerCase('it');
+  // Keep the Sant'Albino name and crest on the side selected for this match.
+  // Swap only when the club is currently on the opposite side, so repeated saves are idempotent.
+  if (ourSide === 'away' && isClub(homeName) && !isClub(awayName)) {
+    [homeName, awayName] = [awayName, homeName];
+    [S.logos.home, S.logos.away] = [S.logos.away, S.logos.home];
+  } else if (ourSide === 'home' && isClub(awayName) && !isClub(homeName)) {
+    [homeName, awayName] = [awayName, homeName];
+    [S.logos.home, S.logos.away] = [S.logos.away, S.logos.home];
+  }
+  S.match.home = homeName;
+  S.match.away = awayName;
+  S.match.ourSide = ourSide;
   S.match.comp = g('#s-comp');
   S.match.venue = g('#s-venue');
   S.match.date = $('#s-date').value;
