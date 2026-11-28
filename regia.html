@@ -1436,7 +1436,7 @@ S.socialDrafts = Object.assign({ matchDay: '', convocati: '' }, S.socialDrafts |
 /* ================= stato locale (solo questo dispositivo) ================= */
 const LK = TEST_MODE ? 'cronaca-live-test-local-v1' : 'cronaca-live-local-v2', DK = TEST_MODE ? 'cronaca-live-test-draft-v1' : 'cronaca-live-draft-v2';
 const CARD_TYPES = ['goal', 'foul', 'yellow', 'red', 'injury', 'sub', 'mvp', 'kickoff', 'halftime', 'secondhalf', 'fulltime'];
-const SOCIAL_AUTO_EVENT_TYPES = ['goal', 'red', 'halftime', 'fulltime'];
+const SOCIAL_AUTO_EVENT_TYPES = ['kickoff', 'goal', 'red', 'halftime', 'fulltime'];
 let L = { tab: 'cron', rtab: 'live', mode: '', fbUrl: '', evImg: {}, evImgRaw: {}, social: {}, evOne: {}, evOneOrder: [] };
 try { Object.assign(L, JSON.parse(localStorage.getItem(LK) || '{}')); } catch (e) {}
 // Ogni apertura dell'app riparte dalla schermata iniziale, senza alterare gli altri dati locali.
@@ -2598,7 +2598,7 @@ async function loadSocialPublicationLog() {
   if (!data?.length) { box.textContent = 'Nessuna pubblicazione automatica registrata.'; return; }
   box.innerHTML = data.map(item => {
     const when = new Date(item.created_at).toLocaleString('it-IT');
-    const title = ({goal:'Gol',red:'Espulsione',halftime:'Intervallo',fulltime:'Fine partita'})[item.event_type] || item.event_type;
+    const title = ({kickoff:'Calcio d’inizio',goal:'Gol',red:'Espulsione',halftime:'Intervallo',fulltime:'Fine partita'})[item.event_type] || item.event_type;
     const fb = 'Facebook: ' + item.facebook_status + (item.facebook_error ? ' · ' + item.facebook_error : '');
     const ig = 'Instagram: ' + item.instagram_status + (item.instagram_error ? ' · ' + item.instagram_error : '');
     const needsReconciliation = item.overall_status === 'reconciliation_required' ||
@@ -5308,7 +5308,7 @@ function settingsHtml() {
     <p class="small muted" style="margin-top:-4px">Non serve nessun token: ogni evento si pubblica con “Pubblica”, che copia il testo, salva l’immagine e apre la tua pagina.</p><button class="btn" data-a="savefb">Salva link</button></div>
 
   <div class="card"><h2>Pubblicazione automatica Facebook e Instagram</h2>
-    <p class="small muted">Pubblica senza passaggi manuali gol, espulsioni, intervallo e fine partita. Le immagini vengono generate dalla grafica SANTA Live. La Partita di prova non invia mai contenuti.</p>
+    <p class="small muted">Pubblica senza passaggi manuali calcio d’inizio, gol, espulsioni, intervallo e fine partita. Le immagini vengono generate dalla grafica SANTA Live. La Partita di prova non invia mai contenuti.</p>
     <label class="check"><input type="checkbox" id="s-social-enabled" ${sp.enabled ? "checked" : ""}> Attiva pubblicazione automatica</label>
     <label class="check"><input type="checkbox" id="s-social-facebook" ${sp.facebook ? "checked" : ""}> Facebook</label>
     <label class="check"><input type="checkbox" id="s-social-instagram" ${sp.instagram ? "checked" : ""}> Instagram</label>
