@@ -11,7 +11,7 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-const allowedEvents = new Set(["goal", "red", "halftime", "fulltime"]);
+export const allowedEvents = new Set(["kickoff", "goal", "red", "halftime", "fulltime"]);
 const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v27.0";
 const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
