@@ -185,6 +185,7 @@ assert.match(regia, /db\.functions\.invoke\(['"]santalive-social-publish['"]/, '
 assert.match(regia, /case ['"]retrySocialPublication['"]/, 'Il registro deve consentire un nuovo tentativo senza ripubblicare i canali già riusciti');
 assert.match(socialFunction, /auth\.getUser\(bearer\)/, 'La Edge Function deve verificare la sessione autenticata');
 assert.match(socialFunction, /META_PUBLISH_ENABLED/, 'La pubblicazione deve avere un interruttore di sicurezza lato server');
+assert.match(socialFunction, /allowedEvents = new Set\(\["kickoff", "goal", "red", "halftime", "fulltime"\]\)/, 'La Edge Function deve accettare gli stessi eventi automatici della regia, compreso il calcio d’inizio');
 assert.match(socialFunction, /if \(!publishingEnabled\)[\s\S]*?403/, 'La Edge Function deve rifiutare ogni pubblicazione finché il blocco server è attivo');
 assert.match(socialFunction, /connected_instagram_account/, 'La verifica Meta deve leggere l’account Instagram collegato alla Pagina');
 assert.match(socialFunction, /linkedInstagramId !== instagramId/, 'La verifica Meta deve confrontare gli ID di Pagina e account Instagram');
