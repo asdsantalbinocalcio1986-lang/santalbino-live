@@ -1,4 +1,12 @@
-import { classifyInstagramContainerStatus, classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
+import { allowedEvents, classifyInstagramContainerStatus, classifyMetaApiError, classifyMetaFailure, graphGet, graphPost, MetaRequestError, safeError } from "./index.ts";
+
+Deno.test("publisher accepts exactly the approved automatic event types, including kickoff", () => {
+  const expected = ["kickoff", "goal", "red", "halftime", "fulltime"];
+  const actual = [...allowedEvents].sort();
+  if (JSON.stringify(actual) !== JSON.stringify([...expected].sort())) {
+    throw new Error("Publisher event allowlist does not match the approved event types");
+  }
+});
 
 Deno.test("explicit Meta rejection is retryable", () => {
   const error = new MetaRequestError("Meta HTTP 400: rejected", "failed_retryable");
